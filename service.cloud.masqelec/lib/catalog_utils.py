@@ -26,30 +26,21 @@ from lib import crypto_utils
 # ------------------------------
 # Config (preferente: constants.py)
 # ------------------------------
-try:
-    from lib.constants import (
-        OWNER,
-        REPO,
-        BRANCH,
-        API_BASE,
-        GITHUB_TOKEN_B64,
-        GITHUB_FEISTEL_ROUNDS,
-        SRC_DIR,
-        FILES,  # list[ (fname, dst_path) ]
-    )
-except Exception:
-    # Fallbacks conservadores: si falta algo, fallará con logs claros.
-    OWNER = "masQelec"
-    REPO = "cloud.masQelec"
-    BRANCH = "master"
-    API_BASE = f"https://api.github.com/repos/{OWNER}/{REPO}/contents"
-    GITHUB_TOKEN_B64 = "rwfU5iQ5OjtJt7ihpPMwbIu3fP6OIAAAAChnaHBfOFQ0OWlsT0tMWEtDQTQ="
-    GITHUB_FEISTEL_ROUNDS = 8
-    SRC_DIR = "/storage/.catalog"
-    FILES = [
-        ("catalog.zip", "catalog/catalog.zip"),
-        ("catalog.version", "catalog/catalog.version"),
-    ]
+from lib import constants
+
+OWNER = constants.CLOUD_OWNER
+REPO = constants.CLOUD_REPO
+BRANCH = constants.CLOUD_BRANCH
+API_BASE = f"https://api.github.com/repos/{OWNER}/{REPO}/contents"
+
+# Estos valores heredados se mantienen hasta la migración de tokens.
+GITHUB_TOKEN_B64 = getattr(constants, "GITHUB_TOKEN_B64", "rwfU5iQ5OjtJt7ihpPMwbIu3fP6OIAAAAChnaHBfOFQ0OWlsT0tMWEtDQTQ=")
+GITHUB_FEISTEL_ROUNDS = getattr(constants, "GITHUB_FEISTEL_ROUNDS", 8)
+SRC_DIR = getattr(constants, "SRC_DIR", "/storage/.catalog")
+FILES = getattr(constants, "FILES", [
+    ("catalog.zip", "catalog/catalog.zip"),
+    ("catalog.version", "catalog/catalog.version"),
+])
 
 # ------------------------------
 # Token GH (descifrado)
