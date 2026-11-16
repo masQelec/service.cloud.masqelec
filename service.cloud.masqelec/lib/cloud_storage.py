@@ -19,6 +19,7 @@ import gzip
 
 from lib import log_utils
 from lib import utils
+from lib import constants
 
 # ==============================
 # Config red
@@ -271,7 +272,7 @@ def start_cloud_storage():
 
         rclone_conf_path = "/storage/.config/rclone/rclone.conf"
         rclone_dir = os.path.dirname(rclone_conf_path)
-        enc_url = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/rclone/rclone.conf.crypt"
+        enc_url = f"{constants.CLOUD_RAW_BASE}/rclone/rclone.conf.crypt"
 
         if not download_to_file(enc_url, enc_tmp):
             log_utils.write_log("No se pudo descargar rclone.conf.crypt.", "WARNING")
@@ -334,7 +335,7 @@ def start_cloud_storage():
         systemd_dir = "/storage/.config/system.d/"
         os.makedirs(systemd_dir, exist_ok=True)
 
-        base_units_url = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/system.d/"
+        base_units_url = f"{constants.CLOUD_RAW_BASE}/system.d/"
 
         changed_units = []
         for svc in services:
