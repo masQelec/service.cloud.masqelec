@@ -7,6 +7,7 @@ import struct
 import traceback
 
 from lib import log_utils
+from lib.chacha_pure import MAGIC, encrypt_v2, decrypt_v2
 
 def feistel_round(left, right, key):
     f_result = bytearray(b ^ key[i % len(key)] for i, b in enumerate(right))
@@ -22,6 +23,15 @@ def decrypt(data_b64, key, rounds=8):
     try:
         if not key:
             raise ValueError("La clave de descifrado está vacía")
+
+        # Primero el formato autenticado MQC2; la lectura Feistel se conserva
+        # temporalmente para los tokens y configs aún no migrados.
+        if isinstance(data_b64, bytes):
+            marker = data_b64.strip().startswith(MAGIC.encode("ascii"))
+        else:
+            marker = isinstance(data_b64, str) and data_b64.strip().startswith(MAGIC)
+        if marker:
+            return decrypt_v2(data_b64, key)
         decoded = base64.b64decode((data_b64 or "").strip())
 
         if not decoded or (len(decoded) % 2) != 0:
