@@ -15,6 +15,7 @@ import shutil
 import socket
 import re
 import hashlib
+import tempfile
 import gzip
 
 from lib import log_utils
@@ -89,6 +90,8 @@ def _atomic_write_bytes(dst_path: str, data: bytes, mode: int = None):
     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
 
     with open(tmp_out, "wb") as f:
+        if mode is not None:
+            os.fchmod(f.fileno(), mode)
         f.write(data)
         f.flush()
         os.fsync(f.fileno())
@@ -265,9 +268,12 @@ def start_cloud_storage():
         return
 
     enc_tmp = os.path.join(tmp_dir, ".rclone.conf.crypt.tmp")
-    dec_tmp = os.path.join(tmp_dir, ".rclone.conf.plain.tmp")
+    dec_tmp = None
 
     try:
+        # Temporal privado (0600) desde su creación, sin nombre fijo en /tmp.
+        dec_fd, dec_tmp = tempfile.mkstemp(prefix=".masqelec-rclone.", suffix=".tmp", dir=tmp_dir)
+        os.close(dec_fd)
         key = utils.get_key_from_authorized_keys()
 
         rclone_conf_path = "/storage/.config/rclone/rclone.conf"
