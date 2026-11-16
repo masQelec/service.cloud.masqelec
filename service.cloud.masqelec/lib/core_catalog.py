@@ -14,12 +14,13 @@ import urllib.error
 
 from lib import log_utils
 from lib import utils
+from lib import constants
 import xbmc
 
 # ==========================
 # CONFIG
 # ==========================
-RAW_BASE = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/catalog"
+RAW_BASE = f"{constants.CLOUD_RAW_BASE}/catalog"
 
 CATALOG_ROOT = "/storage/"
 EXPORT_DIR   = "/storage/.catalog"
