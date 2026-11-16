@@ -24,14 +24,15 @@ import xbmcvfs
 import xbmcgui
 
 from lib import utils
+from lib import constants
 from lib import log_utils
 from lib import jsonrpc_utils
 from lib import fix_guisettings
 
 
 # ---------- Config ----------
-MASTER_DB_BASE_URL = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/userdata/database.master"
-CLIENT_DB_BASE_URL = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/userdata/database.client"
+MASTER_DB_BASE_URL = f"{constants.CLOUD_RAW_BASE}/userdata/database.master"
+CLIENT_DB_BASE_URL = f"{constants.CLOUD_RAW_BASE}/userdata/database.client"
 
 
 def _get_db_base_url() -> str:
