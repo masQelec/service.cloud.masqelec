@@ -10,6 +10,9 @@ import types
 import unittest
 from unittest import mock
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 SCRIPT = (Path(__file__).resolve().parents[1] / "tools"
           / "rclone_two_mount_real_probe_lab.py")
 spec = importlib.util.spec_from_file_location(
@@ -70,6 +73,88 @@ class TwoMountRealProbeFenceTests(unittest.TestCase):
         with mock.patch.object(lab.os, "scandir",
                                side_effect=PermissionError):
             self.assertTrue(lab.any_rclone_mounts_alive())
+
+    def _simulate_divergent_preflight(self, *, remote_head_drift=False):
+        """Ejercita main completo con MQC2 ficticio y sin red ni montajes."""
+        import base64
+        import json
+        from lib import rclone_token_policy as policy
+        from lib import rclone_two_mount_plan as plan
+        from lib import rclone_two_mount_oauth as coordinator
+        from lib import rclone_two_mount_publish_guard as publisher
+        from lib import rclone_two_mount_verify as verifier
+        from test_rclone_mount_isolation import wrapped_conf
+
+        canonical = wrapped_conf("crypt")
+        remote = canonical.replace(
+            b"refresh-users_library_2", b"fictional-remote-refresh")
+        key = b"K" * 32
+        encrypted = publisher.encode_candidate(remote, key)
+        gh_body = json.dumps({
+            "sha": publisher.git_blob_sha(encrypted),
+            "encoding": "base64",
+            "content": base64.b64encode(encrypted).decode("ascii"),
+        }).encode("utf-8")
+        first_sha, next_sha = "a" * 40, "b" * 40
+        branch_reads = [0]
+
+        def fake_fetch(url):
+            if url.startswith(lab.SOURCE):
+                return b"# local mock, never executed\n"
+            if url == lab.BRANCH_URL:
+                branch_reads[0] += 1
+                sha = (next_sha if remote_head_drift and
+                       branch_reads[0] > 1 else first_sha)
+                return json.dumps({"commit": {"sha": sha}}).encode()
+            if url == lab.CONTENTS_URL.replace(
+                    "?ref=develop", "?ref=" + first_sha):
+                return gh_body
+            raise AssertionError("Unexpected network URL")
+
+        modules = {
+            "lib.rclone_token_policy": policy,
+            "lib.rclone_two_mount_plan": plan,
+            "lib.rclone_two_mount_oauth": coordinator,
+            "lib.rclone_two_mount_publish_guard": publisher,
+            "lib.rclone_two_mount_verify": verifier,
+        }
+        output = io.StringIO()
+        with mock.patch.object(lab, "fetch", side_effect=fake_fetch), \
+             mock.patch.object(lab, "read_key", return_value=key), \
+             mock.patch.object(lab, "read_live_stable",
+                               return_value=canonical) as local_reads, \
+             mock.patch.object(lab, "which_rclone",
+                               side_effect=AssertionError("NO_RCLONE")), \
+             mock.patch.object(lab.importlib, "import_module",
+                               side_effect=lambda name: modules[name]), \
+             mock.patch.object(sys, "argv", ["probe.py", "--preflight"]), \
+             contextlib.redirect_stdout(output):
+            result = lab.main()
+        self.assertEqual(local_reads.call_count, 2)
+        self.assertEqual(branch_reads[0], 2)
+        return result, output.getvalue()
+
+    def test_main_divergent_preflight_blocks_without_secrets(self):
+        code, output = self._simulate_divergent_preflight()
+        self.assertEqual(code, 2)
+        self.assertIn("BASELINE_REFRESH_ONEDRIVE_2=DIFFERENT", output)
+        self.assertIn("BASELINE_REFRESH_ONEDRIVE_1=SAME", output)
+        self.assertIn("GH_BRANCH_COMMIT_STABLE=YES", output)
+        self.assertIn("REAL_OAUTH_PROBE=NOT_EXECUTED", output)
+        self.assertIn("GITHUB_PUBLISH_ALLOWED=NO", output)
+        self.assertIn("LAB_RESULT=BLOCKED_BASELINE_DIVERGED", output)
+        self.assertNotIn("fictional-remote-refresh", output)
+        self.assertNotIn("refresh-users_library", output)
+        self.assertNotIn("one_b", output)
+
+    def test_main_divergent_preflight_refuses_changed_github_branch(self):
+        code, output = self._simulate_divergent_preflight(
+            remote_head_drift=True)
+        self.assertEqual(code, 2)
+        self.assertIn("GH_BRANCH_COMMIT_STABLE=NO", output)
+        self.assertIn("LAB_RESULT=INCONCLUSIVE_GITHUB_UPDATED", output)
+        self.assertNotIn("BASELINE_REFRESH_ONEDRIVE_2", output)
+        self.assertNotIn("LAB_RESULT=BLOCKED_BASELINE_DIVERGED", output)
 
     def test_refresh_report_same_four_accounts_never_prints_tokens(self):
         from lib import rclone_token_policy as policy
