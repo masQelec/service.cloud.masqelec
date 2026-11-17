@@ -134,3 +134,10 @@ Se incorporaron en `develop` los módulos puros `lib/rclone_two_mount_generation
 
 
 **Hallazgos SEC-19/SEC-20:** (1) un lock externo no gobierna al escritor OAuth dentro de rclone legacy; (2) los recibos declarados True no autentican equipos, y un lease vencido no demuestra parada del proceso. Protocolo de flota **no implantado**; no permitir que `dual_fence_lab_only` se conecte a `strict_put` ni se trate como aprobación. Ver [P0-C](OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md).
+
+
+## Aclaración de arquitectura y actualización del addon (17-11-2026)
+
+El operador confirma: MASTER publica el catálogo de biblioteca, los CLIENTES ya reciben versiones del addon y el servicio arranca con el código actualizado. Los .strm apuntan a las **cuatro rutas Kodi existentes** y no requieren que el CLIENTE haga barridos de directorios OneDrive para descubrir archivos. La migración se hace **localmente en el arranque de cada versión definitiva**: leer/preservar credenciales locales, preparar los dos snapshots crypt→OneDrive, y sustituir 4 FUSE por 2 FUSE+4 bind únicamente al tener pruebas de idoneidad y rollback. **No hace falta un coordinador central** para esa migración; la sincronización OAuth entre dispositivos es independiente y sigue bloqueada. El addon todavía no ejecuta el cutover. Ver [ADDON_STARTUP_ROLLOUT_2026-11-17.md](ADDON_STARTUP_ROLLOUT_2026-11-17.md). `startup_decision()` es política pura, no ejecución; GitHub Actions **352/352 OK** (run 44197364926).
+
+**Corrección de prioridad de seguridad:** el bloqueo de refrescos entre equipos no impide por sí mismo reducir los procesos de lectura por dispositivo, siempre que se conserve el token local y no exista sincronización/promoción automática del mismo. Sí seguir exigiendo exclusión de montajes locales durante la sustitución de unidades, reserva/rollback y ausencia de reproducción en ese dispositivo.

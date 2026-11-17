@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **322/322 OK** (17-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **352/352 OK** (17-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 
@@ -17,6 +17,7 @@
 | [Coordinación OAuth entre MASTER y CLIENTES (P0-C)](OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md) | Flota sintética, 322/322 PASS, riesgos de legacy y opciones de arquitectura |
 
 | [Diagnóstico divergencia real OneDrive](PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md) | Evidencia de KodiELEC, causa confirmada y bloqueo de recuperación |
+| [Actualización del addon y migración local](ADDON_STARTUP_ROLLOUT_2026-11-17.md) | Flujo real MASTER/CLIENTES, STRM, 2 FUSE+4 bind, fases y pruebas |
 
 ## Historial de laboratorios (fotos del progreso, no instrucciones de despliegue)
 
@@ -55,3 +56,8 @@ Migración MASTER/CLIENTES:  NO DEPLOY
 ```
 
 **Estado más reciente:** P0-B/P0-D son laboratorios; P0-C/P0-E–H y el preflight coherente siguen bloqueados. Las secciones históricas 228/228 y «preflight pendiente» describen el corte inicial, no el estado vivo. Consultar los apartados finales del handoff.
+
+
+## Aclaración de arquitectura y actualización del addon (17-11-2026)
+
+El operador confirma: MASTER publica el catálogo de biblioteca, los CLIENTES ya reciben versiones del addon y el servicio arranca con el código actualizado. Los .strm apuntan a las **cuatro rutas Kodi existentes** y no requieren que el CLIENTE haga barridos de directorios OneDrive para descubrir archivos. La migración se hace **localmente en el arranque de cada versión definitiva**: leer/preservar credenciales locales, preparar los dos snapshots crypt→OneDrive, y sustituir 4 FUSE por 2 FUSE+4 bind únicamente al tener pruebas de idoneidad y rollback. **No hace falta un coordinador central** para esa migración; la sincronización OAuth entre dispositivos es independiente y sigue bloqueada. El addon todavía no ejecuta el cutover. Ver [ADDON_STARTUP_ROLLOUT_2026-11-17.md](ADDON_STARTUP_ROLLOUT_2026-11-17.md). `startup_decision()` es política pura, no ejecución; GitHub Actions **352/352 OK** (run 44197364926).

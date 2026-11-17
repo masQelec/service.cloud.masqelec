@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 17-11-2026.** GitHub Actions **322/322 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+> **Estado actualizado: 17-11-2026.** GitHub Actions **352/352 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## ¿Qué es?
 
@@ -149,3 +149,7 @@ La suite ampliada quedó en **271/271 OK**, GitHub Actions [run 44194785936](htt
 ### Coordinación OAuth P0-C (laboratorio)
 
 Modelados inventario global, exclusión de legacy/offline/desconocidos, confirmaciones por dispositivo, epochs y coherencia conjunta de las dos OneDrive con la fuente MQC2 (sin publicación). **CI 322/322 OK**. Sin coordinador real o integración con rclone, ninguna prueba demuestra exclusión operativa. Microsoft no invalida automáticamente los refresh antiguos al renovarlos: la divergencia no prueba revocación. [Documento técnico P0-C](service.cloud.masqelec/docs/OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md).
+
+### Actualización del addon y migración local (corrección de arquitectura)
+
+Los CLIENTES reciben actualizaciones del addon y arrancan con el código nuevo. MASTER publica catálogo; CLIENTES reproducen mediante rutas `.strm` idénticas. La versión definitiva preparará en cada dispositivo 2 FUSE + 4 bind a partir de sus credenciales locales, sin coordinador central ni lecturas de directorios para poblar la biblioteca. Nuevo modelo de decisión de arranque y 15 tests; GitHub Actions **352/352 PASS**. **Sin activación**. [Procedimiento](service.cloud.masqelec/docs/ADDON_STARTUP_ROLLOUT_2026-11-17.md).

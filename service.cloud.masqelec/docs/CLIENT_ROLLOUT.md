@@ -1,6 +1,6 @@
 # MASTER y CLIENTES — distribución, coexistencia y migración 2 FUSE
 
-**Estado:** diseño + código de *staging* en `develop`. **NO** existe un actualizador automático operativo del addon para instalar esta arquitectura; no está autorizada ninguna migración de MASTER ni CLIENTES.
+**Estado:** el operador confirma que los CLIENTES ya reciben versiones del addon y lo inician con el código actualizado. **Este repositorio no contiene un instalador de montajes v2**, y no está autorizada ninguna migración. El futuro arranque del addon actualizado es el canal previsto, sin servidor de coordinación.
 
 ## 1. Tres vías de actualización: no mezclarlas
 
@@ -10,7 +10,7 @@
 | **Configuración remota/servicios LEGACY** | `lib/cloud_storage.py` | Obtiene `rclone.conf.crypt`, compara/preserva tokens compatibles, descarga `cloud/develop/system.d/` y puede ejecutar `daemon-reload`/`try-restart`. **No subir allí unidades v2 durante el piloto.** |
 | **Distribución futura de esquema v2** | `lib/rclone_two_mount_rollout.py`, `lib/rclone_two_mount_plan.py` + manifiesto `rollouts/` | Reconoce modelo/versionado, prepara configs/unidades en `/tmp` privado, bloquea activación automática. **No descarga/instala una actualización funcional del addon en los CLIENTES; ese canal falta.** |
 
-La instalación/actualización de ficheros del addon entre dispositivos requiere una vía versionada real que aún no se ha implementado ni verificado en esta fase. No presentar el manifiesto como un instalador.
+**Corrección aportada por el operador:** la actualización del addon en los CLIENTES ya existe y provoca el inicio de la versión nueva. No se ha auditado aquí el mecanismo de distribución, pero **no hace falta inventar uno nuevo ni tratar `updater.py` (actualización del SO) como actualizador del addon**. Lo pendiente es que la versión definitiva del addon ejecute la migración local y reversible.
 
 ## 2. Objetivo final de la transición
 
@@ -114,3 +114,8 @@ Documentación asociada: [ARCHITECTURE_AND_MODES.md](ARCHITECTURE_AND_MODES.md),
 
 
 El rollout v2 no puede convertir un cliente legacy en escritor cooperativo solo mediante un cambio de marcador. `cloud/develop/system.d/` conserva 4 unidades legacy y no debe tocarse; cualquier instalación de coordinación requiere enrolamiento auténtico, pruebas en rutas alternativas y autorización por dispositivo. La migración 2 FUSE+4 bind no es un reemplazo de la coordinación entre equipos.
+
+
+## Aclaración de arquitectura y actualización del addon (17-11-2026)
+
+El operador confirma: MASTER publica el catálogo de biblioteca, los CLIENTES ya reciben versiones del addon y el servicio arranca con el código actualizado. Los .strm apuntan a las **cuatro rutas Kodi existentes** y no requieren que el CLIENTE haga barridos de directorios OneDrive para descubrir archivos. La migración se hace **localmente en el arranque de cada versión definitiva**: leer/preservar credenciales locales, preparar los dos snapshots crypt→OneDrive, y sustituir 4 FUSE por 2 FUSE+4 bind únicamente al tener pruebas de idoneidad y rollback. **No hace falta un coordinador central** para esa migración; la sincronización OAuth entre dispositivos es independiente y sigue bloqueada. El addon todavía no ejecuta el cutover. Ver [ADDON_STARTUP_ROLLOUT_2026-11-17.md](ADDON_STARTUP_ROLLOUT_2026-11-17.md). `startup_decision()` es política pura, no ejecución; GitHub Actions **352/352 OK** (run 44197364926).

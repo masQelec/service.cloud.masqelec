@@ -6,7 +6,7 @@
 
 **Objetivo:** mantener un MASTER masQelec que publique respaldos OAuth MQC2 compatibles con CLIENTES legacy y futuros CLIENTES v2, reduciendo cada dispositivo de 4 a 2 procesos rclone y conservando las cuatro rutas de Kodi.
 
-**Estado actual:** arquitectura 2 FUSE+4 bind **no desplegada**; CI **322/322 PASS**. Preflight real MQC2: OneDrive 1/2 diferentes por renovación posterior confirmada, Drive 1/2 iguales; P0-A **BLOCKED** por divergencia. P0-B/P0-C/P0-D son simulaciones; coordinación distribuida operativa pendiente.
+**Estado actual:** arquitectura 2 FUSE+4 bind **no desplegada**; CI **352/352 PASS**. Preflight real MQC2: OneDrive 1/2 diferentes por renovación posterior confirmada, Drive 1/2 iguales; P0-A **BLOCKED** por divergencia. P0-B/P0-C/P0-D son simulaciones; coordinación distribuida operativa pendiente.
 
 **Últimos HEAD de código antes de este hito documental:**
 - Addon `develop`: `46e5960d02302ace8c263c0aafce2bcdbef99eb7` (fix mock de `stderr`).
@@ -178,3 +178,8 @@ Se incorporaron en `develop` los módulos puros `lib/rclone_two_mount_generation
 
 
 **Prioridad siguiente:** inventario no invasivo de procesos y dispositivos, elección entre propiedad central/grants independientes y diseño de un escritor que realmente respete el fencing. No ejecutar `rclone lsf`, `config reconnect`, desinstalación ni paradas para obtener PASS.
+
+
+## Aclaración de arquitectura y actualización del addon (17-11-2026)
+
+El operador confirma: MASTER publica el catálogo de biblioteca, los CLIENTES ya reciben versiones del addon y el servicio arranca con el código actualizado. Los .strm apuntan a las **cuatro rutas Kodi existentes** y no requieren que el CLIENTE haga barridos de directorios OneDrive para descubrir archivos. La migración se hace **localmente en el arranque de cada versión definitiva**: leer/preservar credenciales locales, preparar los dos snapshots crypt→OneDrive, y sustituir 4 FUSE por 2 FUSE+4 bind únicamente al tener pruebas de idoneidad y rollback. **No hace falta un coordinador central** para esa migración; la sincronización OAuth entre dispositivos es independiente y sigue bloqueada. El addon todavía no ejecuta el cutover. Ver [ADDON_STARTUP_ROLLOUT_2026-11-17.md](ADDON_STARTUP_ROLLOUT_2026-11-17.md). `startup_decision()` es política pura, no ejecución; GitHub Actions **352/352 OK** (run 44197364926).
