@@ -457,5 +457,54 @@ class RcloneTokenSyncTests(unittest.TestCase):
         self.assertEqual(open(outside, "rb").read(), b"SECRET_TEST")
 
 
+    def test_master_corrupt_google_rate_limit_does_not_block_onedrive(self):
+        damaged = b"truncated"
+        self._set_bad_local(damaged)
+        self._master_setup()
+        def fake_probe(name, config):
+            return "rate_limited" if name in ("update", "logs") else "ok"
+        self.sync._probe = fake_probe
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_recovered_restart_pending")
+        self.assertEqual(self._disk(), self.local)
+        self.assertEqual(len(self._master_backup_files()), 1)
+
+    def test_master_corrupt_onedrive_rate_limit_blocks_restore(self):
+        damaged = b"truncated"
+        self._set_bad_local(damaged)
+        self._master_setup()
+        self.sync._probe = lambda name, config: (
+            "rate_limited" if name == "series" else "ok"
+        )
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_candidate_unverified")
+        self.assertEqual(self._disk(), damaged)
+
+    def test_master_corrupt_google_auth_failure_blocks_restore(self):
+        damaged = b"truncated"
+        self._set_bad_local(damaged)
+        self._master_setup()
+        self.sync._probe = lambda name, config: (
+            "auth" if name == "update" else "ok"
+        )
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_candidate_unverified")
+        self.assertEqual(self._disk(), damaged)
+
+    def test_probe_distinguishes_rate_limit_from_oauth_failure(self):
+        response = types.SimpleNamespace(
+            returncode=1, stderr=b"Too Many Requests, rate limit exceeded"
+        )
+        with mock.patch.object(self.sync.subprocess, "run", return_value=response):
+            self.assertEqual(self.sync._probe("series", self.path), "rate_limited")
+        response.stderr = b"failed to refresh token: invalid_grant"
+        with mock.patch.object(self.sync.subprocess, "run", return_value=response):
+            self.assertEqual(self.sync._probe("series", self.path), "auth")
+
+
+
 if __name__ == "__main__":
     unittest.main()

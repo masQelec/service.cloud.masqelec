@@ -107,7 +107,15 @@ def _probe(name, config_path):
         return "unavailable"
     if proc.returncode == 0:
         return "ok"
-    return "auth" if policy.auth_failure(proc.stderr[-8192:]) else "unavailable"
+    stderr = proc.stderr[-8192:].lower()
+    if policy.auth_failure(stderr):
+        return "auth"
+    if any(marker in stderr for marker in (
+        b"rate limit", b"ratelimit", b"429", b"quota exceeded",
+        b"throttl",
+    )):
+        return "rate_limited"
+    return "unavailable"
 
 
 def _publish_master():
@@ -261,9 +269,19 @@ def _master_recover(mode, original=None, broken_names=()):
     # En corrupción completa exigimos éxito de los CUATRO remotos.
     tmp = _write_candidate(CONF_PATH, candidate)
     try:
+        provider = policy.sections(candidate)
+        google_limited = 0
         for name in verify_names:
-            if _probe(name, tmp) != "ok":
-                return "master_candidate_unverified"
+            result = _probe(name, tmp)
+            if result == "ok":
+                continue
+            if (mode == "corrupt" and result == "rate_limited" and
+                    provider[name].get("type", "").strip().lower() == "drive"):
+                # Una cuota de Google Drive no bloquea rescatar las
+                # bibliotecas OneDrive. Un error OAuth sí bloquea.
+                google_limited += 1
+                continue
+            return "master_candidate_unverified"
         verified = _read_stable(tmp)
         policy.validate_master_layout(verified)
         if mode == "corrupt" and original is not None:
@@ -288,6 +306,12 @@ def _master_recover(mode, original=None, broken_names=()):
         os.chmod(tmp, 0o600)
         os.replace(tmp, CONF_PATH)
         tmp = None
+        if google_limited:
+            log_utils.write_log(
+                "[rclone_sync] MASTER: bibliotecas verificadas; "
+                "Google Drive limitado por cuota, comprobar más tarde",
+                "WARNING",
+            )
         return "master_recovered_restart_pending"
     finally:
         if tmp is not None and os.path.exists(tmp):
@@ -313,7 +337,7 @@ def _recover_client():
             status = _probe(name, probe_file)
             if status == "auth":
                 bad.append(name)
-            elif status == "unavailable":
+            elif status in ("unavailable", "rate_limited"):
                 unknown += 1
     finally:
         if os.path.exists(probe_file):

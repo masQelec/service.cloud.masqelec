@@ -77,7 +77,10 @@
 - El MASTER incorpora autorrecuperación desde la reserva MQC2:
   * Corrupción estructural: dos observaciones iguales separadas por 60 s,
     descarga de reserva, exige exactamente 2 OneDrive y 2 Google Drive
-    completos y valida acceso de los cuatro remotos mediante rclone.
+    completos y valida con rclone ambos OneDrive y los Google Drive.
+    Se admite un RATE_LIMIT explícito de Google Drive (servicio secundario)
+    si ambos OneDrive funcionan; cualquier fallo de OneDrive o un AUTH
+    de Google Drive bloquea la restauración completa.
   * Fallo OAuth explícito: sondeo de OneDrive cada 15 min y Google Drive
     cada 60 min, sustituyendo solo el token que falla tras verificar copia.
   * Nunca se recupera por error de red, cuota, permisos o rate-limit.
