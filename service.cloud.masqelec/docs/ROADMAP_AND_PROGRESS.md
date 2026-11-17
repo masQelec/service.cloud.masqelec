@@ -6,7 +6,7 @@
 
 **Objetivo:** mantener un MASTER masQelec que publique respaldos OAuth MQC2 compatibles con CLIENTES legacy y futuros CLIENTES v2, reduciendo cada dispositivo de 4 a 2 procesos rclone y conservando las cuatro rutas de Kodi.
 
-**Estado actual:** arquitectura 2 FUSE+4 bind **no desplegada**; suite CI **271/271 PASS**. Preflight real MQC2: ambos OneDrive diferentes por renovación posterior confirmada, ambos Drive iguales; P0-A **BLOCKED** por divergencia. P0-B/P0-D solo simulaciones, P0-C coordinación distribuida pendiente.
+**Estado actual:** arquitectura 2 FUSE+4 bind **no desplegada**; CI **322/322 PASS**. Preflight real MQC2: OneDrive 1/2 diferentes por renovación posterior confirmada, Drive 1/2 iguales; P0-A **BLOCKED** por divergencia. P0-B/P0-C/P0-D son simulaciones; coordinación distribuida operativa pendiente.
 
 **Últimos HEAD de código antes de este hito documental:**
 - Addon `develop`: `46e5960d02302ace8c263c0aafce2bcdbef99eb7` (fix mock de `stderr`).
@@ -164,3 +164,17 @@ Se incorporaron en `develop` los módulos puros `lib/rclone_two_mount_generation
 - Sin red OAuth, sin GitHub PUT de credenciales, sin migración. `main`, `cloud/master`, `cloud/develop/system.d` intactos. Los dos flags siguen False.
 - Documentación técnica: [OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md](OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md).
 
+
+## Estado P0-C: protocolo de flota (17-11-2026)
+
+**Última suite CI:** **322/322 OK**, GitHub Actions [44196168382](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44196168382) (Python 3.11, sin Kodi, OAuth real, GitHub PUT ni mounts). Se incorporaron `rclone_two_mount_fleet.py` (commit `64ddba43`, **35 tests**) y `rclone_two_mount_fleet_gate.py` (commit `b5bf5a47`, **16 tests**). Total: **51 tests nuevos** respecto de 271. Los resultados `quiescent_lab_only`, `both_accounts_quiescent_lab_only` y `dual_fence_lab_only` **nunca autorizan publicación**.
+
+- Impide aceptar flota declarada incompleta/no verificada, legacy activo, escritores desconocidos, equipo offline, ack ausente, ack obsoleto, epoch cambiado, cambio de membresía/revisión, expiración, reloj inválido o cohorte incoherente.
+- La conjunción de ambos OneDrive + fuentes P0-B **bloquea expresamente `baseline_diverged`**, como ocurre ahora en KodiELEC tras renovación OneDrive posterior al MQC2. No se han seleccionado ni copiado tokens.
+- **No hay autoridad real de inventario, attestation autenticada, fencing de procesos rclone, contador global verificable, servicio coordinador, persistencia de leases ni protocolo de reanudación tras crash.** Los booleanos y recibos de los tests son afirmaciones sintéticas; ningún usuario puede convertirlos en una garantía de exclusión.
+- Microsoft documenta que al renovar un refresh token no invalida automáticamente el anterior: https://learn.microsoft.com/en-us/entra/identity-platform/refresh-tokens . La divergencia confirma backup desactualizado, no prueba expiración/revocación de los tokens antiguos ni exige desconectar clientes.
+- **Sigue bloqueado:** P0-A coherencia MQC2; P0-C operativo; P0-D PUT/readback real; despliegue P0-E/H. Flags `RCLONE_TOKEN_SYNC_ENABLED=False`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; `cloud/develop/system.d`, `addon/main` y `cloud/master` sin cambios.
+- Guía completa: [OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md](OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md).
+
+
+**Prioridad siguiente:** inventario no invasivo de procesos y dispositivos, elección entre propiedad central/grants independientes y diseño de un escritor que realmente respete el fencing. No ejecutar `rclone lsf`, `config reconnect`, desinstalación ni paradas para obtener PASS.

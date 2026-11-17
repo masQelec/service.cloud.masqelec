@@ -100,3 +100,17 @@ Todo paquete futuro debe identificar su versión y compatibilidad con marcadores
 No se han ejecutado operaciones de esta migración en CLIENTES reales. Los laboratorios anteriores solo generan propuestas privadas.
 
 Documentación asociada: [ARCHITECTURE_AND_MODES.md](ARCHITECTURE_AND_MODES.md), [OPERATIONS_AND_TESTING.md](OPERATIONS_AND_TESTING.md), [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
+
+## Estado P0-C: protocolo de flota (17-11-2026)
+
+**Última suite CI:** **322/322 OK**, GitHub Actions [44196168382](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44196168382) (Python 3.11, sin Kodi, OAuth real, GitHub PUT ni mounts). Se incorporaron `rclone_two_mount_fleet.py` (commit `64ddba43`, **35 tests**) y `rclone_two_mount_fleet_gate.py` (commit `b5bf5a47`, **16 tests**). Total: **51 tests nuevos** respecto de 271. Los resultados `quiescent_lab_only`, `both_accounts_quiescent_lab_only` y `dual_fence_lab_only` **nunca autorizan publicación**.
+
+- Impide aceptar flota declarada incompleta/no verificada, legacy activo, escritores desconocidos, equipo offline, ack ausente, ack obsoleto, epoch cambiado, cambio de membresía/revisión, expiración, reloj inválido o cohorte incoherente.
+- La conjunción de ambos OneDrive + fuentes P0-B **bloquea expresamente `baseline_diverged`**, como ocurre ahora en KodiELEC tras renovación OneDrive posterior al MQC2. No se han seleccionado ni copiado tokens.
+- **No hay autoridad real de inventario, attestation autenticada, fencing de procesos rclone, contador global verificable, servicio coordinador, persistencia de leases ni protocolo de reanudación tras crash.** Los booleanos y recibos de los tests son afirmaciones sintéticas; ningún usuario puede convertirlos en una garantía de exclusión.
+- Microsoft documenta que al renovar un refresh token no invalida automáticamente el anterior: https://learn.microsoft.com/en-us/entra/identity-platform/refresh-tokens . La divergencia confirma backup desactualizado, no prueba expiración/revocación de los tokens antiguos ni exige desconectar clientes.
+- **Sigue bloqueado:** P0-A coherencia MQC2; P0-C operativo; P0-D PUT/readback real; despliegue P0-E/H. Flags `RCLONE_TOKEN_SYNC_ENABLED=False`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; `cloud/develop/system.d`, `addon/main` y `cloud/master` sin cambios.
+- Guía completa: [OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md](OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md).
+
+
+El rollout v2 no puede convertir un cliente legacy en escritor cooperativo solo mediante un cambio de marcador. `cloud/develop/system.d/` conserva 4 unidades legacy y no debe tocarse; cualquier instalación de coordinación requiere enrolamiento auténtico, pruebas en rutas alternativas y autorización por dispositivo. La migración 2 FUSE+4 bind no es un reemplazo de la coordinación entre equipos.

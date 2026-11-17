@@ -1,6 +1,6 @@
 # Operaciones, pruebas y diagnóstico — masQelec
 
-**Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **271/271 OK** (GitHub Actions run 44194785936). El preflight real quedó BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-D: laboratorios, **no** despliegue ni sincronización.
+**Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **322/322 OK** (GitHub Actions run 44196168382). Preflight real BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-C/P0-D: laboratorios, **no** despliegue ni sincronización.
 
 ## 1. Protocolo de cambios
 
@@ -161,3 +161,23 @@ python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'
 ```
 
 No se necesita permiso para modificar el sistema, OAuth real, GitHub token ni claves. No ejecutar pruebas con `rclone lsf`, ni editar `rclone.conf` o `system.d`.
+
+## Estado P0-C: protocolo de flota (17-11-2026)
+
+**Última suite CI:** **322/322 OK**, GitHub Actions [44196168382](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44196168382) (Python 3.11, sin Kodi, OAuth real, GitHub PUT ni mounts). Se incorporaron `rclone_two_mount_fleet.py` (commit `64ddba43`, **35 tests**) y `rclone_two_mount_fleet_gate.py` (commit `b5bf5a47`, **16 tests**). Total: **51 tests nuevos** respecto de 271. Los resultados `quiescent_lab_only`, `both_accounts_quiescent_lab_only` y `dual_fence_lab_only` **nunca autorizan publicación**.
+
+- Impide aceptar flota declarada incompleta/no verificada, legacy activo, escritores desconocidos, equipo offline, ack ausente, ack obsoleto, epoch cambiado, cambio de membresía/revisión, expiración, reloj inválido o cohorte incoherente.
+- La conjunción de ambos OneDrive + fuentes P0-B **bloquea expresamente `baseline_diverged`**, como ocurre ahora en KodiELEC tras renovación OneDrive posterior al MQC2. No se han seleccionado ni copiado tokens.
+- **No hay autoridad real de inventario, attestation autenticada, fencing de procesos rclone, contador global verificable, servicio coordinador, persistencia de leases ni protocolo de reanudación tras crash.** Los booleanos y recibos de los tests son afirmaciones sintéticas; ningún usuario puede convertirlos en una garantía de exclusión.
+- Microsoft documenta que al renovar un refresh token no invalida automáticamente el anterior: https://learn.microsoft.com/en-us/entra/identity-platform/refresh-tokens . La divergencia confirma backup desactualizado, no prueba expiración/revocación de los tokens antiguos ni exige desconectar clientes.
+- **Sigue bloqueado:** P0-A coherencia MQC2; P0-C operativo; P0-D PUT/readback real; despliegue P0-E/H. Flags `RCLONE_TOKEN_SYNC_ENABLED=False`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; `cloud/develop/system.d`, `addon/main` y `cloud/master` sin cambios.
+- Guía completa: [OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md](OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md).
+
+
+Para ejecutar únicamente los tests sintéticos en un checkout limpio de Ubuntu:
+
+```bash
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'
+```
+
+No usar pruebas OAuth en proveedores ni unit tests en una máquina de producción que tenga su configuración real montada. El software no tiene todavía mecanismo de congelación/ACK para clientes reales.

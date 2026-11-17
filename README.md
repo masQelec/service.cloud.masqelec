@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 17-11-2026.** Suite de GitHub Actions **271/271 OK** (Python 3.11). Preflight real KodiELEC: **ambos refresh OneDrive diferentes del MQC2**, ambos Google Drive iguales; el operador confirmó renovaciones rclone posteriores al backup. P0-B (generaciones/ABA) y readback P0-D: **PASS en laboratorios puros**, sin integración ni despliegue. La coordinación real de MASTER y CLIENTES, los montajes 2 FUSE + 4 bind y la publicación automática siguen **bloqueados**.
+> **Estado actualizado: 17-11-2026.** GitHub Actions **322/322 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## ¿Qué es?
 
@@ -145,3 +145,7 @@ El preflight KodiELEC confirmó SHA GitHub, autenticación MQC2 e identidad est�
 ### P0-B/P0-D: ventanas de generación y readback (17-11-2026)
 
 La suite ampliada quedó en **271/271 OK**, GitHub Actions [run 44194785936](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44194785936). Se incorporaron un control puro de generaciones/ABA, que sin contadores compartidos con rclone bloquea, y un verificador puro de readback MQC2/GitHub por SHA/commit. Ninguno está conectado a producción, y **P0-C (coordinación interdispositivo) permanece pendiente**. Véase [informe P0-B/P0-D](service.cloud.masqelec/docs/OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md).
+
+### Coordinación OAuth P0-C (laboratorio)
+
+Modelados inventario global, exclusión de legacy/offline/desconocidos, confirmaciones por dispositivo, epochs y coherencia conjunta de las dos OneDrive con la fuente MQC2 (sin publicación). **CI 322/322 OK**. Sin coordinador real o integración con rclone, ninguna prueba demuestra exclusión operativa. Microsoft no invalida automáticamente los refresh antiguos al renovarlos: la divergencia no prueba revocación. [Documento técnico P0-C](service.cloud.masqelec/docs/OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md).

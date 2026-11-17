@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada a 17-11-2026: **271/271 OK**. P0-B generaciones/ABA y P0-D readback: solo laboratorios; el preflight real identificó ambas cuentas OneDrive divergentes tras la renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **322/322 OK** (17-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 
@@ -14,6 +14,8 @@
 | [Progreso, decisiones y hoja de ruta](ROADMAP_AND_PROGRESS.md) | Cambios confirmados, criterios de terminado y siguiente prioridad |
 | [**Handoff 17-11-2026**](HANDOFF_2026-11-17.md) | Resumen reproducible para retomar desde otro chat; contiene comando del preflight pendiente |
 | [Generaciones OAuth + CAS/readback (P0-B/P0-D)](OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md) | Prototipos puros, 271/271 PASS, garantías, límites e integración pendiente |
+| [Coordinación OAuth entre MASTER y CLIENTES (P0-C)](OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md) | Flota sintética, 322/322 PASS, riesgos de legacy y opciones de arquitectura |
+
 | [Diagnóstico divergencia real OneDrive](PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md) | Evidencia de KodiELEC, causa confirmada y bloqueo de recuperación |
 
 ## Historial de laboratorios (fotos del progreso, no instrucciones de despliegue)
