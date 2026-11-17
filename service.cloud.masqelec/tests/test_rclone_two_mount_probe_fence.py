@@ -71,6 +71,50 @@ class TwoMountRealProbeFenceTests(unittest.TestCase):
                                side_effect=PermissionError):
             self.assertTrue(lab.any_rclone_mounts_alive())
 
+    def test_refresh_report_same_four_accounts_never_prints_tokens(self):
+        from lib import rclone_token_policy as policy
+        from lib import rclone_two_mount_plan as plan
+        from test_rclone_mount_isolation import wrapped_conf
+        conf = wrapped_conf("crypt")
+        report = lab.baseline_refresh_report(conf, conf, policy, plan)
+        self.assertEqual(report, (
+            ("ONEDRIVE_1", "SAME"), ("ONEDRIVE_2", "SAME"),
+            ("DRIVE_1", "SAME"), ("DRIVE_2", "SAME")))
+        self.assertNotIn("refresh-", str(report))
+        self.assertNotIn("one_a", str(report))
+
+    def test_refresh_report_distinguishes_onedrive_and_drive(self):
+        from lib import rclone_token_policy as policy
+        from lib import rclone_two_mount_plan as plan
+        from test_rclone_mount_isolation import wrapped_conf
+        local = wrapped_conf("crypt")
+        remote = local.replace(b"refresh-users_library_2", b"other-one")
+        remote = remote.replace(b"refresh-updater", b"other-google")
+        report = dict(lab.baseline_refresh_report(local, remote, policy, plan))
+        self.assertEqual(report["ONEDRIVE_1"], "SAME")
+        self.assertEqual(report["ONEDRIVE_2"], "DIFFERENT")
+        self.assertEqual(sum(v == "DIFFERENT" for v in report.values()), 2)
+        self.assertEqual(sum(v == "DIFFERENT" for k, v in report.items()
+                             if k.startswith("DRIVE_")), 1)
+
+    def test_refresh_report_ignores_access_token_only_change(self):
+        from lib import rclone_token_policy as policy
+        from lib import rclone_two_mount_plan as plan
+        from test_rclone_mount_isolation import wrapped_conf
+        local = wrapped_conf("crypt")
+        remote = local.replace(b"access-users_library_1", b"other-access")
+        report = lab.baseline_refresh_report(local, remote, policy, plan)
+        self.assertTrue(all(state == "SAME" for _, state in report))
+
+    def test_refresh_report_rejects_invalid_layout(self):
+        from lib import rclone_token_policy as policy
+        from lib import rclone_two_mount_plan as plan
+        from test_rclone_mount_isolation import wrapped_conf
+        local = wrapped_conf("crypt")
+        broken = local.replace(b"type = onedrive", b"type = alias", 1)
+        with self.assertRaises(ValueError):
+            lab.baseline_refresh_report(local, broken, policy, plan)
+
     def test_github_branch_head_accepted_only_with_full_sha(self):
         good_sha = "a" * 40
         with mock.patch.object(lab, "fetch", return_value=(
