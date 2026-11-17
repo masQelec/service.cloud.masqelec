@@ -5,6 +5,7 @@ import time
 import json
 import shutil
 import tempfile
+import errno
 import hashlib
 import zipfile
 import calendar
@@ -18,6 +19,7 @@ from lib import utils
 from lib import constants
 from lib import catalog_safety
 from lib import master_catalog_safety
+from lib import catalog_workspace
 import xbmc
 
 # ==========================
@@ -322,88 +324,118 @@ def make_zip(src_root, out_zip):
                     z.write(full, arc)
 
 def generate_catalog():
-    """Genera en staging, valida y después aplica los STRM al MASTER.
+    """Genera en /tmp cuando hay espacio, valida y publica desde /storage.
 
-    La versión publicada se modifica solo tras un ZIP íntegro y una
-    aplicación local satisfactoria. No elimina el ZIP si hay una subida
-    previa pendiente de reintento.
+    La fase de aplicación conserva backups persistentes. El ZIP y VERSION
+    finales se escriben con reemplazo atómico dentro de su FS de destino.
     """
     os.makedirs(EXPORT_DIR, exist_ok=True)
     if not acquire_lock():
         raise RuntimeError("Catálogo MASTER: operación concurrente bloqueada")
 
     workdir = None
+    backup_root = None
     preserve_recovery = False
     try:
-        workdir = tempfile.mkdtemp(prefix=".catalog-build-", dir=EXPORT_DIR)
-        stage_root = os.path.join(workdir, "content")
-        staged_movies = os.path.join(stage_root, "videos")
-        staged_tv = os.path.join(stage_root, "tvshows")
-        os.makedirs(staged_movies, exist_ok=True)
-        os.makedirs(staged_tv, exist_ok=True)
-
         ver_path = os.path.join(EXPORT_DIR, VER_NAME)
         old_hash = _read_old_version_hash(ver_path)
-        log_utils.write_log("MASTER: generando catálogo temporal sin borrar STRM activos…")
-        build_movies_strm(output_dir=staged_movies)
-        build_tv_strm(output_dir=staged_tv)
+        chosen = catalog_workspace.select_staging_base(
+            preferred="/tmp", fallback=EXPORT_DIR
+        )
+        bases = [chosen]
+        if os.path.abspath(chosen) != os.path.abspath(EXPORT_DIR):
+            bases.append(EXPORT_DIR)
 
-        new_hash, count = compute_version_hash(stage_root)
-        if count <= 0:
-            raise RuntimeError("Catálogo generado vacío; se conservan los STRM anteriores")
+        # Solo repetir generación en /storage si /tmp se agota.
+        # Ningún STRM activo se modifica antes de completar esta fase.
+        for base in bases:
+            try:
+                workdir = tempfile.mkdtemp(prefix=".catalog-build-", dir=base)
+                stage_root = os.path.join(workdir, "content")
+                staged_movies = os.path.join(stage_root, "videos")
+                staged_tv = os.path.join(stage_root, "tvshows")
+                os.makedirs(staged_movies, exist_ok=True)
+                os.makedirs(staged_tv, exist_ok=True)
+                log_utils.write_log(
+                    f"MASTER: staging catálogo en {base}; STRM activos intactos"
+                )
+                build_movies_strm(output_dir=staged_movies)
+                build_tv_strm(output_dir=staged_tv)
 
-        stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        new_version = f"{new_hash}  strm_files={count}  utc={stamp}\n"
-        if catalog_safety.verify_staging(stage_root, new_version) != count:
-            raise RuntimeError("Verificación del staging MASTER fallida")
+                new_hash, count = compute_version_hash(stage_root)
+                if count <= 0:
+                    raise RuntimeError(
+                        "Catálogo generado vacío; se conserva el anterior"
+                    )
 
-        changed = not (old_hash and old_hash == new_hash)
-        staged_zip = os.path.join(workdir, ZIP_NAME)
-        if changed:
-            if not MAKE_ZIP:
-                raise RuntimeError("No se puede publicar catalog.version sin catalog.zip")
-            make_zip(stage_root, staged_zip)
-            catalog_safety.verify_zip_manifest(staged_zip, new_version)
+                stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                new_version = f"{new_hash}  strm_files={count}  utc={stamp}\n"
+                if catalog_safety.verify_staging(stage_root, new_version) != count:
+                    raise RuntimeError("Verificación de staging MASTER fallida")
 
-        # La copia de respaldo está también bajo /storage para evitar
-        # dependencias de RAM (/tmp) y conservar permisos/mtime.
+                changed = not (old_hash and old_hash == new_hash)
+                staged_zip = os.path.join(workdir, ZIP_NAME)
+                if changed:
+                    if not MAKE_ZIP:
+                        raise RuntimeError("VERSION requiere catalog.zip")
+                    make_zip(stage_root, staged_zip)
+                    catalog_safety.verify_zip_manifest(staged_zip, new_version)
+                break
+            except OSError as exc:
+                if exc.errno != errno.ENOSPC or os.path.abspath(base) == os.path.abspath(EXPORT_DIR):
+                    raise
+                log_utils.write_log(
+                    "MASTER: /tmp agotado durante generación; reintentando en /storage",
+                    "WARNING",
+                )
+                if workdir:
+                    shutil.rmtree(workdir, ignore_errors=True)
+                workdir = None
+                continue
+        else:
+            raise RuntimeError("No se pudo crear staging del catálogo")
+
+        # Backup persistente SIEMPRE en /storage, nunca en /tmp.
+        backup_root = tempfile.mkdtemp(
+            prefix=".catalog-rollback-", dir=EXPORT_DIR
+        )
         copied, deleted = master_catalog_safety.apply_staged_catalog(
-            stage_root, CATALOG_ROOT, os.path.join(workdir, "rollback")
+            stage_root, CATALOG_ROOT, backup_root
         )
         log_utils.write_log(
             f"MASTER: catálogo local aplicado: copiados={copied} eliminados={deleted}"
         )
 
         if changed:
-            # Publicar ZIP antes que VERSION; el uploader verifica ambos.
-            os.replace(staged_zip, os.path.join(EXPORT_DIR, ZIP_NAME))
+            # La copia temporal de publicación se crea dentro de /storage;
+            # no se usa os.replace() directamente entre FS diferentes.
+            catalog_workspace.publish_file_atomic(
+                staged_zip, os.path.join(EXPORT_DIR, ZIP_NAME)
+            )
             version_temp = os.path.join(workdir, VER_NAME)
-            with open(version_temp, "w", encoding="utf-8", newline="\n") as stream:
-                stream.write(new_version)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(version_temp, ver_path)
+            write_text(version_temp, new_version)
+            catalog_workspace.publish_file_atomic(version_temp, ver_path)
             log_utils.write_log(
-                f"MASTER: catálogo preparado para publicar: hash={new_hash} strm_files={count}"
+                f"MASTER: catálogo preparado: hash={new_hash} STRM={count}"
             )
         else:
             log_utils.write_log(
-                f"MASTER: catálogo sin cambios (hash={new_hash}); "
-                "conservando ZIP pendiente si lo hay"
+                f"MASTER: sin cambios ({new_hash}); se conserva cualquier ZIP pendiente"
             )
-
         return bool(changed)
     except Exception as exc:
         if "rollback INCOMPLETO" in str(exc):
             preserve_recovery = True
             log_utils.write_log(
-                f"MASTER: recuperación pendiente; conservando respaldos en {workdir}",
+                f"MASTER: recuperación pendiente; respaldos conservados en {backup_root}",
                 "ERROR",
             )
         raise
     finally:
-        if workdir and not preserve_recovery:
+        if workdir:
             shutil.rmtree(workdir, ignore_errors=True)
+        if backup_root and not preserve_recovery:
+            shutil.rmtree(backup_root, ignore_errors=True)
         release_lock()
 
 
