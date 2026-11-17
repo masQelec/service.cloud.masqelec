@@ -21,6 +21,7 @@ import gzip
 from lib import log_utils
 from lib import utils
 from lib import constants
+from lib import rclone_conf_merge
 
 # ==============================
 # Config red
@@ -291,41 +292,58 @@ def start_cloud_storage():
         with open(dec_tmp, "rb") as f:
             remote_raw = f.read()
 
-        remote_norm = _normalize_rclone_conf_bytes(remote_raw)
-
         os.makedirs(rclone_dir, exist_ok=True)
 
-        local_norm = None
+        local_raw = None
         if os.path.exists(rclone_conf_path):
             try:
                 with open(rclone_conf_path, "rb") as lf:
                     local_raw = lf.read()
-                local_norm = _normalize_rclone_conf_bytes(local_raw)
-            except Exception:
-                local_norm = None
+            except Exception as exc:
+                # No reemplazar una configuración potencialmente válida si
+                # ni siquiera se ha podido leer para preservar su token.
+                raise RuntimeError("No se pudo leer rclone.conf local") from exc
 
-        if local_norm is not None and local_norm == remote_norm:
-            log_utils.write_log("rclone.conf sin cambios (idéntico tras normalizar).")
+        if local_raw is not None:
+            # rclone puede renovar su token durante el uso normal. Conservar
+            # el local al aplicar otros cambios del remoto mientras el perfil
+            # de autenticación no haya cambiado.
+            merged_raw = rclone_conf_merge.preserve_local_oauth_tokens(
+                remote_raw, local_raw
+            )
+            remote_norm = _normalize_rclone_conf_bytes(merged_raw)
+            local_norm = _normalize_rclone_conf_bytes(local_raw)
+        else:
+            merged_raw = remote_raw
+            remote_norm = _normalize_rclone_conf_bytes(merged_raw)
+            local_norm = None
+
+        if local_norm is not None and (
+            local_norm == remote_norm or
+            rclone_conf_merge.same_non_token_settings(local_raw, merged_raw)
+        ):
+            log_utils.write_log(
+                "rclone.conf sin cambios relevantes; se conserva el token local."
+            )
         else:
             if local_norm is not None:
+                changed_keys = rclone_conf_merge.compare_non_token_settings(
+                    local_raw, merged_raw
+                )
+                # Solo nombres de opciones; nunca nombres de remotos o valores.
                 log_utils.write_log(
-                    f"rclone.conf difiere: sha_local={utils._sha256(local_norm)} sha_remote={utils._sha256(remote_norm)}",
+                    "rclone.conf: opciones diferentes={} (o solo formato).".format(
+                        ",".join(changed_keys[:16]) if changed_keys else "ninguna"
+                    ),
                     "DEBUG",
                 )
-            else:
-                log_utils.write_log(
-                    f"rclone.conf local no legible/no existe; sha_remote={utils._sha256(remote_norm)}",
-                    "DEBUG",
-                )
-
-            # Escribimos estable: LF + newline final (PERO escribimos el RAW, no el norm filtrado)
-            stable = b"\n".join(remote_raw.splitlines()).rstrip(b"\n") + b"\n"
+            stable = b"\n".join(merged_raw.splitlines()).rstrip(b"\n") + b"\n"
             _atomic_write_bytes(
-                rclone_conf_path,
-                stable,
-                mode=(stat.S_IRUSR | stat.S_IWUSR),  # 0600
+                rclone_conf_path, stable, mode=(stat.S_IRUSR | stat.S_IWUSR)
             )
-            log_utils.write_log("rclone.conf actualizado (cambios detectados).")
+            log_utils.write_log(
+                "rclone.conf actualizado preservando tokens OAuth locales compatibles."
+            )
 
         # ==========================
         # Units systemd desde remoto
