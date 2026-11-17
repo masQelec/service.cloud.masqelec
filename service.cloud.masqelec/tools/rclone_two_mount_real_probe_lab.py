@@ -97,8 +97,11 @@ def any_rclone_mounts_alive():
                 continue
             try:
                 with open(entry.path + "/cmdline", "rb") as f:
+                    raw_cmdline = f.read(16385)
+                    if len(raw_cmdline) > 16384:
+                        return True  # Truncamiento: no declarar ausencia de montajes.
                     cmd = [part.decode("utf-8", "replace")
-                           for part in f.read(16384).split(b"\0") if part]
+                           for part in raw_cmdline.split(b"\0") if part]
             except (FileNotFoundError, ProcessLookupError):
                 continue
             except OSError:
@@ -106,7 +109,8 @@ def any_rclone_mounts_alive():
             if not cmd:
                 continue
             if (os.path.basename(cmd[0]).startswith("rclone")
-                    and "mount" in cmd[1:10]):
+                    and any(arg in ("mount", "mount2", "cmount")
+                            for arg in cmd[1:])):
                 return True
         return False
     finally:
@@ -134,9 +138,13 @@ def main():
             print("LAB_RESULT=BLOCKED_ACTIVE_MOUNTS")
             return 2
         print("ACTIVE_RCLONE_MOUNTS=NO")
-        # Esto verifica solamente inactividad LOCAL. No demuestra que
-        # otros CLIENTES de la misma cuenta estén inactivos. El operador
-        # debe coordinar antes de autorizar la prueba de refresh OAuth.
+        # No existe aún un protocolo fiable para comprobar escritores en
+        # OTROS CLIENTES de la cuenta. El probe puede rotar refresh remoto.
+        # Por diseño, se deniega incluso cuando /proc local está vacío.
+        STAGE = "FLEET_OAUTH_COORDINATION_FENCE"
+        print("FLEET_OAUTH_COORDINATION=NOT_VERIFIED")
+        print("LAB_RESULT=BLOCKED_FLEET_COORDINATION")
+        return 2
 
     with tempfile.TemporaryDirectory(
             prefix="masqelec-v2-mqc2-probe-", dir="/tmp") as dirname:
