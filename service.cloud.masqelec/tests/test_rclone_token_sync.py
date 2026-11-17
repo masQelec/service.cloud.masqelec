@@ -722,7 +722,9 @@ class RcloneTokenSyncTests(unittest.TestCase):
             return io.BytesIO(by_path[path])
         return (mock.patch.object(self.sync.os, "scandir",
                                   return_value=Scan(entries)),
-                mock.patch("builtins.open", side_effect=open_proc))
+                mock.patch("builtins.open", side_effect=open_proc),
+                mock.patch.object(self.sync.os, "getpid",
+                                  return_value=999999))
 
     def test_detects_one_of_four_rclone_mount_writers(self):
         argv = [["/storage/.config/rclone/rclone", "mount", "cloud:tv",
@@ -734,7 +736,7 @@ class RcloneTokenSyncTests(unittest.TestCase):
                 ["/storage/.config/rclone/rclone", "lsf", "cloud:",
                  "--config", self.path]]
         contexts = self._simulate_processes(argv)
-        with contexts[0], contexts[1]:
+        with contexts[0], contexts[1], contexts[2]:
             self.assertTrue(self.sync._config_mounts_active())
 
     def test_different_rclone_mount_config_does_not_block_lab(self):
@@ -742,13 +744,13 @@ class RcloneTokenSyncTests(unittest.TestCase):
                      "/storage/.mnt/a",
                      "--config=/storage/.config/rclone/rclone.conf"]]
         contexts = self._simulate_processes(commands)
-        with contexts[0], contexts[1]:
+        with contexts[0], contexts[1], contexts[2]:
             self.assertFalse(self.sync._config_mounts_active())
 
     def test_rclone_mount_without_explicit_config_fails_closed(self):
         commands = [["rclone", "mount", "cloud:", "/storage/.mnt/a"]]
         contexts = self._simulate_processes(commands)
-        with contexts[0], contexts[1]:
+        with contexts[0], contexts[1], contexts[2]:
             self.assertTrue(self.sync._config_mounts_active())
 
 
