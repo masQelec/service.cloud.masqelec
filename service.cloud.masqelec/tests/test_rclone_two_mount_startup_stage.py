@@ -91,7 +91,7 @@ class StartupStageTests(unittest.TestCase):
         staged_file = self.staged_folder() / "account1.conf"
         original = staged_file.read_bytes()
         self.conf.write_bytes(self.conf.read_bytes().replace(
-            b"refresh-one_a", b"new-refresh-one-a"))
+            b"refresh-users_library_1", b"new-refresh-one-a"))
         self.assertEqual(self.stage(), "blocked_stale_or_unsafe_stage")
         self.assertEqual(staged_file.read_bytes(), original)
 
