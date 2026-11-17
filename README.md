@@ -33,7 +33,7 @@ RCLONE_TOKEN_SYNC_ENABLED = False
 RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
 ```
 
-**No habilitar esas banderas por haber superado 228 pruebas.** La opción `--real-probe` puede renovar OAuth en el proveedor: no debe ejecutarse con montajes activos ni sin coordinar los demás CLIENTES.
+**No habilitar esas banderas por haber superado 228 pruebas.** La opción `--real-probe` está ahora **bloqueada incluso sin montajes locales**, porque no se puede demostrar que otros CLIENTES estén inactivos. No habilitarla sin coordinación de flota y pruebas específicas.
 
 ## Estructura
 
@@ -99,7 +99,7 @@ python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'
 **Prueba siguiente recomendada en KodiELEC (sin OAuth real):**
 
 ```bash
-wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/develop/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' \
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/c701e74e5a677e3d300094f9ea112eb830749c3f/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' \
   -O /tmp/rclone_two_mount_real_probe_lab.py
 python3 -m py_compile /tmp/rclone_two_mount_real_probe_lab.py
 python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
@@ -130,3 +130,7 @@ La documentación mantenida está en [**docs/README.md**](service.cloud.masqelec
 - Cualquier operación de transición de montajes requiere plan de rollback por dispositivo y ventana sin reproducción.
 
 **Estado de release a 17-11-2026: `NO DEPLOY`; `NO LIVE UNIT CHANGE`; `NO GITHUB CREDENTIAL UPLOAD`.**
+
+### Endurecimiento posterior al corte documental (17-11-2026)
+
+En `develop` se incorporaron cinco pruebas nuevas y dos barreras: `--real-probe` falla con `BLOCKED_FLEET_COORDINATION` aunque no existan montajes rclone locales; `--preflight` lee el MQC2 desde el commit GitHub fijado y comprueba también `GH_BRANCH_COMMIT_STABLE=YES` para detectar cambios del HEAD remoto. Commits: `17cb2901`, `41b9f033`, `c701e74e`, `75cb8b48`. **La suite ampliada aún no tiene una ejecución confirmada**; el último `228/228 OK` corresponde al corte previo. El preflight en KodiELEC sigue **PENDIENTE**.
