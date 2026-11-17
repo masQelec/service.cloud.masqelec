@@ -55,7 +55,8 @@ inactivo; esta función no autoriza migrar unidades.
 
 Cada CLIENTE conserva marcador local (no en GitHub):
 /storage/.config/masqelec/rclone-mount-mode.json
-schema=1, layout=two-fuse-v1, state=prepared|active.
+schema=1, layout=two-fuse-v1, state=prepared|active,
+candidate_id=2026-11-17-two-fuse-v1.
 El fichero no se crea ni se modifica automáticamente en esta fase.
 
 - Sin marcador: legacy; se mantienen los cuatro servicios y los
@@ -141,3 +142,37 @@ Hasta implementar la nueva reconciliación de `account1.conf` y
 `account2.conf`, **no hay publicador ni recuperador autorizado para
 el modo two-fuse**. El manifiesto remoto es solo metadatos de versión;
 las credenciales nunca se añaden al repositorio.
+
+## Publicación de candidato seguro y límites de alcance
+
+El repo `cloud.masqelec` contiene únicamente el descriptor
+`rollouts/rclone-two-mount/v1/manifest.json` en `develop`.
+No se han añadido servicios a `system.d` y no hay refresh_token,
+password crypt ni rclone.conf en este descriptor.
+
+La nueva suite cubre:
+- 2 configuraciones crypt->OneDrive, aisladas y 0600;
+- 2 servicios root FUSE con Type=notify y opciones de rclone
+  provenientes de las unidades legacy, sin ejecutarlos;
+- 4 servicios oneshot bind con BindsTo/After y rechazo de destinos
+  ya montados, para respetar las rutas antiguas de Kodi;
+- validación /proc/self/mountinfo de correspondencia real de superblock
+  FUSE y subruta, no sólo existencia de directorios;
+- marcador por dispositivo y versionado del candidato;
+- bloqueos del updater y del OAuth legacy en modo v2;
+- manifest de actualización que no contiene credenciales;
+- provisión de 9 archivos SOLO dentro de /tmp privado (2 conf,
+  6 units y 1 manifest de propuesta).
+
+El binario rclone real puede no soportar Type=notify como se espera
+en el piloto, y el árbol de montajes no ha sido ensayado todavía. No
+iniciar servicios nuevos ni modificar unidades legacy en producción.
+
+El proceso normal de actualización del addon de los CLIENTES seguirá
+existiendo, pero un paquete nuevo no autoriza por sí solo que un cliente
+pase de cuatro a dos FUSE. La activación requerirá autorizar CADA
+dispositivo y conservar una ruta de rollback; el manifiesto en GitHub
+sólo anuncia la versión candidata.
+
+Con dos procesos habrá un escritor por cuenta **en cada equipo**;
+la posible rotación OAuth entre distintos equipos sigue pendiente.

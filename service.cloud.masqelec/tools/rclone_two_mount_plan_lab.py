@@ -8,7 +8,7 @@ import sys
 import tempfile
 import urllib.request
 
-ADDON_REF = "5cf41965b9a06eea30328cec1717550ef642aca9"
+ADDON_REF = "a256b12118e10d3bca03b1c88dc13dce8bde76e5"
 CLOUD_REF = "ffc5ee83a33fdde81ebde120c1fef633077b41c4"
 SOURCE = ("https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/"
           + ADDON_REF + "/service.cloud.masqelec/lib/")
