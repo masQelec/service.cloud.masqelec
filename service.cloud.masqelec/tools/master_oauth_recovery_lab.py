@@ -96,18 +96,27 @@ def _rclone_binary():
 
 
 def _corrupt_one_token(raw, merge):
-    names, section, lines = 0, None, []
-    for line in merge._lines(raw):
+    # Simular la corrupción de una biblioteca OneDrive, nunca de alias/crypt.
+    all_lines = merge._lines(raw)
+    parsed = merge._sections(all_lines)
+    selected = next((name for name, options in parsed.items()
+                     if options.get("type", "").strip().lower() == "onedrive"
+                     and options.get("token")), None)
+    if selected is None:
+        raise ValueError("Falta OneDrive válido para ensayo")
+    changed, section, lines = 0, None, []
+    for line in all_lines:
         match = merge._SECTION.match(line)
         if match:
             section = match.group(1)
         option = merge._OPTION.match(line)
-        if option and option.group(1).lower() == "token" and names == 0:
+        if (option and option.group(1).lower() == "token"
+                and section == selected):
             line = line[:line.index("=") + 1] + " {broken-test-json"
-            names += 1
+            changed += 1
         lines.append(line)
-    if names != 1:
-        raise ValueError("No se pudo simular corrupción de token")
+    if changed != 1:
+        raise ValueError("No se pudo simular corrupción de OneDrive")
     return ("\n".join(lines).rstrip("\n") + "\n").encode("utf-8")
 
 
@@ -173,6 +182,7 @@ def main():
         print("MQC2_AND_FOUR_REMOTES=PASS")
         LAB_STAGE = "CREATE_BROKEN_COPY"
         broken = _corrupt_one_token(local, merge)
+        print("SIMULATED_CORRUPTION_PROVIDER=ONEDRIVE")
         tmpconf = str(root / "rclone.conf")
         with open(tmpconf, "xb") as stream:
             os.fchmod(stream.fileno(), 0o600)
