@@ -38,6 +38,7 @@ from lib import rclone_token_sync
 from lib import constants
 from lib import rclone_two_mount_rollout
 from lib import rclone_two_mount_health
+from lib import rclone_two_mount_startup_stage
 
 # ---- Config constante ----
 SLEEP_INTERVAL_SECS = 10
@@ -499,6 +500,18 @@ def _phase1_cloud_storage_blocking(monitor: xbmc.Monitor):
         start_cloud_storage()
     except Exception:
         log(f"Fallo en cloud_storage:\n{traceback.format_exc()}", "ERROR")
+    # Staging local de 2 FUSE + 4 bind: sólo cuando la bandera específica
+    # esté autorizada. La rama develop la mantiene False.
+    if getattr(constants, "RCLONE_TWO_MOUNT_STAGING_ENABLED", False) is True:
+        try:
+            stage_result = rclone_two_mount_startup_stage.stage_on_startup(
+                staging_enabled=True)
+            # Sólo marcadores cerrados, nunca rutas, excepciones o credenciales.
+            if stage_result not in ("disabled",):
+                log("rclone v2 local staging: " + stage_result, "INFO")
+        except Exception:
+            # La fase de staging NO debe interrumpir el servicio legado.
+            log("rclone v2 local staging: blocked_unexpected_error", "WARNING")
     log("Fase 1: cloud_storage -> finalizado")
     if monitor.abortRequested():
         raise SystemExit

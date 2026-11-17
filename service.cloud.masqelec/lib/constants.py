@@ -26,4 +26,6 @@ RCLONE_TOKEN_SYNC_ENABLED = False
 # Con False, un CLIENTE ya activo en v2 es bloqueado para evitar
 # reactivar accidentalmente los cuatro servicios legacy.
 RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
+# Preparación privada local al arrancar (NO instala montajes/unidades).
+RCLONE_TWO_MOUNT_STAGING_ENABLED = False
 
