@@ -39,19 +39,24 @@ def oauth_tokens(raw):
 
 
 def validate_master_layout(raw):
-    """El MASTER configurado debe tener exactamente 2 OneDrive + 2 Drive.
+    """Exige 2 OneDrive + 2 Drive, pero permite secciones no OAuth.
 
-    Distingue un archivo sintácticamente legible de uno incompleto o
-    truncado: si falta una sección OAuth, no autorizar publicación.
+    rclone.conf puede incluir alias, crypt y otros remotos adicionales.
+    Deben conservarse, no confundirse con los cuatro remotos OAuth. Un
+    remoto drive/onedrive sin token es un fallo estructural, no un extra.
     """
     config = sections(raw)
     tokens = oauth_tokens(raw)
     counts = oauth_provider_counts(raw)
-    if (len(config) != 4 or len(tokens) != 4 or
-            counts != {"drive": 2, "onedrive": 2} or
-            set(config) != set(tokens)):
+    declared_oauth = {
+        name for name, options in config.items()
+        if options.get("type", "").strip().lower() in OAUTH_BACKENDS
+    }
+    if (len(tokens) != 4 or counts != {"drive": 2, "onedrive": 2} or
+            set(tokens) != declared_oauth):
         raise ValueError("Inventario MASTER OAuth incompleto o incompatible")
-    for name, options in config.items():
+    for name in declared_oauth:
+        options = config[name]
         if options.get("type", "").strip().lower() == "onedrive":
             if not options.get("drive_id") or not options.get("drive_type"):
                 raise ValueError("Identidad OneDrive incompleta")
@@ -75,6 +80,12 @@ def master_partial_identity_compatible(partial_raw, published_raw):
         for key in conf._AUTH_IDENTITY:
             if key in old and old[key] != published[name].get(key, ""):
                 return False
+        # Alias/crypt/local y otras secciones auxiliares también importan:
+        # no restaurar silenciosamente rutas o ajustes estáticos distintos.
+        if old.get("type", "").strip().lower() not in OAUTH_BACKENDS:
+            for key, value in old.items():
+                if key != "token" and published[name].get(key) != value:
+                    return False
     return True
 
 def oauth_provider_counts(raw):

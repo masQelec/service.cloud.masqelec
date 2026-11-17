@@ -169,3 +169,20 @@ master_candidate_unverified el ensayo es inconcluyente y el archivo real
 permanece intacto. No repetir de inmediato contra Microsoft/Google.
 Un éxito con lsf prueba el acceso actual, no necesariamente la posibilidad
 de renovar un refresh_token que caduque en el futuro.
+
+## Diagnóstico 2026-11-17: dos secciones extra
+
+El laboratorio MASTER detectó LOCAL_SECTIONS=6, LOCAL_OAUTH_REMOTES=4,
+LOCAL_ONEDRIVE=2, LOCAL_GOOGLE_DRIVE=2 y LAB_FAILED_AT=VALIDATE_LOCAL_LAYOUT.
+El fallo era la condición errónea len(config)==4, no una prueba de
+corrupción. El MASTER exige exactamente 2 OneDrive + 2 Google Drive con
+token válido, pero **permite secciones auxiliares no OAuth** (por ejemplo
+alias, crypt, local). Se mantienen las secciones auxiliares en todo
+rclone.conf restaurado o publicado.
+
+La reserva publicada puede contener también las dos secciones adicionales,
+pendiente de corroborar con el laboratorio actualizado. Si los nombres,
+tipos o parámetros estáticos de secciones auxiliares difieren del archivo
+actual, la recuperación completa debe bloquearse, sin eliminar secciones
+ni modificar la configuración operativa.
+

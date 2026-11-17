@@ -19,6 +19,28 @@ def conf(refresh, access="a", expiry="2026-11-17T09:00:00Z", chunk="64M"):
             .format(chunk, value)).encode("utf-8")
 
 
+def master_conf_with_extras():
+    providers = ("onedrive", "onedrive", "drive", "drive")
+    sections = []
+    for n, provider in enumerate(providers, 1):
+        token = json.dumps({
+            "access_token": "access{}".format(n),
+            "refresh_token": "refresh{}".format(n),
+            "expiry": "2026-11-17T09:00:00Z",
+        })
+        section = ["[oauth{}]".format(n), "type = " + provider,
+                   "client_id = app"]
+        if provider == "onedrive":
+            section.extend(["drive_id = od{}".format(n),
+                            "drive_type = personal"])
+        section.extend(["token = " + token, ""])
+        sections.extend(section)
+    sections.extend(["[alias]", "type = alias", "remote = oauth1:", "",
+                     "[secure]", "type = crypt", "remote = oauth2:folder",
+                     "password = sample-test", ""])
+    return "\n".join(sections).encode("utf-8")
+
+
 class RcloneTokenPolicyTests(unittest.TestCase):
     def test_ignore_access_and_expiry_churn(self):
         local = conf("valid", "access-two", "2026-11-17T12:00:00Z")
@@ -203,6 +225,61 @@ class RcloneTokenPolicyTests(unittest.TestCase):
                 local, local, ["cloud"], allow_same_refresh=True
             )
 
+
+
+    def test_master_allows_six_sections_with_four_oauth(self):
+        raw = master_conf_with_extras()
+        self.assertEqual(len(policy.sections(raw)), 6)
+        self.assertEqual(policy.oauth_provider_counts(raw),
+                         {"onedrive": 2, "drive": 2})
+        self.assertEqual(policy.validate_master_layout(raw),
+                         ("oauth1", "oauth2", "oauth3", "oauth4"))
+
+    def test_master_rejects_extra_oauth_section_without_token(self):
+        raw = master_conf_with_extras() + b"\n[broken]\ntype = onedrive\n"
+        with self.assertRaisesRegex(ValueError, "Inventario"):
+            policy.validate_master_layout(raw)
+
+    def test_master_rejects_missing_oauth_token_among_six_sections(self):
+        raw = master_conf_with_extras()
+        lines = [line for line in raw.splitlines()
+                 if b'"refresh_token": "refresh4"' not in line]
+        with self.assertRaisesRegex(ValueError, "Inventario"):
+            policy.validate_master_layout(b"\n".join(lines))
+
+    def test_master_rejects_fifth_oauth_remote(self):
+        raw = (master_conf_with_extras() +
+               b'\n[fifth]\ntype = drive\ntoken = {"refresh_token":"extra"}\n')
+        with self.assertRaisesRegex(ValueError, "Inventario"):
+            policy.validate_master_layout(raw)
+
+    def test_master_publishes_token_change_with_unchanged_extras(self):
+        previous = master_conf_with_extras()
+        refreshed = previous.replace(b"refresh1", b"new-refresh1")
+        self.assertTrue(policy.master_should_publish(refreshed, previous))
+        self.assertFalse(policy.master_should_publish(previous, previous))
+        self.assertIn(b"[alias]", refreshed)
+        self.assertIn(b"[secure]", refreshed)
+
+    def test_master_does_not_publish_changed_non_oauth_settings(self):
+        previous = master_conf_with_extras()
+        modified = previous.replace(b"remote = oauth1:",
+                                    b"remote = oauth2:")
+        with self.assertRaisesRegex(ValueError, "opciones no OAuth"):
+            policy.master_should_publish(modified, previous)
+
+    def test_master_recovery_rejects_modified_extra_static_options(self):
+        published = master_conf_with_extras()
+        damaged = published.replace(b"remote = oauth1:",
+                                    b"remote = unknown:")
+        self.assertFalse(policy.master_partial_identity_compatible(
+            damaged, published))
+
+    def test_master_recovery_rejects_missing_non_oauth_section(self):
+        published = master_conf_with_extras()
+        damaged = published + b"\n[other]\ntype = alias\nremote = oauth3:\n"
+        self.assertFalse(policy.master_partial_identity_compatible(
+            damaged, published))
 
 
 if __name__ == "__main__":

@@ -506,5 +506,60 @@ class RcloneTokenSyncTests(unittest.TestCase):
 
 
 
+    def _six_section_config(self):
+        return (self.local +
+                b"\n[alias]\ntype = alias\nremote = series:\n"
+                b"\n[crypt]\ntype = crypt\nremote = movies:media\n"
+                b"password = test-only-opaque\n")
+
+    def test_master_six_sections_publish_keeps_auxiliary_remotes(self):
+        local = self._six_section_config()
+        self._set_bad_local(local)
+        published = local.replace(b"old-one", b"former-one")
+        self._master_setup(published=published, probe_status="ok")
+        payloads = []
+        def upload(token, src, dest):
+            with open(src, "rb") as fd:
+                payloads.append(fd.read())
+            return True
+        self.sync.catalog_utils._upload_file = upload
+        self.assertEqual(self.sync._publish_master(), "published")
+        self.assertEqual(self._disk(), local)
+        self.assertEqual(len(payloads), 1)
+        self.assertIn(b"[alias]", local)
+        self.assertIn(b"[crypt]", local)
+
+    def test_master_six_sections_corrupt_then_restore_every_section(self):
+        local = self._six_section_config()
+        self._set_bad_local(local)
+        self._master_setup(published=local, probe_status="ok")
+        damaged = local.replace(
+            b'"refresh_token": "old-one"', b'"refresh_token": {broken'
+        )
+        self._set_bad_local(damaged)
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_recovered_restart_pending")
+        self.assertEqual(self._disk(), local)
+        self.assertEqual(len(policy.sections(self._disk())), 6)
+        backup = self._master_backup_files()
+        self.assertEqual(len(backup), 1)
+        self.assertEqual(open(backup[0], "rb").read(), damaged)
+
+    def test_master_six_sections_different_extra_identity_blocks_recovery(self):
+        local = self._six_section_config()
+        damaged = local.replace(b"remote = series:",
+                                b"remote = another-remote:")
+        damaged = damaged.replace(
+            b'"refresh_token": "old-one"', b'"refresh_token": {broken'
+        )
+        self._set_bad_local(damaged)
+        self._master_setup(published=local, probe_status="ok")
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_identity_mismatch")
+        self.assertEqual(self._disk(), damaged)
+
+
 if __name__ == "__main__":
     unittest.main()
