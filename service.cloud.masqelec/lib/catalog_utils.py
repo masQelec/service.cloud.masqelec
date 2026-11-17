@@ -22,6 +22,7 @@ import urllib.error
 from lib import log_utils
 from lib import device_utils
 from lib import crypto_utils
+from lib import catalog_safety
 
 # ------------------------------
 # Config (preferente: constants.py)
@@ -223,6 +224,22 @@ def load_catalog_github():
         log_utils.write_log("[catalog_uploader] Estado inconsistente: zip=True version=False. Abortando subida.", "ERROR")
         return False
 
+    # Nunca publicar ZIP/version incongruentes, ni reintentar archivos
+    # incompletos de un arranque anterior.
+    try:
+        with open(ver_path, "r", encoding="utf-8") as f:
+            version_text = f.read()
+        checked_count = catalog_safety.verify_zip_manifest(zip_path, version_text)
+        log_utils.write_log(
+            "[catalog_uploader] ZIP y manifest verificados: {} STRM".format(checked_count), "INFO"
+        )
+    except Exception as exc:
+        log_utils.write_log(
+            "[catalog_uploader] ZIP/version inválidos; subida bloqueada: {}".format(exc),
+            "ERROR",
+        )
+        return False
+
     # Ya sabemos que hay algo real que subir -> ahora sí exigimos token
     token = _gh_get_plain_token()
     if not token:
@@ -245,6 +262,15 @@ def load_catalog_github():
             return False
         log_utils.write_log("{} subido correctamente".format(dst), "INFO")
 
+    # La ausencia de ZIP representa 'sin publicación pendiente'.
+    # En caso de error en GitHub, el ZIP se conserva para reintentar.
+    try:
+        os.remove(zip_path)
+    except OSError as exc:
+        log_utils.write_log(
+            "[catalog_uploader] Publicado, pero no se pudo retirar ZIP local: {}".format(exc),
+            "WARNING",
+        )
     return True
 
 

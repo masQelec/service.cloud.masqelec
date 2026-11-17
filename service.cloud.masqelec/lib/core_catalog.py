@@ -4,6 +4,7 @@ import re
 import time
 import json
 import shutil
+import tempfile
 import hashlib
 import zipfile
 import calendar
@@ -16,6 +17,7 @@ from lib import log_utils
 from lib import utils
 from lib import constants
 from lib import catalog_safety
+from lib import master_catalog_safety
 import xbmc
 
 # ==========================
@@ -213,13 +215,22 @@ def _read_old_version_hash(ver_path: str):
 # ==========================
 # BUILD STRM
 # ==========================
-def build_movies_strm():
+def build_movies_strm(output_dir=None):
     res = rpc("VideoLibrary.GetMovies", {
         "properties": ["title", "year", "file"],
         "sort": {"method": "title", "order": "ascending"},
         "limits": {"start": 0, "end": 200000},
     })
+    if not isinstance(res, dict):
+        raise RuntimeError("Respuesta GetMovies inválida")
     movies = res.get("movies", []) or []
+    if not isinstance(movies, list):
+        raise RuntimeError("GetMovies devolvió datos incorrectos")
+    limits = res.get("limits") or {}
+    if isinstance(limits, dict) and int(limits.get("total") or 0) > len(movies):
+        raise RuntimeError("GetMovies devolvió respuesta parcial; se conserva catálogo anterior")
+    if output_dir is None:
+        output_dir = MOVIES_DIR
 
     n = 0
     for m in movies:
@@ -232,7 +243,7 @@ def build_movies_strm():
         base = f"{title} ({year})" if year else title
         base = safe_name(base)
 
-        strm = os.path.join(MOVIES_DIR, base + ".strm")
+        strm = os.path.join(output_dir, base + ".strm")
         write_text(strm, fpath + "\n")
 
         _clone_mtime_from_video(fpath, strm)
@@ -243,13 +254,22 @@ def build_movies_strm():
 
     log_utils.write_log(f"Películas total .strm: {n}")
 
-def build_tv_strm():
+def build_tv_strm(output_dir=None):
     res = rpc("VideoLibrary.GetEpisodes", {
         "properties": ["title", "file", "showtitle", "season", "episode"],
         "sort": {"method": "title", "order": "ascending"},
         "limits": {"start": 0, "end": 2000000},
     })
+    if not isinstance(res, dict):
+        raise RuntimeError("Respuesta GetEpisodes inválida")
     eps = res.get("episodes", []) or []
+    if not isinstance(eps, list):
+        raise RuntimeError("GetEpisodes devolvió datos incorrectos")
+    limits = res.get("limits") or {}
+    if isinstance(limits, dict) and int(limits.get("total") or 0) > len(eps):
+        raise RuntimeError("GetEpisodes devolvió respuesta parcial; se conserva catálogo anterior")
+    if output_dir is None:
+        output_dir = TV_DIR
 
     total = 0
     fallback = 0
@@ -268,7 +288,7 @@ def build_tv_strm():
             fallback += 1
             show_folder = safe_name(e.get("showtitle") or "Unknown Show")
 
-        show_dir = os.path.join(TV_DIR, safe_name(show_folder))
+        show_dir = os.path.join(output_dir, safe_name(show_folder))
         season_dir = os.path.join(show_dir, f"Season {season:02d}")
         os.makedirs(season_dir, exist_ok=True)
 
@@ -302,53 +322,89 @@ def make_zip(src_root, out_zip):
                     z.write(full, arc)
 
 def generate_catalog():
-    os.makedirs(MOVIES_DIR, exist_ok=True)
-    os.makedirs(TV_DIR, exist_ok=True)
+    """Genera en staging, valida y después aplica los STRM al MASTER.
+
+    La versión publicada se modifica solo tras un ZIP íntegro y una
+    aplicación local satisfactoria. No elimina el ZIP si hay una subida
+    previa pendiente de reintento.
+    """
     os.makedirs(EXPORT_DIR, exist_ok=True)
+    if not acquire_lock():
+        raise RuntimeError("Catálogo MASTER: operación concurrente bloqueada")
 
-    ver_path = os.path.join(EXPORT_DIR, VER_NAME)
-    old_hash = _read_old_version_hash(ver_path)
+    workdir = None
+    preserve_recovery = False
+    try:
+        workdir = tempfile.mkdtemp(prefix=".catalog-build-", dir=EXPORT_DIR)
+        stage_root = os.path.join(workdir, "content")
+        staged_movies = os.path.join(stage_root, "videos")
+        staged_tv = os.path.join(stage_root, "tvshows")
+        os.makedirs(staged_movies, exist_ok=True)
+        os.makedirs(staged_tv, exist_ok=True)
 
-    if old_hash:
-        log_utils.write_log(f"Hash anterior detectado: {old_hash}")
-    else:
-        log_utils.write_log("No hay hash anterior válido (catalog.version ausente o corrupto).")
+        ver_path = os.path.join(EXPORT_DIR, VER_NAME)
+        old_hash = _read_old_version_hash(ver_path)
+        log_utils.write_log("MASTER: generando catálogo temporal sin borrar STRM activos…")
+        build_movies_strm(output_dir=staged_movies)
+        build_tv_strm(output_dir=staged_tv)
 
-    log_utils.write_log("Limpiando catálogo previo (.strm)…")
-    wipe_strm_only()
+        new_hash, count = compute_version_hash(stage_root)
+        if count <= 0:
+            raise RuntimeError("Catálogo generado vacío; se conservan los STRM anteriores")
 
-    log_utils.write_log("Generando .strm de películas…")
-    build_movies_strm()
-
-    log_utils.write_log("Generando .strm de series…")
-    build_tv_strm()
-
-    new_hash, count = compute_version_hash(CATALOG_ROOT)
-
-    changed = not (old_hash and old_hash == new_hash.lower())
-
-    if not changed:
-        log_utils.write_log(f"Hash idéntico al anterior; NO se actualiza {VER_NAME} ni se crea ZIP (hash={new_hash})")
-        # Si existe un ZIP viejo, opcionalmente bórralo para evitar que alguien lo suba por error
-        try:
-            old_zip = os.path.join(EXPORT_DIR, ZIP_NAME)
-            if os.path.exists(old_zip):
-                os.remove(old_zip)
-        except Exception:
-            pass
-    else:
         stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        ver_txt = f"{new_hash}  strm_files={count}  utc={stamp}\n"
-        write_text(ver_path, ver_txt)
-        log_utils.write_log(f"Version actualizada: {ver_path} (hash={new_hash})")
+        new_version = f"{new_hash}  strm_files={count}  utc={stamp}\n"
+        if catalog_safety.verify_staging(stage_root, new_version) != count:
+            raise RuntimeError("Verificación del staging MASTER fallida")
 
-        if MAKE_ZIP:
-            zip_path = os.path.join(EXPORT_DIR, ZIP_NAME)
-            log_utils.write_log("Creando ZIP (.strm)…")
-            make_zip(CATALOG_ROOT, zip_path)
-            log_utils.write_log(f"ZIP: {zip_path}")
+        changed = not (old_hash and old_hash == new_hash)
+        staged_zip = os.path.join(workdir, ZIP_NAME)
+        if changed:
+            if not MAKE_ZIP:
+                raise RuntimeError("No se puede publicar catalog.version sin catalog.zip")
+            make_zip(stage_root, staged_zip)
+            catalog_safety.verify_zip_manifest(staged_zip, new_version)
 
-    log_utils.write_log(f"OK. hash={new_hash} strm_files={count} changed={int(changed)}")
+        # La copia de respaldo está también bajo /storage para evitar
+        # dependencias de RAM (/tmp) y conservar permisos/mtime.
+        copied, deleted = master_catalog_safety.apply_staged_catalog(
+            stage_root, CATALOG_ROOT, os.path.join(workdir, "rollback")
+        )
+        log_utils.write_log(
+            f"MASTER: catálogo local aplicado: copiados={copied} eliminados={deleted}"
+        )
+
+        if changed:
+            # Publicar ZIP antes que VERSION; el uploader verifica ambos.
+            os.replace(staged_zip, os.path.join(EXPORT_DIR, ZIP_NAME))
+            version_temp = os.path.join(workdir, VER_NAME)
+            with open(version_temp, "w", encoding="utf-8", newline="\n") as stream:
+                stream.write(new_version)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(version_temp, ver_path)
+            log_utils.write_log(
+                f"MASTER: catálogo preparado para publicar: hash={new_hash} strm_files={count}"
+            )
+        else:
+            log_utils.write_log(
+                f"MASTER: catálogo sin cambios (hash={new_hash}); "
+                "conservando ZIP pendiente si lo hay"
+            )
+
+        return bool(changed)
+    except Exception as exc:
+        if "rollback INCOMPLETO" in str(exc):
+            preserve_recovery = True
+            log_utils.write_log(
+                f"MASTER: recuperación pendiente; conservando respaldos en {workdir}",
+                "ERROR",
+            )
+        raise
+    finally:
+        if workdir and not preserve_recovery:
+            shutil.rmtree(workdir, ignore_errors=True)
+        release_lock()
 
 
 # ==========================

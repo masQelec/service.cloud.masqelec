@@ -98,3 +98,29 @@ def validate_deletions(local_count, deletion_count):
         raise ValueError(
             "Borrado masivo bloqueado: {} de {} STRM (límite {})".format(
                 deletion_count, local_count, limit))
+
+def verify_zip_manifest(zip_path, version_text):
+    """Valida ZIP completo y compara su contenido con catalog.version.
+
+    La lectura con ZipFile.open verifica también el CRC de los miembros.
+    No extrae nada al sistema de archivos.
+    """
+    entries = validate_catalog_zip(zip_path)
+    tokens = (version_text or "").split()
+    expected = tokens[0].lower() if tokens else ""
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("Hash inválido en catalog.version")
+    match = re.search(r"\bstrm_files=(\d+)\b", version_text or "")
+    if not match or int(match.group(1)) != entries:
+        raise ValueError("Número STRM ZIP/version no coincide")
+
+    h = hashlib.sha256()
+    with zipfile.ZipFile(zip_path, "r") as archive:
+        for name in sorted(member.filename.replace("\\", "/") for member in archive.infolist() if not member.is_dir()):
+            h.update(name.encode("utf-8"))
+            with archive.open(name, "r") as stream:
+                for chunk in iter(lambda: stream.read(262144), b""):
+                    h.update(chunk)
+    if h.hexdigest() != expected:
+        raise ValueError("Hash del ZIP no coincide con catalog.version")
+    return entries
