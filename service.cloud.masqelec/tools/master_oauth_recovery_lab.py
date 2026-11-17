@@ -16,7 +16,7 @@ import time
 import types
 import urllib.request
 
-SOURCE_COMMIT = "c3d1fa5fcf756da2ea594cdb308fba079dd22150"
+SOURCE_COMMIT = "20833544ea16b8d7038025e4583bfad472c7f4db"
 SOURCE_BASE = (
     "https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/"
     + SOURCE_COMMIT + "/service.cloud.masqelec/lib/"
@@ -142,7 +142,11 @@ def _fake_modules(lab, key, binary):
 
 def main():
     global LAB_STAGE
-    print("LAB_MODE=MASTER_CORRUPT_SELF_RECOVERY")
+    mount_only = "--mount-check-only" in sys.argv[1:]
+    if len(sys.argv) > 1 and not mount_only:
+        raise ValueError("Modo de laboratorio no admitido")
+    print("LAB_MODE=" + ("MOUNT_CONCURRENCY_READ_ONLY" if mount_only
+                         else "MASTER_CORRUPT_SELF_RECOVERY"))
     print("ADDON_MODIFIED=NO")
     print("LIVE_RCLONE_CONF_WRITE=NO")
     print("GITHUB_UPLOAD=NO")
@@ -158,6 +162,20 @@ def main():
         sys.path.insert(0, str(root))
         from lib import rclone_conf_merge as merge
         from lib import rclone_token_policy as policy
+        if mount_only:
+            LAB_STAGE = "CHECK_MOUNT_GUARD"
+            # Sin claves ni consultas OAuth: solamente inspeccionar /proc.
+            worker = _fake_modules(root, b"K" * 32, "/usr/bin/rclone")
+            worker.CONF_PATH = LIVE_CONF
+            live_busy = worker._config_mounts_active()
+            worker.CONF_PATH = str(root / "isolated-rclone.conf")
+            isolated_busy = worker._config_mounts_active()
+            print("LIVE_CONFIG_MOUNTS_ACTIVE=" + ("YES" if live_busy else "NO"))
+            print("ISOLATED_CONFIG_MOUNTS_ACTIVE=" +
+                  ("YES" if isolated_busy else "NO"))
+            print("LAB_RESULT=" +
+                  ("PASS" if live_busy and not isolated_busy else "INCONCLUSIVE"))
+            return 0 if not isolated_busy else 2
         LAB_STAGE = "READ_KEY"
         key = _get_key()
         LAB_STAGE = "FIND_RCLONE"

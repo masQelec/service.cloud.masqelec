@@ -236,3 +236,21 @@ nombre: https://rclone.org/docs/#config-string. En los servicios
 `cloud.masqelec/develop/system.d` no hay un mecanismo de lock interproceso.
 
 Pruebas previstas tras este cambio: 123 (111 anteriores + 12 de concurrencia).
+
+## Comprobación de detección real de montajes (solo lectura)
+
+El script `tools/master_oauth_recovery_lab.py`, cuando se ejecuta con
+`--mount-check-only`, usa el worker fijado al commit 2083354 y recorre
+`/proc` sin abrir tokens ni consultar Microsoft/Google.
+
+    python3 /tmp/master_oauth_recovery_lab.py --mount-check-only
+
+Salida esperada con al menos un `rclone mount` activo usando `rclone.conf`:
+
+    LAB_MODE=MOUNT_CONCURRENCY_READ_ONLY
+    LIVE_CONFIG_MOUNTS_ACTIVE=YES
+    ISOLATED_CONFIG_MOUNTS_ACTIVE=NO
+    LAB_RESULT=PASS
+
+El modo no modifica ficheros ni sube datos. Si no hay montajes reales
+activos, el resultado es `INCONCLUSIVE`; no constituye fallo del guard.
