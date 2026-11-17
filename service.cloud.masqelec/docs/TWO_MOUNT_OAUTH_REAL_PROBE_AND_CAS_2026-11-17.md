@@ -110,3 +110,27 @@ de credenciales reales en incidencias o respuestas; solo estados anónimos.
 inmutable/condicional requiere una fase posterior de concurrencia y
 confirmación operativa. La función strict_put es una pieza de transporte
 desconectada; no se considera un publicador listo.
+
+## Protección adicional antes de sondeo real (bloqueo operativo)
+
+Los comandos rclone lsf pueden provocar una renovación de token ante
+Microsoft. Incluso si los nuevos valores se guardan SOLAMENTE en una
+copia privada, no podemos garantizar que el refresh_token anterior
+mantenga validez para los montajes vivos del mismo usuario. La renovación
+es un posible efecto de servidor, no solo de escritura local.
+
+Por eso, el laboratorio se niega a ejecutar `--real-probe` si detecta
+CUALQUIER proceso rclone mount en el dispositivo. También falla cerrado
+si no puede inspeccionar /proc. Devuelve
+`LAB_RESULT=BLOCKED_ACTIVE_MOUNTS` antes de solicitar el MQC2 o una
+clave local. Esa comprobación cubre solo el dispositivo local y no
+descarta montajes de CLIENTES remotos: todavía se requiere coordinación
+de todos los escritores de cada cuenta.
+
+El modo `--preflight` SÍ puede ejecutarse con los mounts activos,
+porque lee el respaldo MQC2 de GitHub y compara estructura/SHA sin
+hacer una petición OAuth a Microsoft. Se añadieron cuatro pruebas
+adicionales del fence. Total esperado: **228**.
+
+NO ejecutar `--real-probe` durante funcionamiento normal de Kodi.
+No se realizará todavía un ensayo OAuth real en caliente.

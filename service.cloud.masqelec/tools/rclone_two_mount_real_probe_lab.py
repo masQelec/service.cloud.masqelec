@@ -80,6 +80,39 @@ def which_rclone():
     return os.path.realpath(found)
 
 
+def any_rclone_mounts_alive():
+    """Bloqueo antes de probar OAuth: rclone podría rotar el refresh remoto.
+
+    No basta que el fichero --config sea una copia privada. Si Microsoft
+    invalida otro refresh token, un mount vivo puede quedarse sin acceso.
+    Sin /proc completo o permisos suficientes se falla de forma segura.
+    """
+    try:
+        processes = os.scandir("/proc")
+    except OSError:
+        return True
+    try:
+        for entry in processes:
+            if not entry.name.isdecimal() or int(entry.name) == os.getpid():
+                continue
+            try:
+                with open(entry.path + "/cmdline", "rb") as f:
+                    cmd = [part.decode("utf-8", "replace")
+                           for part in f.read(16384).split(b"\0") if part]
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+            except OSError:
+                return True
+            if not cmd:
+                continue
+            if (os.path.basename(cmd[0]).startswith("rclone")
+                    and "mount" in cmd[1:10]):
+                return True
+        return False
+    finally:
+        processes.close()
+
+
 def main():
     global STAGE
     mode = "--real-probe" if "--real-probe" in sys.argv[1:] else "--preflight"
@@ -94,6 +127,16 @@ def main():
     print("SYSTEMD_WRITE=NO")
     print("GITHUB_UPLOAD=NO")
     print("OAUTH_PROBE_REQUESTED=" + ("YES" if mode == "--real-probe" else "NO"))
+    if mode == "--real-probe":
+        STAGE = "MOUNT_SAFETY_FENCE"
+        if any_rclone_mounts_alive():
+            print("ACTIVE_RCLONE_MOUNTS=YES_OR_UNKNOWN")
+            print("LAB_RESULT=BLOCKED_ACTIVE_MOUNTS")
+            return 2
+        print("ACTIVE_RCLONE_MOUNTS=NO")
+        # Esto verifica solamente inactividad LOCAL. No demuestra que
+        # otros CLIENTES de la misma cuenta estén inactivos. El operador
+        # debe coordinar antes de autorizar la prueba de refresh OAuth.
 
     with tempfile.TemporaryDirectory(
             prefix="masqelec-v2-mqc2-probe-", dir="/tmp") as dirname:
