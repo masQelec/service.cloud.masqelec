@@ -124,3 +124,15 @@ Código fijado del script: `c701e74e5a677e3d300094f9ea112eb830749c3f`; el script
 
 
 **CI registrado (17-11-2026):** workflow `develop unit tests (no deployment)` con `permissions: contents: read`, checkout sin credenciales persistentes y Python 3.11. Run: https://github.com/masQelec/service.cloud.masqelec/actions/runs/44188131468; `Ran 233 tests in 0.359s / OK`. Esto **no** verifica ejecución en KodiELEC, dispositivos remotos, publicación GitHub MQC2 ni migración real. `main`, `cloud/master`, `cloud/develop/system.d` y montajes no se han modificado.
+
+### Diagnóstico seguro de divergencia (solo preflight)
+
+Para observar qué cuenta tiene un refresh diferente, sin mostrar tokens ni hashes, ejecutar exclusivamente en KodiELEC:
+
+```bash
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/${source_commit}/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' -O /tmp/rclone_two_mount_real_probe_lab.py
+python3 -m py_compile /tmp/rclone_two_mount_real_probe_lab.py
+python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
+```
+
+En caso de discrepancia estable, salida adicional `BASELINE_REFRESH_ONEDRIVE_1|2` y `BASELINE_REFRESH_DRIVE_1|2` con `SAME/DIFFERENT`, junto a `GH_BRANCH_COMMIT_STABLE=YES`. Resultado esperado de seguridad: `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`, **no** PASS. Si cambia la fuente durante la lectura: `INCONCLUSIVE_*`. No usar `--real-probe`; no copiar ni publicar ninguno de los tokens. **No se ha ejecutado todavía este script actualizado en el KodiELEC real.** Pruebas de laboratorio GitHub Actions: **239/239 OK** (run `${run}`). [Informe completo](PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md).

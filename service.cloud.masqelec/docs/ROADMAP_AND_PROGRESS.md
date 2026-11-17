@@ -117,3 +117,7 @@ En `service.cloud.masqelec/develop` se añadieron commits `17cb2901`, `41b9f033`
 
 
 **CI registrado (17-11-2026):** workflow `develop unit tests (no deployment)` con `permissions: contents: read`, checkout sin credenciales persistentes y Python 3.11. Run: https://github.com/masQelec/service.cloud.masqelec/actions/runs/44188131468; `Ran 233 tests in 0.359s / OK`. Esto **no** verifica ejecución en KodiELEC, dispositivos remotos, publicación GitHub MQC2 ni migración real. `main`, `cloud/master`, `cloud/develop/system.d` y montajes no se han modificado.
+
+### Gate P0-A — discrepancia detectada
+
+El preflight real en KodiELEC devolvió `GH_OAUTH_BASELINE=DIFFERENT` y `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`, con SHA/autenticidad MQC2 e identidad estática PASS. No se conoce qué refresh es posterior/usable, ni se efectuaron modificaciones. `P0-A=BLOCKED` hasta diagnóstico de las cuatro cuentas. Implementado desglose anónimo y recheck local + HEAD GitHub (commits `f1c6ba1`, `20f924c`, `07b008d`); GitHub Actions `239/239 OK`, run `44191814025`. Código aún no probado en dispositivo. El siguiente paso es el preflight fijado a `07b008d`, nunca sondeo OAuth real ni restauración automática.

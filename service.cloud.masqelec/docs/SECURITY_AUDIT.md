@@ -97,3 +97,13 @@ Fuentes de implementación: `lib/rclone_token_policy.py`, `lib/rclone_token_sync
 
 
 **CI registrado (17-11-2026):** workflow `develop unit tests (no deployment)` con `permissions: contents: read`, checkout sin credenciales persistentes y Python 3.11. Run: https://github.com/masQelec/service.cloud.masqelec/actions/runs/44188131468; `Ran 233 tests in 0.359s / OK`. Esto **no** verifica ejecución en KodiELEC, dispositivos remotos, publicación GitHub MQC2 ni migración real. `main`, `cloud/master`, `cloud/develop/system.d` y montajes no se han modificado.
+
+## Preflight real de KodiELEC: discrepancia OAuth (17-11-2026)
+
+Evidencia del operador (sin credenciales): `MASTER_CANONICAL_LAYOUT=PASS`, `GH_BLOB_SHA_VALID=PASS`, `MQC2_AUTHENTICATED=PASS`, `GH_STATIC_IDENTITY=PASS`, `GH_OAUTH_BASELINE=DIFFERENT`, `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`. El comando fue `--preflight` (`OAUTH_PROBE_REQUESTED=NO`). **Ningún refresh_token puede elegirse como válido/nuevo por esta evidencia**. Puede discrepar OneDrive o Google Drive: la comparación cubre cuatro OAuth. La seguridad del bloqueo es correcta; gate de consistencia L5/P0-A **BLOCKED**, no PASS.
+
+En `develop` se añadió diagnóstico anónimo para las cuatro cuentas: `BASELINE_REFRESH_ONEDRIVE_1`, `BASELINE_REFRESH_ONEDRIVE_2`, `BASELINE_REFRESH_DRIVE_1`, `BASELINE_REFRESH_DRIVE_2` (valores exclusivos `SAME`/`DIFFERENT`; DRIVE numerado por orden de sección). No emite nombres, claves, hashes ni contenido de tokens. Ante divergencia vuelve a leer el fichero local y comprobar `GH_BRANCH_COMMIT_STABLE=YES`; si cambia una fuente devuelve INCONCLUSIVE sin informar un snapshot inconsistente. **No publica, restaura ni sondea OAuth.**
+
+Commits: `f1c6ba1`, `20f924c`, `07b008d`. Suite sintética GitHub Actions: **239/239 OK** (run [44191814025](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44191814025)); incluye dos tests end-to-end del preflight con MQC2 ficticio y cambio de HEAD. **La nueva versión del diagnóstico NO se ha ejecutado todavía en el KodiELEC real.**
+
+Siguiente acción permitida: repetir exclusivamente `--preflight` descargando el script desde el **commit inmutable `07b008db93ad524e9cbfec5b5e0e4b63704fe15e`**; la salida debe indicar qué cuenta difiere, no cuál es más nueva. Si aparece `BLOCKED_BASELINE_DIVERGED`, mantener el bloqueo y conservar las dos fuentes intactas. No ejecutar `--real-probe`, ni modificar `rclone.conf`, `cloud/develop/rclone/rclone.conf.crypt`, unidades, montajes o `main`/`master`.

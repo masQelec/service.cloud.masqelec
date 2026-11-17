@@ -137,3 +137,7 @@ En `develop` se incorporaron cinco pruebas nuevas y dos barreras: `--real-probe`
 
 
 **CI registrado (17-11-2026):** workflow `develop unit tests (no deployment)` con `permissions: contents: read`, checkout sin credenciales persistentes y Python 3.11. Run: https://github.com/masQelec/service.cloud.masqelec/actions/runs/44188131468; `Ran 233 tests in 0.359s / OK`. Esto **no** verifica ejecución en KodiELEC, dispositivos remotos, publicación GitHub MQC2 ni migración real. `main`, `cloud/master`, `cloud/develop/system.d` y montajes no se han modificado.
+
+### Discrepancia real OAuth detectada (17-11-2026)
+
+El preflight KodiELEC confirmó SHA GitHub, autenticación MQC2 e identidad estática, pero devolvió **BLOCKED_BASELINE_DIVERGED**. Una o más de las cuatro cuentas OAuth presentan refresh diferentes; no es prueba de caducidad. La rama `develop` incorpora un informe por proveedor/cuenta sin secretos, sin modificar las fuentes. Pruebas GitHub Actions **239/239 OK** (commit `07b008d`); falta repetir el preflight de diagnóstico en KodiELEC. Ver [informe de incidencia](service.cloud.masqelec/docs/PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md).
