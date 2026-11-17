@@ -1,6 +1,6 @@
 # Operaciones, pruebas y diagnóstico — masQelec
 
-**Ámbito:** procedimientos seguros para continuar trabajando en `develop` sin cortar la reproducción. Los ensayos son **diagnóstico**, no despliegue. Última referencia probada: **228/228 `OK`** (informado por operador, 17-11-2026).
+**Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **271/271 OK** (GitHub Actions run 44194785936). El preflight real quedó BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-D: laboratorios, **no** despliegue ni sincronización.
 
 ## 1. Protocolo de cambios
 
@@ -140,3 +140,24 @@ En caso de discrepancia estable, salida adicional `BASELINE_REFRESH_ONEDRIVE_1|2
 ## 8. Resultado real del segundo preflight
 
 El operador comunicó `ONEDRIVE_1=DIFFERENT`, `ONEDRIVE_2=DIFFERENT`, `DRIVE_1=SAME`, `DRIVE_2=SAME` en etiquetas `BASELINE_REFRESH_*`, `GH_BRANCH_COMMIT_STABLE=YES`, `LIVE_CONFIG_CHANGED=NO`, `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`. El bloqueo protege frente a una sobrescritura sin evidencia de validez OAuth. **No repetir el preflight sin una nueva pregunta diagnóstica**. No hacer `rclone lsf`, `config reconnect`, OAuth real, PUT GitHub ni cambios en montajes/unidades. Arquitectura objetivo: 2 FUSE (cada `users_library_N` crypt sobre OneDrive `library_N`) + 4 bind a las rutas Kodi originales; sin desplegar.
+
+## 9. Gate P0-B/P0-D después del segundo preflight
+
+## Actualización 17-11-2026: P0-B (generaciones) y P0-D (readback), laboratorio
+
+Se incorporaron en `develop` los módulos puros `lib/rclone_two_mount_generation.py` (`5730c0e`) y `lib/rclone_two_mount_readback.py` (`d441ea5`), con **32 pruebas nuevas** sobre el baseline 239. GitHub Actions run [44194785936](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44194785936) confirma **271/271 OK**.
+
+- P0-B: **PASS en simulación**, compara canónico, dos cuentas aisladas y MQC2 mediante huellas HMAC efímeras, SHA/HEAD y cuatro epochs. Distingue cambio local, cambio remoto y ABA **si y solo si** todos los escritores incrementan epochs fiables. No existen en el legacy; con escritores no coordinados `blocked_untracked_writers`.
+- P0-D: **PASS parcial sintético**, confirma GET MQC2 autenticado y bytes idénticos, blob SHA esperado, commit HEAD leído estable. `verified_lab_only` **no es autorización**.
+- P0-C: **NO IMPLEMENTADO**; múltiples CLIENTES/montajes rclone siguen pudiendo renovar refresh OneDrive. El token local renovado después del backup es la **causa confirmada por operador** del bloqueo P0-A.
+- Sin red OAuth, sin GitHub PUT de credenciales, sin migración. `main`, `cloud/master`, `cloud/develop/system.d` intactos. Los dos flags siguen False.
+- Documentación técnica: [OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md](OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md).
+
+
+**Para reproducir pruebas sintéticas** (Ubuntu, checkout `develop`; no ejecutar código live de KodiELEC):
+
+```bash
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'
+```
+
+No se necesita permiso para modificar el sistema, OAuth real, GitHub token ni claves. No ejecutar pruebas con `rclone lsf`, ni editar `rclone.conf` o `system.d`.

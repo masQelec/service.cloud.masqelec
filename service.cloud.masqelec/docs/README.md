@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice de referencia para desarrolladores y nuevos chats.** Estado cerrado a 17-11-2026; 228 pruebas unitarias **OK** según salida comunicada por el operador. Las propuestas de OAuth v2 y dos montajes FUSE permanecen **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada a 17-11-2026: **271/271 OK**. P0-B generaciones/ABA y P0-D readback: solo laboratorios; el preflight real identificó ambas cuentas OneDrive divergentes tras la renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 
@@ -13,6 +13,8 @@
 | [CLIENTES: actualizaciones y migración](CLIENT_ROLLOUT.md) | Coexistencia, manifiesto, `prepared/active/unsafe`, rollback y funciones aún inexistentes |
 | [Progreso, decisiones y hoja de ruta](ROADMAP_AND_PROGRESS.md) | Cambios confirmados, criterios de terminado y siguiente prioridad |
 | [**Handoff 17-11-2026**](HANDOFF_2026-11-17.md) | Resumen reproducible para retomar desde otro chat; contiene comando del preflight pendiente |
+| [Generaciones OAuth + CAS/readback (P0-B/P0-D)](OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md) | Prototipos puros, 271/271 PASS, garantías, límites e integración pendiente |
+| [Diagnóstico divergencia real OneDrive](PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md) | Evidencia de KodiELEC, causa confirmada y bloqueo de recuperación |
 
 ## Historial de laboratorios (fotos del progreso, no instrucciones de despliegue)
 
@@ -49,3 +51,5 @@ Próxima prueba:             tools/rclone_two_mount_real_probe_lab.py --prefligh
 Prueba OAuth --real-probe:  NO AUTORIZADA con montajes activos
 Migración MASTER/CLIENTES:  NO DEPLOY
 ```
+
+**Estado más reciente:** P0-B/P0-D son laboratorios; P0-C/P0-E–H y el preflight coherente siguen bloqueados. Las secciones históricas 228/228 y «preflight pendiente» describen el corte inicial, no el estado vivo. Consultar los apartados finales del handoff.

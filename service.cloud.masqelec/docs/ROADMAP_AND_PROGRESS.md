@@ -6,7 +6,7 @@
 
 **Objetivo:** mantener un MASTER masQelec que publique respaldos OAuth MQC2 compatibles con CLIENTES legacy y futuros CLIENTES v2, reduciendo cada dispositivo de 4 a 2 procesos rclone y conservando las cuatro rutas de Kodi.
 
-**Estado:** arquitectura y políticas preparadas en `develop`; **no desplegadas**. Los cuatro montajes legacy siguen como referencia operativa. La suite reportada es **228/228 OK**. **Siguiente hito:** `--preflight` real de SHA GitHub + MQC2, **sin** sondeo Microsoft.
+**Estado actual:** arquitectura 2 FUSE+4 bind **no desplegada**; suite CI **271/271 PASS**. Preflight real MQC2: ambos OneDrive diferentes por renovación posterior confirmada, ambos Drive iguales; P0-A **BLOCKED** por divergencia. P0-B/P0-D solo simulaciones, P0-C coordinación distribuida pendiente.
 
 **Últimos HEAD de código antes de este hito documental:**
 - Addon `develop`: `46e5960d02302ace8c263c0aafce2bcdbef99eb7` (fix mock de `stderr`).
@@ -152,4 +152,15 @@ La pareja lógica **1** consta del remoto OAuth OneDrive `library_1` y el wrappe
 - `P0-A` queda con **causa de divergencia identificada**, pero el gate de coherencia OAuth permanece **BLOCKED**.
 - Próximos gates P0-B/C/D: generaciones por fuente, detección de cambios concurrentes de ambos remotos y del MQC2, coordinación entre MASTER/CLIENTES, publicación CAS con readback y revalidación independiente en laboratorios sintéticos.
 - `RCLONE_TOKEN_SYNC_ENABLED=False`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; sin deploy, reinicios, ni escritura de credenciales en GitHub.
+
+
+## Actualización 17-11-2026: P0-B (generaciones) y P0-D (readback), laboratorio
+
+Se incorporaron en `develop` los módulos puros `lib/rclone_two_mount_generation.py` (`5730c0e`) y `lib/rclone_two_mount_readback.py` (`d441ea5`), con **32 pruebas nuevas** sobre el baseline 239. GitHub Actions run [44194785936](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44194785936) confirma **271/271 OK**.
+
+- P0-B: **PASS en simulación**, compara canónico, dos cuentas aisladas y MQC2 mediante huellas HMAC efímeras, SHA/HEAD y cuatro epochs. Distingue cambio local, cambio remoto y ABA **si y solo si** todos los escritores incrementan epochs fiables. No existen en el legacy; con escritores no coordinados `blocked_untracked_writers`.
+- P0-D: **PASS parcial sintético**, confirma GET MQC2 autenticado y bytes idénticos, blob SHA esperado, commit HEAD leído estable. `verified_lab_only` **no es autorización**.
+- P0-C: **NO IMPLEMENTADO**; múltiples CLIENTES/montajes rclone siguen pudiendo renovar refresh OneDrive. El token local renovado después del backup es la **causa confirmada por operador** del bloqueo P0-A.
+- Sin red OAuth, sin GitHub PUT de credenciales, sin migración. `main`, `cloud/master`, `cloud/develop/system.d` intactos. Los dos flags siguen False.
+- Documentación técnica: [OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md](OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md).
 

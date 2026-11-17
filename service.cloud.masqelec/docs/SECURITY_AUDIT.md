@@ -107,3 +107,16 @@ En `develop` se añadió diagnóstico anónimo para las cuatro cuentas: `BASELIN
 Commits: `f1c6ba1`, `20f924c`, `07b008d`. Suite sintética GitHub Actions: **239/239 OK** (run [44191814025](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44191814025)); incluye dos tests end-to-end del preflight con MQC2 ficticio y cambio de HEAD. **La nueva versión del diagnóstico NO se ha ejecutado todavía en el KodiELEC real.**
 
 Siguiente acción permitida: repetir exclusivamente `--preflight` descargando el script desde el **commit inmutable `07b008db93ad524e9cbfec5b5e0e4b63704fe15e`**; la salida debe indicar qué cuenta difiere, no cuál es más nueva. Si aparece `BLOCKED_BASELINE_DIVERGED`, mantener el bloqueo y conservar las dos fuentes intactas. No ejecutar `--real-probe`, ni modificar `rclone.conf`, `cloud/develop/rclone/rclone.conf.crypt`, unidades, montajes o `main`/`master`.
+
+## Actualización 17-11-2026: P0-B (generaciones) y P0-D (readback), laboratorio
+
+Se incorporaron en `develop` los módulos puros `lib/rclone_two_mount_generation.py` (`5730c0e`) y `lib/rclone_two_mount_readback.py` (`d441ea5`), con **32 pruebas nuevas** sobre el baseline 239. GitHub Actions run [44194785936](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44194785936) confirma **271/271 OK**.
+
+- P0-B: **PASS en simulación**, compara canónico, dos cuentas aisladas y MQC2 mediante huellas HMAC efímeras, SHA/HEAD y cuatro epochs. Distingue cambio local, cambio remoto y ABA **si y solo si** todos los escritores incrementan epochs fiables. No existen en el legacy; con escritores no coordinados `blocked_untracked_writers`.
+- P0-D: **PASS parcial sintético**, confirma GET MQC2 autenticado y bytes idénticos, blob SHA esperado, commit HEAD leído estable. `verified_lab_only` **no es autorización**.
+- P0-C: **NO IMPLEMENTADO**; múltiples CLIENTES/montajes rclone siguen pudiendo renovar refresh OneDrive. El token local renovado después del backup es la **causa confirmada por operador** del bloqueo P0-A.
+- Sin red OAuth, sin GitHub PUT de credenciales, sin migración. `main`, `cloud/master`, `cloud/develop/system.d` intactos. Los dos flags siguen False.
+- Documentación técnica: [OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md](OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md).
+
+
+**Hallazgos nuevos:** SEC-17 — sin contador fiable por cada escritor (los HMAC de snapshots detectan cambio neto, no ABA invisible), **BLOCKED operativo**; SEC-18 — la lectura independiente post-PUT y coordinación interdispositivo no están integradas, **BLOCKED operativo**. Los tests sintéticos no validan que se controle un proceso rclone en vivo. Mantener el caso P0-A bloqueado y no publicar tokens.
