@@ -18,6 +18,10 @@ def sections(raw):
 def oauth_tokens(raw):
     result = {}
     for name, options in sections(raw).items():
+        # Los refresh_token de Box y otros proveedores pueden ser de un solo
+        # uso: compartirlos entre dispositivos los invalidaría.
+        if options.get("type", "").strip().lower() != "drive":
+            continue
         if "token" not in options:
             continue
         try:

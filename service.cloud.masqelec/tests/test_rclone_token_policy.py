@@ -81,6 +81,13 @@ class RcloneTokenPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "JSON"):
             policy.oauth_tokens(bad)
 
+    def test_non_drive_refresh_not_shared(self):
+        drive = conf("drive-token")
+        box = drive.replace(b"type = drive", b"type = box")
+        self.assertEqual(list(policy.oauth_tokens(drive)), ["cloud"])
+        self.assertEqual(policy.oauth_tokens(box), {})
+
+
 
 if __name__ == "__main__":
     unittest.main()
