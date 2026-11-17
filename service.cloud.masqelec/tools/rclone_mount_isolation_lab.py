@@ -8,11 +8,12 @@ import sys
 import tempfile
 import urllib.request
 
-REF = "adbd506fa0a1a9237b81d19a379fd5bd1e41939a"
+REF = "049b0d67d165ab353d53924f30f701b9691b9aa5"
 SOURCE = ("https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/"
           + REF + "/service.cloud.masqelec/lib/")
 UNITS = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/develop/system.d/"
 LIVE = "/storage/.config/rclone/rclone.conf"
+LAB_STAGE = "BOOT"
 
 
 def _fetch(url):
@@ -43,6 +44,7 @@ def _stable_live():
 
 
 def run():
+    global LAB_STAGE
     print("LAB_MODE=PER_MOUNT_ONEDRIVE_CONFIG_ISOLATION")
     print("SOURCE_REF=" + REF)
     print("LIVE_CONFIG_WRITE=NO")
@@ -50,7 +52,7 @@ def run():
     print("SYSTEMD_WRITE=NO")
     print("MOUNT_RESTART=NO")
     print("GITHUB_UPLOAD=NO")
-    stage = "CREATE_TMP"
+    LAB_STAGE = "CREATE_TMP"
     with tempfile.TemporaryDirectory(prefix="masqelec-mount-isolation-", dir="/tmp") as dirname:
         root = Path(dirname)
         os.chmod(root, 0o700)
@@ -61,29 +63,51 @@ def run():
         (lib / "__init__.py").write_bytes(b"")
         for file in ("rclone_mount_isolation.py", "rclone_conf_merge.py",
                      "rclone_token_policy.py"):
-            stage = "DOWNLOAD_MODULES"
+            LAB_STAGE = "DOWNLOAD_MODULES"
             target = lib / file
             target.write_bytes(_fetch(SOURCE + file))
             os.chmod(target, 0o600)
-        stage = "IMPORT_MODULES"
+        LAB_STAGE = "IMPORT_MODULES"
         sys.path.insert(0, str(lib.parent))
         module = importlib.import_module("lib.rclone_mount_isolation")
-        stage = "READ_LOCAL"
+        LAB_STAGE = "READ_LOCAL"
         original = _stable_live()
-        stage = "DOWNLOAD_UNITS"
+        LAB_STAGE = "DOWNLOAD_UNITS"
         units = {}
         for service, remote, _folder, _mount in module.MOUNT_SPECS:
             units[service] = _fetch(UNITS + service)
-        stage = "VERIFY_UNITS"
+        LAB_STAGE = "VERIFY_UNITS"
         module.inspect_units(units)
         print("UNITS_MATCH_DEVELOP=PASS")
-        stage = "STAGE_PRIVATE"
+        # Diagnóstico estructural seguro: nunca imprime nombres ni tokens.
+        # Detecta remotos renombrados en el conf real vs las unidades.
+        LAB_STAGE = "CHECK_TEMP_ROOT"
+        temp_base = os.path.realpath("/tmp")
+        target = os.path.realpath(str(root / "proposal"))
+        within_tmp = (target != temp_base and
+                      os.path.commonpath((temp_base, target)) == temp_base)
+        print("TEMP_REALPATH_SAFE=" + ("YES" if within_tmp else "NO"))
+        LAB_STAGE = "PREFLIGHT_SELECTION"
+        sections = module.policy.sections(original)
+        for index, (service, remote, _folder, _mount) in enumerate(
+                module.MOUNT_SPECS, 1):
+            kind = sections.get(remote, {}).get("type", "").strip().lower()
+            provider = ("ONEDRIVE" if kind == "onedrive" else
+                        "DRIVE" if kind == "drive" else
+                        "MISSING" if not kind else "OTHER")
+            print("UNIT_{}_REMOTE_PROVIDER={}".format(index, provider))
+            LAB_STAGE = "SELECT_REMOTE_{}".format(index)
+            module.select_remote(original, remote)
+            LAB_STAGE = "PROPOSE_UNIT_{}".format(index)
+            module.propose_unit(service, units[service])
+            print("UNIT_{}_PREPARED=PASS".format(index))
+        LAB_STAGE = "STAGE_PRIVATE"
         destination = root / "proposal"
         destination.mkdir(mode=0o700)
         count = module.stage_in_directory(str(destination), original, units)
         print("ISOLATED_CONFIG_FILES=" + str(count))
         print("GENERATED_UNIT_PROPOSALS=" + str(count))
-        stage = "VERIFY_ACCOUNTS"
+        LAB_STAGE = "VERIFY_ACCOUNTS"
         config_files = {}
         for service, remote, _, _ in module.MOUNT_SPECS:
             file = destination / (service.removesuffix(".service") + ".conf")
@@ -97,7 +121,7 @@ def run():
         print("STAGED_FILES_MODE_0600=" +
               ("PASS" if all(os.stat(p).st_mode & 0o777 == 0o600
                              for p in destination.iterdir()) else "FAIL"))
-        stage = "VERIFY_LIVE"
+        LAB_STAGE = "VERIFY_LIVE"
         refreshed = _stable_live()
         print("LIVE_CHANGED_DURING_LAB=" +
               ("NO" if refreshed == original else "YES"))
@@ -106,10 +130,11 @@ def run():
 
 
 if __name__ == "__main__":
-    step = "START"
     try:
         sys.exit(run())
     except Exception as exc:
-        # Errores genéricos: no mostrar secretos ni contenido rclone.conf.
+        # No imprimir detalles de excepciones: pueden contener valores
+        # sensibles de configuración o cabeceras de autenticación.
+        print("LAB_FAILED_AT=" + LAB_STAGE)
         print("LAB_RESULT=ERROR_" + type(exc).__name__)
         sys.exit(1)

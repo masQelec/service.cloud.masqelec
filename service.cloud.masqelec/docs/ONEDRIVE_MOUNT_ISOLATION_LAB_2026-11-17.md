@@ -72,3 +72,28 @@ elimina automáticamente las copias privadas al finalizar. Verificar
 `ACCOUNT_TOKENS_CONSISTENT=2`, `STAGED_FILES_MODE_0600=PASS` y
 `LAB_RESULT=PASS`. La prueba no confirma la adopción de nuevos tokens
 por montajes actualmente activos.
+
+## Diagnóstico del ensayo en KodiELEC
+
+El operador obtuvo `UNITS_MATCH_DEVELOP=PASS`, seguido de
+`LAB_RESULT=ERROR_ValueError`. El fallo sucede **después** de
+validar las cuatro unidades, pero la versión anterior del script no
+indicaba la operación exacta. No hay evidencia de que se haya
+modificado la configuración activa.
+
+La validación inicial de `stage_in_directory()` usaba
+`os.path.realpath(root).startswith("/tmp/")`, demasiado rígida cuando
+`/tmp` resuelve a otro tmpfs mediante symlink (posible en KodiELEC).
+Se sustituye por `os.path.commonpath((realpath(root), realpath("/tmp")))`
+y se exige un directorio hijo, manteniendo el bloqueo de rutas fuera del
+temporal. Dos pruebas comprueban tanto el caso permitido como el intento
+de salir del directorio temporal.
+
+El laboratorio actualizado informa `TEMP_REALPATH_SAFE=YES/NO`,
+`UNIT_N_REMOTE_PROVIDER` (ONEDRIVE/DRIVE/MISSING/OTHER),
+`UNIT_N_PREPARED` y `LAB_FAILED_AT`, sin revelar los nombres de remotos,
+rutas de secretos ni valores de tokens.
+
+**La causa exacta no se considera confirmada** hasta ejecutar la nueva
+versión y observar el diagnóstico. Total esperado: 137 pruebas
+(123 verificadas + 12 de aislamiento + 2 de ruta temporal).
