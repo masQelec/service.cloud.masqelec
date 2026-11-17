@@ -73,3 +73,40 @@ KodiELEC: el laboratorio de sondeo real, sin upload ni escritura live,
 requiere lectura de MQC2 GitHub y la opción explícita \`--real-probe\`.
 No ejecutarlo durante un corte de conectividad. Un PASS no autoriza
 a realizar publicación en vivo ni migración de CLIENTES.
+
+## Laboratorio KodiELEC: SSH/device key, GitHub SHA y OAuth REAL
+
+`tools/rclone_two_mount_real_probe_lab.py` descargará módulos desde
+el commit inmutable `636866996cd72551ef37eb4439c6f023d5c3561d`.
+Obtiene la clave del dispositivo desde authorized_keys con el mismo
+algoritmo SHA256 utilizado en el laboratorio MASTER anterior. El GET
+HTTP público de GitHub Contents descarga la copia MQC2 sin necesidad
+de exponer el token personal de GitHub, valida el Git blob SHA contra
+los bytes cifrados y autentica el contenido MQC2 con la clave local.
+
+Después comprueba que la identidad estática de las seis secciones sea
+idéntica y que los refresh_token del respaldo y del canónico no diverjan.
+Una diferencia bloquea el avance: no se elige automáticamente el más nuevo.
+
+Modo `--preflight`: valida backup GH y configuraciones, sin sondeos OAuth.
+
+Modo `--real-probe`: ejecuta DOS comandos `rclone lsf` de solo
+lectura de medios sobre copias individuales 0600 y reporta únicamente
+OK/AUTH/RATE_LIMITED/UNAVAILABLE/TAMPERED. El proveedor puede renovar
+OAuth durante la prueba, pero la actualización queda en la copia
+temporal eliminada al salir. No se usa ni altera el rclone.conf real,
+el servicio systemd o los montajes. Después se releen la configuración
+local y el SHA remoto para detectar cambios concurrentes.
+
+    wget -q https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/develop/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py -O /tmp/rclone_two_mount_real_probe_lab.py
+    python3 -m py_compile /tmp/rclone_two_mount_real_probe_lab.py
+    python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
+    python3 /tmp/rclone_two_mount_real_probe_lab.py --real-probe
+
+No ejecutar el modo real sin conectividad. NO insertar ni cargar archivos
+de credenciales reales en incidencias o respuestas; solo estados anónimos.
+
+**Estas comprobaciones NO autorizan subir tokens MQC2.** La publicación
+inmutable/condicional requiere una fase posterior de concurrencia y
+confirmación operativa. La función strict_put es una pieza de transporte
+desconectada; no se considera un publicador listo.
