@@ -82,34 +82,99 @@ def inspect_units(units):
     return True
 
 
-def select_remote(raw_conf, name):
-    """Construye config mínima de OneDrive con UNA sección exacta.
+def _remote_reference(value):
+    """Dependencia nombrada 'remoto:ruta'; no admite rutas locales ni inline."""
+    if not value or not isinstance(value, str) or ":" not in value:
+        raise ValueError("Referencia de remoto no soportada")
+    name = value.split(":", 1)[0]
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", name):
+        raise ValueError("Referencia remota no segura o no nombrada")
+    return name
 
-    No copia Google Drive, crypt, alias ni otras credenciales que el
-    proceso de montaje no necesita.
+
+def dependency_closure(raw_conf, name):
+    """Obtiene la cadena completa de backends de un montaje.
+
+    Soporta remotos OAuth directos, alias/crypt/chunker y múltiples
+    upstreams de combine/union. Falla si hay referencias locales, remotos
+    inexistentes, ciclos o tipos que no podemos analizar de forma segura.
     """
-    all_lines = conf._lines(raw_conf)
-    sections = conf._sections(all_lines)
-    remote = sections.get(name)
-    if not remote or remote.get("type", "").lower() != "onedrive":
-        raise ValueError("Remoto OneDrive no encontrado")
-    if not remote.get("drive_id") or not remote.get("drive_type"):
-        raise ValueError("Identidad OneDrive incompleta")
-    if name not in policy.oauth_tokens(raw_conf):
-        raise ValueError("OAuth OneDrive inválido")
-    selected, current = [], None
-    for line in all_lines:
+    sections = conf._sections(conf._lines(raw_conf))
+    tokens = policy.oauth_tokens(raw_conf)  # Validar JSON OAuth en todos.
+    active, complete, used_oauth = set(), set(), set()
+
+    def walk(current):
+        if current in active:
+            raise ValueError("Ciclo entre remotos virtuales")
+        if current in complete:
+            return
+        if current not in sections:
+            raise ValueError("Dependencia de remoto ausente")
+        opts = sections[current]
+        backend = opts.get("type", "").strip().lower()
+        active.add(current)
+        try:
+            if backend in ("onedrive", "drive"):
+                if current not in tokens:
+                    raise ValueError("Remoto OAuth sin refresh_token")
+                if backend == "onedrive" and (
+                        not opts.get("drive_id") or not opts.get("drive_type")):
+                    raise ValueError("Identidad OneDrive incompleta")
+                used_oauth.add(current)
+            elif backend in ("alias", "crypt", "chunker"):
+                walk(_remote_reference(opts.get("remote", "")))
+            elif backend in ("union", "combine"):
+                upstreams = opts.get("upstreams", "")
+                try:
+                    parts = shlex.split(upstreams)
+                except ValueError:
+                    raise ValueError("Lista de upstreams inválida")
+                if not parts:
+                    raise ValueError("Remoto virtual sin upstreams")
+                for item in parts:
+                    remote_path = item
+                    if backend == "combine":
+                        label, sep, remote_path = item.partition("=")
+                        if not sep or not label or not remote_path:
+                            raise ValueError("Upstream combine inválido")
+                    walk(_remote_reference(remote_path))
+            else:
+                raise ValueError("Backend de remoto no verificado")
+            complete.add(current)
+        finally:
+            active.remove(current)
+
+    walk(name)
+    if not used_oauth:
+        raise ValueError("Montaje sin credenciales OAuth verificables")
+    return frozenset(complete)
+
+
+def select_remote(raw_conf, name):
+    """Extrae el remoto solicitado y todas sus dependencias, sin inventarlas.
+
+    Conserva las secciones originales completas, en el orden original.
+    OAuth, wrappers y rutas internas mantienen los valores exactos.
+    """
+    selected = dependency_closure(raw_conf, name)
+    result, current = [], None
+    for line in conf._lines(raw_conf):
         found = conf._SECTION.match(line)
         if found:
             current = found.group(1)
-        if current == name:
-            selected.append(line)
-    result = ("\n".join(selected).rstrip("\n") + "\n").encode("utf-8")
-    if list(conf._sections(conf._lines(result))) != [name]:
-        raise ValueError("Selección de configuración incorrecta")
-    if policy.oauth_tokens(result)[name] != policy.oauth_tokens(raw_conf)[name]:
-        raise ValueError("Token seleccionado no coincide")
-    return result
+        if current in selected:
+            result.append(line)
+    raw = ("\n".join(result).rstrip("\n") + "\n").encode("utf-8")
+    sections = conf._sections(conf._lines(raw))
+    if set(sections) != selected:
+        raise ValueError("Faltan secciones en la configuración aislada")
+    originals = policy.oauth_tokens(raw_conf)
+    for remote, token in policy.oauth_tokens(raw).items():
+        if token != originals[remote]:
+            raise ValueError("Token cambiado al preparar la configuración")
+    if dependency_closure(raw, name) != selected:
+        raise ValueError("Dependencias no conservadas")
+    return raw
 
 
 def proposed_config_path(service):
@@ -135,34 +200,32 @@ def propose_unit(service, original):
 
 
 def account_divergence(configs):
-    """Compara refresh_token de los dos procesos por cada cuenta OneDrive.
+    """Compara por nombre cada credencial OAuth compartida entre montajes.
 
-    Solo indica igualdad/diferencia. No supone que el token con un mtime
-    más reciente sea válido o más nuevo. Si difieren, se requiere una
-    reconciliación validada antes de promover ninguno a MASTER/GitHub.
+    No elige ganadores automáticamente; una discrepancia exige validación
+    independiente antes de propagar credenciales a los otros procesos.
     """
     if set(configs) != {service for service, _, _, _ in MOUNT_SPECS}:
         raise ValueError("Faltan configuraciones de montaje")
     accounts = {}
     for service, remote, _, _ in MOUNT_SPECS:
         raw = configs[service]
-        names = list(policy.oauth_tokens(raw))
-        if names != [remote] or list(conf._sections(conf._lines(raw))) != [remote]:
-            raise ValueError("Configuración aislada con remotos inesperados")
-        options = policy.sections(raw)[remote]
-        if options.get("type", "").lower() != "onedrive":
-            raise ValueError("Proveedor inesperado")
-        accounts.setdefault(remote, []).append(raw)
-    result = {}
+        expected = dependency_closure(raw, remote)
+        if set(policy.sections(raw)) != expected:
+            raise ValueError("Configuración aislada contiene secciones ajenas")
+        all_opts = policy.sections(raw)
+        for name, token in policy.oauth_tokens(raw).items():
+            accounts.setdefault(name, []).append((all_opts[name], token))
+    status = {}
     for name, snapshots in accounts.items():
-        if len(snapshots) != 2:
-            raise ValueError("Se esperaban dos montajes por cuenta")
-        if not conf.same_non_token_settings(*snapshots):
-            raise ValueError("Identidad de una cuenta diferente entre montajes")
-        a, b = (policy.oauth_tokens(raw)[name]["refresh_token"]
-                for raw in snapshots)
-        result[name] = "consistent" if a == b else "diverged"
-    return result
+        non_tokens = [{k: v for k, v in opts.items() if k != "token"}
+                      for opts, token in snapshots]
+        if any(opts != non_tokens[0] for opts in non_tokens):
+            raise ValueError("Identidad OAuth diferente entre montajes")
+        tokens = [token["refresh_token"] for opts, token in snapshots]
+        status[name] = ("single_mount" if len(tokens) == 1 else
+                        "consistent" if len(set(tokens)) == 1 else "diverged")
+    return status
 
 def _atomic_private(path, contents):
     """Solo para escribir dentro del directorio temporal del laboratorio."""
@@ -208,6 +271,8 @@ def stage_in_directory(root, live_conf, units):
         _atomic_private(conf_path, select_remote(live_conf, remote))
         _atomic_private(unit_path, propose_unit(service, units[service]))
         with open(conf_path, "rb") as fd:
-            if list(policy.oauth_tokens(fd.read())) != [remote]:
-                raise ValueError("Fichero preparado con OAuth inesperado")
+            config = fd.read()
+        if (dependency_closure(config, remote) !=
+                frozenset(policy.sections(config))):
+            raise ValueError("Fichero preparado con dependencias extrañas")
     return 4

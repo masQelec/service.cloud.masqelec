@@ -97,3 +97,59 @@ rutas de secretos ni valores de tokens.
 **La causa exacta no se considera confirmada** hasta ejecutar la nueva
 versión y observar el diagnóstico. Total esperado: 137 pruebas
 (123 verificadas + 12 de aislamiento + 2 de ruta temporal).
+
+## Resultado real: el nombre montado es un remoto virtual (2026-11-17)
+
+El operador completó las 137 pruebas: `Ran 137 tests ... OK`.
+El laboratorio en KodiELEC devolvió `UNITS_MATCH_DEVELOP=PASS`,
+`TEMP_REALPATH_SAFE=YES`,
+`UNIT_1_REMOTE_PROVIDER=OTHER`,
+`LAB_FAILED_AT=SELECT_REMOTE_1`. La ruta temporal era correcta.
+El error real estaba en asumir que `users_library_1` era directamente
+`type=onedrive`, sin resolver sus dependencias.
+
+La implementación `dependency_closure` admite raíces OAuth directas y
+backends virtuales alias/crypt/chunker (clave `remote`) y union/combine
+(clave `upstreams`). Sigue referencias nominales de forma recursiva,
+conserva los parámetros de las secciones necesarias y rechaza ciclos,
+referencias ausentes, rutas locales, conexiones inline y backends no
+reconocidos. El aislamiento mantiene las cuatro OAuth o las que sean
+realmente necesarias para cada raíz; **no** se puede asegurar todavía que
+cada unidad solo necesite una cuenta OneDrive.
+
+La reconciliación `account_divergence()` compara tokens por nombre del
+remoto OAuth efectivo, no por el nombre del wrapper. Si dos montajes usan
+una credencial común y sus refresh_token difieren, devuelve `diverged`
+sin elegir ni publicar una versión. Nunca elimina secciones necesarias.
+
+Los tipos y referencias exactos del dispositivo siguen siendo desconocidos
+hasta ejecutar el laboratorio corregido. Se añadieron 12 pruebas con raíces
+alias, crypt, chunker, union, combine, ciclos y dependencias ausentes.
+El total previsto pasa de 137 a **149**.
+
+## Aclaración del operador: `crypt` y nombres sin cifrar
+
+El operador confirmó que utiliza `rclone crypt` para **cifrar los datos,
+pero no los nombres de archivo**. La raíz usada por cada montaje es una
+sección virtual `crypt` que referencia otra sección remota con la cuenta
+de almacenamiento; los nombres exactos se respetan tal como consten en
+`rclone.conf` (no se deducen ni renombran). El anterior laboratorio
+falló en `UNIT_1_REMOTE_PROVIDER=OTHER` porque consideraba que la raíz
+debía tener `type=onedrive`.
+
+La selección segura conserva en el fichero por proceso:
+- la sección `crypt` original COMPLETA, con sus valores de `remote`,
+  `password`, `password2`, `filename_encryption`,
+  `directory_name_encryption` y cualquier otra opción;
+- la sección OAuth real de la que depende y sus opciones originales;
+- cualquier otra sección referenciada recursivamente por wrappers
+  admitidos, sin eliminar dependencias.
+
+En particular se conserva `filename_encryption = off` cuando aparece:
+NO se habilita el cifrado de nombres y NO se modifican rutas de medios.
+El cifrado de datos continúa dependiendo de la configuración `crypt`
+original. El plan no convierte, migra ni reescribe datos remotos.
+
+Se añaden pruebas que comparan exactamente los ajustes de `crypt`,
+verifican aislamiento entre las dos cuentas y bloquean dependencias
+ausentes. Total previsto de pruebas tras este cambio: **152**.
