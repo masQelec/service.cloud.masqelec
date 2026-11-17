@@ -20,3 +20,10 @@ TG_CHATID = "952051424"
 
 # Recuperación OAuth: preparado en develop, inicialmente inactivo hasta validación real.
 RCLONE_TOKEN_SYNC_ENABLED = False
+
+# La arquitectura dos FUSE/cuatro bind exige activación EXPLÍCITA por
+# dispositivo y un coordinador OAuth v2. Mantener False en develop.
+# Con False, un CLIENTE ya activo en v2 es bloqueado para evitar
+# reactivar accidentalmente los cuatro servicios legacy.
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
+

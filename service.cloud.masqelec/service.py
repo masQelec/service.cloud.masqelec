@@ -35,6 +35,9 @@ from lib.fix_settings import fix_skin_home_menu_visibility_and_reload
 from lib import utils
 from lib import core_catalog
 from lib import rclone_token_sync
+from lib import constants
+from lib import rclone_two_mount_rollout
+from lib import rclone_two_mount_health
 
 # ---- Config constante ----
 SLEEP_INTERVAL_SECS = 10
@@ -250,6 +253,29 @@ def _unescape_mount(s: str) -> str:
          .replace("\\134", "\\")
     )
 
+def _two_mounts_ready() -> bool:
+    """Valida la nueva arquitectura sin exigir 4 FUSE en rutas legacy."""
+    try:
+        with open("/proc/self/mountinfo", "r", encoding="utf-8") as stream:
+            entries = stream.read(1024 * 1024 + 1)
+        if len(entries) > 1024 * 1024:
+            return False
+        if not rclone_two_mount_health.check_two_fuse_four_bind(entries):
+            log("_two_mounts_ready: árbol FUSE/bind incorrecto", "WARNING")
+            return False
+        for _unit, _idx, _folder, target in rclone_two_mount_health.plan.BIND_MAP:
+            if not os.path.isdir(target):
+                return False
+            files = _safe_listdir(target, timeout=LIST_TIMEOUT)
+            if files is None or not files:
+                log("_two_mounts_ready: ruta bind no disponible", "WARNING")
+                return False
+        return True
+    except Exception:
+        log("_two_mounts_ready: fallo leyendo mountinfo", "WARNING")
+        return False
+
+
 def _mounts_ready() -> bool:
     """
     Verifica que los montajes rclone están:
@@ -258,6 +284,16 @@ def _mounts_ready() -> bool:
       ✔ NO vacíos
       ✔ sin bloquear por FUSE colgado
     """
+    mode = rclone_two_mount_rollout.mode(
+        getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+    )
+    if mode == "unsafe":
+        log("_mounts_ready: marcador de migración inválido o no autorizado",
+            "ERROR")
+        return False
+    if mode == "active":
+        return _two_mounts_ready()
+
     try:
         try:
             with open("/proc/mounts", "r") as f:

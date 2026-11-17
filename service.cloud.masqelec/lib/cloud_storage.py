@@ -22,6 +22,7 @@ from lib import log_utils
 from lib import utils
 from lib import constants
 from lib import rclone_conf_merge
+from lib import rclone_two_mount_rollout
 
 # ==============================
 # Config red
@@ -263,6 +264,26 @@ def _ensure_services_active(services):
 # CLOUD STORAGE
 # ==============================
 def start_cloud_storage():
+    # El actualizador legacy puede reiniciar rclone al cambiar unidades.
+    # Nunca aplicarlo sobre un CLIENTE marcado como two-fuse activo; la
+    # migración necesita su propio protocolo de versión y rollback.
+    mount_mode = rclone_two_mount_rollout.mode(
+        getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+    )
+    if mount_mode == "unsafe":
+        log_utils.write_log(
+            "rclone: marcador de arquitectura no autorizado/inválido; "
+            "bloqueada actualización de mounts legacy", "ERROR"
+        )
+        return
+    if mount_mode == "active":
+        log_utils.write_log(
+            "rclone: dos montajes activos; sincronizador legacy en pausa. "
+            "Ninguna unidad se sobrescribe ni reinicia.", "INFO"
+        )
+        return
+    # Modos legacy y prepared continúan con el código anterior SIN
+    # modificar rutas ni sustituir cuatro unidades prematuramente.
     if not utils.cb_should_run("cloud_storage"):
         if utils.cb_should_log_cooldown("cloud_storage"):
             log_utils.write_log("cloud_storage en cooldown; se omite.", "INFO")
