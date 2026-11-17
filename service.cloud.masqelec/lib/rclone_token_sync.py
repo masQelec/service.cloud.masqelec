@@ -20,6 +20,7 @@ from lib import constants
 from lib import device_utils
 from lib import log_utils
 from lib import rclone_token_policy as policy
+from lib import rclone_two_mount_rollout
 from lib import rclone_utils
 
 CONF_PATH = "/storage/.config/rclone/rclone.conf"
@@ -194,7 +195,17 @@ def _probe(name, config_path):
     return "unavailable"
 
 
+def _legacy_sync_permitted():
+    """No publicar ni recuperar rclone.conf legacy si el equipo usa 2 FUSE."""
+    mode = rclone_two_mount_rollout.mode(
+        getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+    )
+    return mode in ("legacy", "prepared")
+
+
 def _publish_master():
+    if not _legacy_sync_permitted():
+        return "two_mount_mode"
     if constants.CLOUD_BRANCH != "develop" or not device_utils.is_master_device():
         return "blocked"
     key = device_utils.get_key_from_authorized_keys()
@@ -305,6 +316,8 @@ def _master_recover(mode, original=None, broken_names=()):
     mode=auth: cambia solo tokens explícitamente fallidos y conserva opciones
     estáticas propias del MASTER. Ningún error de red/cuota provoca cambios.
     """
+    if not _legacy_sync_permitted():
+        return "two_mount_mode"
     if constants.CLOUD_BRANCH != "develop" or not device_utils.is_master_device():
         return "blocked"
     if mode not in ("corrupt", "auth"):
@@ -409,6 +422,8 @@ def _master_recover(mode, original=None, broken_names=()):
             os.unlink(tmp)
 
 def _recover_client():
+    if not _legacy_sync_permitted():
+        return "two_mount_mode"
     if device_utils.is_master_device():
         return "master"
     if not os.path.isfile(CONF_PATH):
@@ -491,6 +506,8 @@ def _recover_client():
 
 def _master_cycle(now):
     """Publicación + recuperación MASTER con prioridad a las bibliotecas."""
+    if not _legacy_sync_permitted():
+        return "two_mount_mode"
     global _last_master_confirmed_fp, _last_master_remote_checked_at
     global _last_master_onedrive_health_at, _last_master_drive_health_at
     global _master_corrupt_signature, _master_corrupt_since
@@ -578,6 +595,8 @@ def tick():
     global _last_tick, _last_master_confirmed_fp, _last_master_remote_checked_at
     global _last_master_onedrive_health_at, _last_master_drive_health_at
     if not getattr(constants, "RCLONE_TOKEN_SYNC_ENABLED", False):
+        return
+    if not _legacy_sync_permitted():
         return
     if constants.CLOUD_BRANCH != "develop":
         return

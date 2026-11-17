@@ -760,5 +760,40 @@ class RcloneTokenSyncTests(unittest.TestCase):
 
 
 
+    def test_two_fuse_mode_never_publishes_stale_legacy_tokens(self):
+        self.sync.device_utils.is_master_device = lambda: True
+        with mock.patch.object(
+                self.sync.rclone_two_mount_rollout, "mode",
+                return_value="active"):
+            with mock.patch.object(self.sync, "_remote_config") as remote:
+                self.assertEqual(self.sync._publish_master(), "two_mount_mode")
+                remote.assert_not_called()
+            self.assertEqual(self._disk(), self.local)
+
+    def test_two_fuse_mode_blocks_master_and_client_legacy_restore(self):
+        self.sync.device_utils.is_master_device = lambda: True
+        with mock.patch.object(
+                self.sync.rclone_two_mount_rollout, "mode",
+                return_value="active"):
+            self.assertEqual(
+                self.sync._master_recover("corrupt", original=b"broken"),
+                "two_mount_mode")
+            self.assertEqual(self.sync._master_cycle(1000), "two_mount_mode")
+            self.assertEqual(self.sync._recover_client(), "two_mount_mode")
+            self.assertEqual(self._disk(), self.local)
+
+    def test_two_fuse_mode_tick_no_legacy_probe_or_publish(self):
+        self.sync.constants.RCLONE_TOKEN_SYNC_ENABLED = True
+        self.addCleanup(
+            setattr, self.sync.constants, "RCLONE_TOKEN_SYNC_ENABLED", False)
+        self.sync.device_utils.get_device_role = lambda: "MASTER"
+        with mock.patch.object(
+                self.sync.rclone_two_mount_rollout, "mode",
+                return_value="active"):
+            with mock.patch.object(self.sync, "_master_cycle") as cycle:
+                self.sync.tick()
+                cycle.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

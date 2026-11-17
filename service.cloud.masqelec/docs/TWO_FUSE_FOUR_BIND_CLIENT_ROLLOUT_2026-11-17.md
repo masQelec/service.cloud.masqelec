@@ -127,3 +127,17 @@ TWO_MOUNT_FUSE_RESTART_EXECUTED=NO
 TWO_MOUNT_CLIENT_AUTO_ACTIVATE=NO
 MFA_RELEASE_AUTHORIZED=N/A
 RCLONE_TOKEN_SYNC_ENABLED=False
+
+## Fence adicional: OAuth legacy no es OAuth v2
+
+Se añadió una guarda explícita en `rclone_token_sync.py`: si el
+marcador del dispositivo declara `active` para two-fuse, o si está
+inválido/inhabilitado, la vía legacy no descarga ni publica ni
+restaura el `rclone.conf` canónico. El worker `tick()` tampoco llama
+al ciclo MASTER ni al recuperador CLIENT. Se añadieron 3 tests de
+ausencia de efectos.
+
+Hasta implementar la nueva reconciliación de `account1.conf` y
+`account2.conf`, **no hay publicador ni recuperador autorizado para
+el modo two-fuse**. El manifiesto remoto es solo metadatos de versión;
+las credenciales nunca se añaden al repositorio.
