@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import sys
+import time
 import tempfile
 import types
 import unittest
@@ -76,6 +77,9 @@ class RcloneTokenSyncTests(unittest.TestCase):
         self.local = _mixed()
         with open(self.path, "wb") as out:
             out.write(self.local)
+        # El archivo de pruebas tiene que superar el debounce del MASTER.
+        old = time.time() - 30
+        os.utime(self.path, (old, old))
         self.sync.CONF_PATH = self.path
         self.sync.REMOTE_PATH = "rclone/rclone.conf.crypt"
 
@@ -198,6 +202,62 @@ class RcloneTokenSyncTests(unittest.TestCase):
             self.sync.tick()
             self.sync.tick()
         self.assertEqual(status, ["ran"])
+
+
+    def test_master_does_not_publish_during_live_rclone_write(self):
+        self.sync.device_utils.is_master_device = lambda: True
+        now = time.time()
+        os.utime(self.path, (now, now))
+        with mock.patch.object(self.sync, "_remote_config") as remote:
+            self.assertEqual(self.sync._publish_master(), "local_settling")
+            remote.assert_not_called()
+
+    def test_master_checks_every_minute_without_six_hour_publish_lock(self):
+        self.sync.constants.RCLONE_TOKEN_SYNC_ENABLED = True
+        self.addCleanup(setattr, self.sync.constants, "RCLONE_TOKEN_SYNC_ENABLED", False)
+        self.sync.device_utils.get_device_role = lambda: "MASTER"
+        actions = []
+        self.sync._publish_master = lambda: actions.append("publish") or "published"
+        with mock.patch.object(self.sync.time, "monotonic", return_value=100.0):
+            self.sync.tick()
+        with mock.patch.object(self.sync.time, "monotonic", return_value=161.0):
+            self.sync.tick()
+        self.assertEqual(actions, ["publish"])
+        # OneDrive renueva refresh_token; el siguiente minuto se publica.
+        updated = self.local.replace(b"old-one", b"new-one")
+        with open(self.path, "wb") as out:
+            out.write(updated)
+        with mock.patch.object(self.sync.time, "monotonic", return_value=222.0):
+            self.sync.tick()
+        self.assertEqual(actions, ["publish", "publish"])
+
+    def test_master_ignores_access_token_only_churn_during_poll(self):
+        self.sync.constants.RCLONE_TOKEN_SYNC_ENABLED = True
+        self.addCleanup(setattr, self.sync.constants, "RCLONE_TOKEN_SYNC_ENABLED", False)
+        self.sync.device_utils.get_device_role = lambda: "MASTER"
+        actions = []
+        self.sync._publish_master = lambda: actions.append("check") or "unchanged"
+        with mock.patch.object(self.sync.time, "monotonic", return_value=100.0):
+            self.sync.tick()
+        refreshed_access = self.local.replace(b"access-series", b"new-access-only")
+        with open(self.path, "wb") as out:
+            out.write(refreshed_access)
+        with mock.patch.object(self.sync.time, "monotonic", return_value=161.0):
+            self.sync.tick()
+        self.assertEqual(actions, ["check"])
+
+    def test_master_periodically_reconciles_without_local_changes(self):
+        self.sync.constants.RCLONE_TOKEN_SYNC_ENABLED = True
+        self.addCleanup(setattr, self.sync.constants, "RCLONE_TOKEN_SYNC_ENABLED", False)
+        self.sync.device_utils.get_device_role = lambda: "MASTER"
+        actions = []
+        self.sync._publish_master = lambda: actions.append("check") or "unchanged"
+        with mock.patch.object(self.sync.time, "monotonic", return_value=100.0):
+            self.sync.tick()
+        with mock.patch.object(self.sync.time, "monotonic", return_value=100.0 + 21601):
+            self.sync.tick()
+        self.assertEqual(actions, ["check", "check"])
+
 
 
 if __name__ == "__main__":

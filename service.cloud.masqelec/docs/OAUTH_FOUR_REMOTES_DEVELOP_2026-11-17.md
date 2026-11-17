@@ -35,9 +35,18 @@
   cambios efectivos de opciones no-token ni de inventario de remotos.
 - Verifica cada remoto modificado con rclone usando una configuración temporal.
   No ordena tokens por el expiry del access_token.
-- MASTER comprueba cada 30 minutos; tras publicar, deja un intervalo de
-  al menos 6 horas entre publicaciones, siempre que Kodi no reinicie.
-  El primer chequeo se permite inmediatamente tras iniciar el worker.
+- MASTER inspecciona la huella local cada 60 segundos (sin enviar
+  secretos ni consultar GitHub cuando el refresh_token no cambia).
+  Publica en GitHub **cada refresh_token nuevo** detectado y que supere
+  la comprobación del remoto en una copia temporal.
+  No se impone un bloqueo de 6 horas a nuevas publicaciones.
+- Si el archivo acaba de ser escrito por rclone, deja 10 segundos para
+  estabilizarse y lo reintenta el siguiente minuto.
+- Si la huella local no cambia, hace conciliación con GitHub cada 6 horas;
+  no se crean commits por cambios de access_token ni expiry.
+- La latencia máxima normal para detectar una rotación es de ~1 minuto
+  mientras el worker esté en ejecución y haya red; no hay hook directo
+  dentro del proceso rclone mount.
 - CLIENTE comprueba cada hora una copia privada del fichero. Si falla
   explícitamente OAuth, descarga y valida MQC2, fusiona solo el token
   fallido, comprueba el candidato, vuelve a leer el activo y lo reemplaza
@@ -60,6 +69,14 @@
 - Comprobar escrituras concurrentes de varios rclone mount al mismo conf:
   read_stable y reread reducen riesgos, pero no implementan bloqueo
   compartido con procesos externos.
+- Los procesos rclone mount guardan sus tokens en memoria y escriben
+  sus propias renovaciones. La comprobación en copia temporal puede
+  provocar una renovación adicional independiente; el archivo publicado
+  corresponde a la última instantánea estable del MASTER, no a una
+  supuesta fecha de creación de refresh_token.
+- El MASTER **no tiene recuperación automática desde GitHub** si falla
+  su propia autenticación en la versión actual; el código solo publica
+  desde MASTER y recupera en CLIENTES. Diseñar este fallback aparte.
 - El mantenimiento de Kodi protege CleanLibrary con _mounts_ready()
   (montajes FUSE presentes, accesibles y no vacíos), pero **esto no
   demuestra por sí solo que OAuth OneDrive funcione ahora**; un FUSE

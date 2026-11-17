@@ -24,14 +24,17 @@ from lib import rclone_utils
 CONF_PATH = "/storage/.config/rclone/rclone.conf"
 REMOTE_PATH = "rclone/rclone.conf.crypt"
 MAX_CONF_BYTES = 1024 * 1024
-# Revisión MASTER cada 30 min, pero no crear commits por cada rotación de OneDrive.
-MASTER_INTERVAL = 30 * 60
-MASTER_MIN_PUBLISH_GAP = 6 * 60 * 60
+# El worker ya despierta cada 60 s. El MASTER comprueba huella local cada
+# minuto y contacta GitHub solo si cambió refresh_token/opciones o cada 6 h.
+MASTER_INTERVAL = 60
+MASTER_REMOTE_RECONCILE_INTERVAL = 6 * 60 * 60
+MASTER_SETTLE_SECONDS = 10
 CLIENT_INTERVAL = 60 * 60
 
 _lock = threading.Lock()
 _last_tick = None  # Primer chequeo al arrancar, no al alcanzar X horas de uptime.
-_last_published = None
+_last_master_confirmed_fp = None
+_last_master_remote_checked_at = None
 
 
 def _read_stable(path):
@@ -103,6 +106,11 @@ def _publish_master():
     key = device_utils.get_key_from_authorized_keys()
     if not key:
         return "no_key"
+    # Evitar capturar una escritura reciente de varios rclone mount.
+    # Se reintentará en el próximo minuto sin publicar un fichero intermedio.
+    local_stat = os.stat(CONF_PATH)
+    if time.time() - local_stat.st_mtime < MASTER_SETTLE_SECONDS:
+        return "local_settling"
     local = _read_stable(CONF_PATH)
     remote = _remote_config(key)  # No publicar si no podemos verificar la base.
     if not policy.master_should_publish(local, remote):
@@ -235,8 +243,8 @@ def _recover_client():
 
 
 def tick():
-    """Invocado cada 60s por el servicio, trabajo real cada 30/60 min."""
-    global _last_tick, _last_published
+    """Invocado cada minuto; publica nuevas rotaciones MASTER sin retardos fijos."""
+    global _last_tick, _last_master_confirmed_fp, _last_master_remote_checked_at
     if not getattr(constants, "RCLONE_TOKEN_SYNC_ENABLED", False):
         return
     if constants.CLOUD_BRANCH != "develop":
@@ -249,13 +257,26 @@ def tick():
     if not _lock.acquire(blocking=False):
         return
     try:
-        # Sin revalidar credenciales recientemente publicadas: OneDrive suele
-        # cambiar refresh_token con cada renovación y generaría commits continuos.
-        if (role == "MASTER" and _last_published is not None and
-                now - _last_published < MASTER_MIN_PUBLISH_GAP):
-            return
-        # Si falla la red, reintentar en el siguiente intervalo, no cada 60 s.
         _last_tick = time.monotonic()
+        current_fp = None
+        if role == "MASTER":
+            try:
+                current_fp = policy.stable_oauth_fingerprint(
+                    _read_stable(CONF_PATH)
+                )
+            except Exception as exc:
+                log_utils.write_log(
+                    "[rclone_sync] no se pudo leer huella local ({})"
+                    .format(type(exc).__name__), "WARNING",
+                )
+                return
+            # No descargar de GitHub cada minuto si el MASTER no ha
+            # renovado refresh_token. Conciliación periódica de reserva.
+            if (current_fp == _last_master_confirmed_fp and
+                    _last_master_remote_checked_at is not None and
+                    now - _last_master_remote_checked_at <
+                    MASTER_REMOTE_RECONCILE_INTERVAL):
+                return
         try:
             status = _publish_master() if role == "MASTER" else _recover_client()
         except Exception as exc:
@@ -264,15 +285,18 @@ def tick():
                 "WARNING",
             )
             return
+        if role == "MASTER" and status in ("published", "unchanged"):
+            _last_master_confirmed_fp = current_fp
+            _last_master_remote_checked_at = time.monotonic()
+
         if status == "published":
-            _last_published = time.monotonic()
             log_utils.write_log("[rclone_sync] published", "INFO")
         elif status == "recovered_restart_pending":
             log_utils.write_log(
                 "[rclone_sync] token recuperado en disco; montajes en ejecución "
-                "pueden requerir reinicio controlado", "WARNING"
+                "pueden requerir reinicio controlado", "WARNING",
             )
-        elif status not in ("healthy", "unchanged"):
+        elif status not in ("healthy", "unchanged", "local_settling"):
             log_utils.write_log("[rclone_sync] {}".format(status), "WARNING")
     finally:
         _lock.release()
