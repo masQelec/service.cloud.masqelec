@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Distribución controlada de refresh_token MQC2 (MASTER -> GitHub -> CLIENT).
+"""Distribución OAuth de Google Drive + OneDrive (MASTER -> GitHub -> CLIENT).
 
-Solo la rama experimental admite publicación. No registra secretos ni el
-contenido de rclone.conf. Las operaciones fallidas conservan el fichero local.
+Solo develop puede publicar. No registra secretos ni contenido de rclone.conf.
+Un cambio de token se comprueba antes de publicar o instalar.
+Los montajes ya iniciados no se reinician aquí (requieren gestión aparte).
 """
-import hashlib
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import threading
@@ -25,11 +24,14 @@ from lib import rclone_utils
 CONF_PATH = "/storage/.config/rclone/rclone.conf"
 REMOTE_PATH = "rclone/rclone.conf.crypt"
 MAX_CONF_BYTES = 1024 * 1024
+# Revisión MASTER cada 30 min, pero no crear commits por cada rotación de OneDrive.
 MASTER_INTERVAL = 30 * 60
+MASTER_MIN_PUBLISH_GAP = 6 * 60 * 60
 CLIENT_INTERVAL = 60 * 60
 
 _lock = threading.Lock()
-_last_tick = 0.0
+_last_tick = None  # Primer chequeo al arrancar, no al alcanzar X horas de uptime.
+_last_published = None
 
 
 def _read_stable(path):
@@ -105,7 +107,27 @@ def _publish_master():
     remote = _remote_config(key)  # No publicar si no podemos verificar la base.
     if not policy.master_should_publish(local, remote):
         return "unchanged"
-    # Conflicto: no reemplazar un refresh_token publicado aparentemente más reciente.
+    changed = policy.changed_refresh_names(local, remote)
+
+    # El refresh_token cambia con frecuencia en OneDrive. No basta comparar
+    # fechas de access_token; probar cada credencial distinta en una COPIA.
+    temp_conf = None
+    fd, temp_conf = tempfile.mkstemp(
+        prefix=".rclone-verify-", suffix=".conf", dir="/tmp"
+    )
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(local)
+            stream.flush()
+            os.fsync(stream.fileno())
+        for name in changed:
+            if _probe(name, temp_conf) != "ok":
+                return "candidate_unverified"
+    finally:
+        if temp_conf is not None and os.path.exists(temp_conf):
+            os.unlink(temp_conf)
+
+    # No publicar si rclone ha renovado la configuración mientras probábamos.
     if _read_stable(CONF_PATH) != local:
         return "local_changed"
 
@@ -152,14 +174,21 @@ def _recover_client():
     if not names:
         return "no_oauth"
 
-    bad = []
-    unknown = 0
-    for name in names:
-        status = _probe(name, CONF_PATH)
-        if status == "auth":
-            bad.append(name)
-        elif status == "unavailable":
-            unknown += 1
+    # Probar una copia: una renovación durante el sondeo no debe sobrescribir
+    # el rclone.conf que están usando los cuatro montajes.
+    probe_file = _write_candidate(CONF_PATH, local)
+    try:
+        bad = []
+        unknown = 0
+        for name in names:
+            status = _probe(name, probe_file)
+            if status == "auth":
+                bad.append(name)
+            elif status == "unavailable":
+                unknown += 1
+    finally:
+        if os.path.exists(probe_file):
+            os.unlink(probe_file)
     if not bad:
         return "unavailable" if unknown else "healthy"
 
@@ -197,7 +226,9 @@ def _recover_client():
         os.chmod(tmp, 0o600)
         os.replace(tmp, CONF_PATH)
         tmp = None
-        return "recovered"
+        # Los procesos rclone mount pueden conservar su token en memoria.
+        # NO reiniciar servicios aquí: podría interrumpir reproducción Kodi.
+        return "recovered_restart_pending"
     finally:
         if tmp is not None and os.path.exists(tmp):
             os.unlink(tmp)
@@ -205,7 +236,7 @@ def _recover_client():
 
 def tick():
     """Invocado cada 60s por el servicio, trabajo real cada 30/60 min."""
-    global _last_tick
+    global _last_tick, _last_published
     if not getattr(constants, "RCLONE_TOKEN_SYNC_ENABLED", False):
         return
     if constants.CLOUD_BRANCH != "develop":
@@ -213,13 +244,17 @@ def tick():
     role = device_utils.get_device_role()
     interval = MASTER_INTERVAL if role == "MASTER" else CLIENT_INTERVAL
     now = time.monotonic()
-    if now - _last_tick < interval:
+    if _last_tick is not None and now - _last_tick < interval:
         return
     if not _lock.acquire(blocking=False):
         return
     try:
-        # Programar el próximo intento incluso si hay error de red;
-        # evita bombardear GitHub o provocar reintentos cada minuto.
+        # Sin revalidar credenciales recientemente publicadas: OneDrive suele
+        # cambiar refresh_token con cada renovación y generaría commits continuos.
+        if (role == "MASTER" and _last_published is not None and
+                now - _last_published < MASTER_MIN_PUBLISH_GAP):
+            return
+        # Si falla la red, reintentar en el siguiente intervalo, no cada 60 s.
         _last_tick = time.monotonic()
         try:
             status = _publish_master() if role == "MASTER" else _recover_client()
@@ -229,8 +264,14 @@ def tick():
                 "WARNING",
             )
             return
-        if status in ("published", "recovered"):
-            log_utils.write_log("[rclone_sync] {}".format(status), "INFO")
+        if status == "published":
+            _last_published = time.monotonic()
+            log_utils.write_log("[rclone_sync] published", "INFO")
+        elif status == "recovered_restart_pending":
+            log_utils.write_log(
+                "[rclone_sync] token recuperado en disco; montajes en ejecución "
+                "pueden requerir reinicio controlado", "WARNING"
+            )
         elif status not in ("healthy", "unchanged"):
             log_utils.write_log("[rclone_sync] {}".format(status), "WARNING")
     finally:

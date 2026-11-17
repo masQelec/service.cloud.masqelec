@@ -54,5 +54,55 @@ class RcloneConfMergeTests(unittest.TestCase):
 
 
 
+    def test_onedrive_preserve_local_when_same_drive_identity(self):
+        local = (b'[library]\ntype = onedrive\ndrive_id = abc\n'
+                 b'drive_type = personal\ntoken = LOCAL\n')
+        remote = (b'[library]\ntype = onedrive\ndrive_id = abc\n'
+                  b'drive_type = personal\ntoken = REMOTE\n')
+        out = merge.preserve_local_oauth_tokens(remote, local)
+        self.assertIn(b'token = LOCAL', out)
+        self.assertNotIn(b'token = REMOTE', out)
+
+    def test_onedrive_changed_drive_id_never_preserves_token(self):
+        local = (b'[library]\ntype = onedrive\ndrive_id = first\n'
+                 b'drive_type = personal\ntoken = LOCAL\n')
+        remote = (b'[library]\ntype = onedrive\ndrive_id = second\n'
+                  b'drive_type = personal\ntoken = REMOTE\n')
+        out = merge.preserve_local_oauth_tokens(remote, local)
+        self.assertIn(b'token = REMOTE', out)
+        self.assertNotIn(b'token = LOCAL', out)
+
+    def test_onedrive_changed_drive_type_never_preserves_token(self):
+        local = (b'[library]\ntype = onedrive\ndrive_id = same\n'
+                 b'drive_type = personal\ntoken = LOCAL\n')
+        remote = (b'[library]\ntype = onedrive\ndrive_id = same\n'
+                  b'drive_type = business\ntoken = REMOTE\n')
+        out = merge.preserve_local_oauth_tokens(remote, local)
+        self.assertIn(b'token = REMOTE', out)
+
+
+    def test_onedrive_startup_identity_guard(self):
+        local = (b'[library]\ntype = onedrive\ndrive_id = xyz\n'
+                 b'drive_type = personal\ntoken = OLD\n')
+        same = local.replace(b'token = OLD', b'token = ROTATED')
+        wrong = local.replace(b'drive_id = xyz', b'drive_id = other')
+        wrong_type = local.replace(b'drive_type = personal',
+                                   b'drive_type = business')
+        self.assertFalse(merge.onedrive_identity_changed(same, local))
+        self.assertTrue(merge.onedrive_identity_changed(wrong, local))
+        self.assertTrue(merge.onedrive_identity_changed(wrong_type, local))
+
+    def test_onedrive_startup_removal_and_addition_are_fenced(self):
+        local = b'[library]\ntype = onedrive\ndrive_id = xyz\ntoken = OLD\n'
+        other = b'[logs]\ntype = drive\ntoken = LOG\n'
+        self.assertTrue(merge.onedrive_identity_changed(other, local))
+        self.assertTrue(merge.onedrive_identity_changed(local, other))
+
+    def test_google_drive_change_does_not_trigger_onedrive_guard(self):
+        local = b'[logs]\ntype = drive\nteam_drive = old\ntoken = OLD\n'
+        remote = local.replace(b'team_drive = old', b'team_drive = new')
+        self.assertFalse(merge.onedrive_identity_changed(remote, local))
+
+
 if __name__ == "__main__":
     unittest.main()

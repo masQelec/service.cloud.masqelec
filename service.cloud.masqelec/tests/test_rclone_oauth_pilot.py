@@ -24,6 +24,22 @@ def _config(refresh="live-refresh"):
             token + "\n").encode("utf-8")
 
 
+
+
+def _four_remotes():
+    items = []
+    for i, backend in enumerate(("drive", "onedrive", "drive", "onedrive"), 1):
+        token = json.dumps({
+            "access_token": "access",
+            "refresh_token": "refresh-{}".format(i),
+            "expiry": "2026-11-18T12:00:00Z",
+        })
+        items.extend(["[sample{}]".format(i), "type = " + backend])
+        if backend == "onedrive":
+            items.extend(["drive_id = fake_id_{}".format(i), "drive_type = personal"])
+        items.extend(["token = " + token, ""])
+    return "\n".join(items).encode("utf-8")
+
 class OAuthPilotTests(unittest.TestCase):
     def test_fake_client_invalidates_only_copy(self):
         original = _config()
@@ -119,6 +135,36 @@ class OAuthPilotTests(unittest.TestCase):
             result = pilot._client_simulation(_config(), remote_index=99)
         self.assertEqual(result, 2)
         self.assertIn("SIMULATION=INVALID_REMOTE_INDEX", buf.getvalue())
+
+
+    def test_four_remotes_simulated_onedrive_first(self):
+        observed = []
+
+        def fake_probe(binary, name, path):
+            with open(path, "rb") as stream:
+                cfg = stream.read()
+            if b"invalid-test-refresh-token" in cfg:
+                return ("AUTH", "AUTH", 1)
+            return ("OK", "OK", 0)
+
+        with mock.patch.object(pilot, "_rclone", return_value="/rclone"):
+            with mock.patch.object(pilot, "_probe_details", side_effect=fake_probe):
+                for index, expected in ((1, "onedrive"), (2, "onedrive"),
+                                        (3, "drive"), (4, "drive")):
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out):
+                        rc = pilot._client_simulation(_four_remotes(),
+                                                      remote_index=index)
+                    observed.append((rc, out.getvalue()))
+                    self.assertEqual(rc, 0)
+                    self.assertIn("TARGET_REMOTE_PROVIDER=" + expected, out.getvalue())
+                    self.assertIn("SIMULATION=PASS", out.getvalue())
+        self.assertEqual(len(observed), 4)
+
+    def test_report_counts_each_provider_without_names(self):
+        remote = _four_remotes()
+        counts = pilot.rclone_token_policy.oauth_provider_counts(remote)
+        self.assertEqual(counts, {"drive": 2, "onedrive": 2})
 
 
 if __name__ == "__main__":

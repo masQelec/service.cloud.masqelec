@@ -32,21 +32,29 @@ class RcloneTokenPolicyTests(unittest.TestCase):
         old = conf("older", "old", "2026-11-17T09:00:00Z")
         self.assertTrue(policy.master_should_publish(local, old))
 
-    def test_master_rejects_older_credential(self):
+    def test_access_expiry_does_not_rank_refresh_age(self):
         local = conf("older", expiry="2026-11-17T09:00:00Z")
         old = conf("rotated", expiry="2026-11-17T13:00:00Z")
-        with self.assertRaisesRegex(ValueError, "anterior"):
-            policy.master_should_publish(local, old)
+        # La fecha de access_token no es la de emisión de refresh_token.
+        # La validez se comprobará con rclone antes de publicar.
+        self.assertTrue(policy.master_should_publish(local, old))
 
-    def test_master_can_publish_non_identity_settings(self):
+    def test_master_fences_non_token_changes(self):
         local = conf("same", chunk="128M")
         old = conf("same", chunk="64M")
-        self.assertTrue(policy.master_should_publish(local, old))
+        with self.assertRaisesRegex(ValueError, "opciones no OAuth"):
+            policy.master_should_publish(local, old)
+
+    def test_master_fences_static_change_even_if_refresh_rotated(self):
+        local = conf("new", chunk="128M")
+        old = conf("old", chunk="64M")
+        with self.assertRaisesRegex(ValueError, "opciones no OAuth"):
+            policy.master_should_publish(local, old)
 
     def test_master_rejects_identity_change(self):
         local = conf("same").replace(b"client_id = x", b"client_id = different")
         old = conf("same")
-        with self.assertRaisesRegex(ValueError, "identidad"):
+        with self.assertRaisesRegex(ValueError, "opciones no OAuth"):
             policy.master_should_publish(local, old)
 
     def test_client_only_changes_failed_token(self):
@@ -81,12 +89,74 @@ class RcloneTokenPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "JSON"):
             policy.oauth_tokens(bad)
 
-    def test_non_drive_refresh_not_shared(self):
+    def test_onedrive_supported_but_box_not_shared(self):
         drive = conf("drive-token")
+        onedrive = drive.replace(b"type = drive", b"type = onedrive")
         box = drive.replace(b"type = drive", b"type = box")
         self.assertEqual(list(policy.oauth_tokens(drive)), ["cloud"])
+        self.assertEqual(list(policy.oauth_tokens(onedrive)), ["cloud"])
         self.assertEqual(policy.oauth_tokens(box), {})
 
+
+
+    def test_four_remotes_two_of_each(self):
+        parts = []
+        for index, provider in enumerate(("onedrive", "onedrive", "drive", "drive"), 1):
+            item = conf("refresh-{}".format(index))
+            item = item.replace(b"[cloud]", ("[remote{}]".format(index)).encode())
+            item = item.replace(b"type = drive", ("type = {}".format(provider)).encode())
+            parts.append(item)
+        mixed = b"\n".join(parts)
+        self.assertEqual(len(policy.oauth_tokens(mixed)), 4)
+        self.assertEqual(policy.oauth_provider_counts(mixed),
+                         {"onedrive": 2, "drive": 2})
+        changed = mixed.replace(b"refresh-2", b"refresh-other")
+        self.assertEqual(policy.changed_refresh_names(changed, mixed), ("remote2",))
+        self.assertTrue(policy.master_should_publish(changed, mixed))
+
+    def test_only_access_renewed_onedrive_no_publish(self):
+        local = conf("same-refresh", "new-access", "2026-11-20T12:00:00Z")
+        old = conf("same-refresh", "old-access", "2026-11-19T09:00:00Z")
+        local = local.replace(b"type = drive", b"type = onedrive")
+        old = old.replace(b"type = drive", b"type = onedrive")
+        self.assertFalse(policy.master_should_publish(local, old))
+
+    def test_onedrive_drive_id_changed_blocks_recovery(self):
+        local = conf("bad").replace(b"type = drive",
+                                    b"type = onedrive\ndrive_id = id_A\ndrive_type = personal")
+        published = conf("good").replace(b"type = drive",
+                                        b"type = onedrive\ndrive_id = id_B\ndrive_type = personal")
+        with self.assertRaisesRegex(ValueError, "Identidad"):
+            policy.tokens_from_master(local, published, ["cloud"])
+
+    def test_onedrive_drive_type_changed_blocks_recovery(self):
+        local = conf("bad").replace(b"type = drive",
+                                    b"type = onedrive\ndrive_id = id_A\ndrive_type = personal")
+        published = conf("good").replace(b"type = drive",
+                                        b"type = onedrive\ndrive_id = id_A\ndrive_type = business")
+        with self.assertRaisesRegex(ValueError, "Identidad"):
+            policy.tokens_from_master(local, published, ["cloud"])
+
+    def test_onedrive_same_identity_recovers_without_static_modification(self):
+        local = conf("bad", chunk="64M").replace(b"type = drive",
+                          b"type = onedrive\ndrive_id = id_A\ndrive_type = personal")
+        published = conf("good", chunk="32M").replace(b"type = drive",
+                          b"type = onedrive\ndrive_id = id_A\ndrive_type = personal")
+        candidate = policy.tokens_from_master(local, published, ["cloud"])
+        self.assertEqual(policy.oauth_tokens(candidate)["cloud"]["refresh_token"], "good")
+        self.assertEqual(policy.sections(candidate)["cloud"]["chunk_size"], "64M")
+
+    def test_refresh_unchanged_despite_expiry_change_not_recovered(self):
+        local = conf("same", "old-access")
+        published = conf("same", "new-access")
+        with self.assertRaisesRegex(ValueError, "diferente"):
+            policy.tokens_from_master(local, published, ["cloud"])
+
+    def test_onedrive_auth_error_vs_rate_limit(self):
+        self.assertTrue(policy.auth_failure(b"OneDrive invalid_grant AADSTS700082"))
+        self.assertTrue(policy.auth_failure(b"Graph invalidAuthenticationToken"))
+        self.assertFalse(policy.auth_failure(b"Microsoft Graph 429 throttled"))
+        self.assertFalse(policy.auth_failure(b"OneDrive 403 forbidden"))
 
 
 if __name__ == "__main__":

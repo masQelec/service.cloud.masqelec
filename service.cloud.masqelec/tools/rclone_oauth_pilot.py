@@ -196,16 +196,23 @@ def _master_check(local, remote):
 
 
 def _client_simulation(remote, local=None, remote_index=1):
-    names = sorted(rclone_token_policy.oauth_tokens(remote))
+    supported = rclone_token_policy.oauth_tokens(remote)
+    options = rclone_token_policy.sections(remote)
+    # OneDrive primero: biblioteca multimedia prioritaria; nombres no se imprimen.
+    names = sorted(supported, key=lambda name: (
+        0 if options[name].get("type", "").strip().lower() == "onedrive" else 1,
+        name,
+    ))
     if not names:
-        print("SIMULATION=NO_GOOGLE_DRIVE_TOKEN")
+        print("SIMULATION=NO_OAUTH_TOKEN")
         return 2
     if remote_index < 1 or remote_index > len(names):
         print("SIMULATION=INVALID_REMOTE_INDEX")
-        print("AVAILABLE_GOOGLE_DRIVE_REMOTES=" + str(len(names)))
+        print("AVAILABLE_OAUTH_REMOTES=" + str(len(names)))
         return 2
     name = names[remote_index - 1]
     print("TARGET_REMOTE_INDEX=" + str(remote_index))
+    print("TARGET_REMOTE_PROVIDER=" + options[name].get("type", "").strip().lower())
     binary = _rclone()
     with tempfile.TemporaryDirectory(prefix="masqelec-oauth-pilot-", dir="/tmp") as temp:
         os.chmod(temp, 0o700)
@@ -247,7 +254,7 @@ def main():
     parser.add_argument("--simulate-client", action="store_true",
                         help="simula un cliente roto usando exclusivamente /tmp")
     parser.add_argument("--remote-index", type=int, default=1,
-                        help="índice 1..N de remoto Google Drive para simular (sin mostrar nombre)")
+                        help="índice 1..N, primero OneDrive, luego Google Drive (sin nombres)")
     parser.add_argument("--config", default=LOCAL_CONF)
     parser.add_argument("--key-file", default=AUTHORIZED_KEYS)
     opts = parser.parse_args()
@@ -258,10 +265,12 @@ def main():
     local = _read(opts.config)
     remote = _published(_key_from_file(opts.key_file))
     print("MQC2_DECRYPT=PASS")
-    print("LOCAL_GOOGLE_DRIVE_REMOTES=" +
-          str(len(rclone_token_policy.oauth_tokens(local))))
-    print("PUBLISHED_GOOGLE_DRIVE_REMOTES=" +
-          str(len(rclone_token_policy.oauth_tokens(remote))))
+    local_counts = rclone_token_policy.oauth_provider_counts(local)
+    published_counts = rclone_token_policy.oauth_provider_counts(remote)
+    print("LOCAL_GOOGLE_DRIVE_REMOTES=" + str(local_counts["drive"]))
+    print("LOCAL_ONEDRIVE_REMOTES=" + str(local_counts["onedrive"]))
+    print("PUBLISHED_GOOGLE_DRIVE_REMOTES=" + str(published_counts["drive"]))
+    print("PUBLISHED_ONEDRIVE_REMOTES=" + str(published_counts["onedrive"]))
     _master_check(local, remote)
     if opts.simulate_client:
         return _client_simulation(remote, local=local, remote_index=opts.remote_index)

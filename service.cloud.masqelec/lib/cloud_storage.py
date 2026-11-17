@@ -304,13 +304,20 @@ def start_cloud_storage():
                 # ni siquiera se ha podido leer para preservar su token.
                 raise RuntimeError("No se pudo leer rclone.conf local") from exc
 
+        identity_blocked = False
         if local_raw is not None:
-            # rclone puede renovar su token durante el uso normal. Conservar
-            # el local al aplicar otros cambios del remoto mientras el perfil
-            # de autenticación no haya cambiado.
-            merged_raw = rclone_conf_merge.preserve_local_oauth_tokens(
+            # Una biblioteca OneDrive no puede cambiar de unidad/destino
+            # automáticamente por descargar un nuevo conf del repositorio.
+            identity_blocked = rclone_conf_merge.onedrive_identity_changed(
                 remote_raw, local_raw
             )
+            if identity_blocked:
+                merged_raw = local_raw
+            else:
+                # Las renovaciones normales de OAuth deben conservarse.
+                merged_raw = rclone_conf_merge.preserve_local_oauth_tokens(
+                    remote_raw, local_raw
+                )
             remote_norm = _normalize_rclone_conf_bytes(merged_raw)
             local_norm = _normalize_rclone_conf_bytes(local_raw)
         else:
@@ -318,7 +325,13 @@ def start_cloud_storage():
             remote_norm = _normalize_rclone_conf_bytes(merged_raw)
             local_norm = None
 
-        if local_norm is not None and (
+        if identity_blocked:
+            log_utils.write_log(
+                "OneDrive: identidad de unidad diferente; "
+                "se conserva rclone.conf local hasta revisión manual.",
+                "WARNING",
+            )
+        elif local_norm is not None and (
             local_norm == remote_norm or
             rclone_conf_merge.same_non_token_settings(local_raw, merged_raw)
         ):
@@ -344,6 +357,15 @@ def start_cloud_storage():
             log_utils.write_log(
                 "rclone.conf actualizado preservando tokens OAuth locales compatibles."
             )
+
+        if identity_blocked:
+            # Evitar cambios de units que puedan reiniciar o redirigir
+            # una biblioteca OneDrive incompatible con el conf local.
+            log_utils.write_log(
+                "OneDrive: se omiten actualizaciones de unidades systemd "
+                "hasta resolver la diferencia de identidad.", "WARNING"
+            )
+            return
 
         # ==========================
         # Units systemd desde remoto

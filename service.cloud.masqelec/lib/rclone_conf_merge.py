@@ -4,9 +4,14 @@ import re
 
 _SECTION = re.compile(r"^\s*\[([^\]\r\n]+)\]\s*$")
 _OPTION = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*$")
-_AUTH_IDENTITY = ("type", "client_id", "client_secret", "scope",
-                  "service_account_file", "service_account_credentials",
-                  "env_auth", "team_drive", "root_folder_id")
+# Identidad del proveedor y de la unidad: nunca cruzar tokens entre OneDrives.
+_AUTH_IDENTITY = (
+    "type", "client_id", "client_secret", "scope",
+    "service_account_file", "service_account_credentials", "env_auth",
+    "team_drive", "root_folder_id",
+    "drive_id", "drive_type", "tenant", "tenant_url", "tenant_api_version",
+    "region", "auth_url", "token_url",
+)
 
 
 def _lines(raw):
@@ -36,6 +41,30 @@ def _sections(lines):
             sections[current][key] = match.group(2).strip()
     return sections
 
+
+
+def onedrive_identity_changed(remote_raw, local_raw):
+    """Impide sustituir bibliotecas OneDrive por una unidad distinta al inicio.
+
+    Se consideran cambios también la desaparición, adición o cambio de tipo
+    de un remoto OneDrive ya que podría alterar montajes existentes.
+    No devuelve ni registra nombres de remotos o valores sensibles.
+    """
+    published = _sections(_lines(remote_raw))
+    current = _sections(_lines(local_raw))
+    for name in set(current) | set(published):
+        old = current.get(name) or {}
+        new = published.get(name) or {}
+        if "onedrive" not in (
+                old.get("type", "").strip().lower(),
+                new.get("type", "").strip().lower()):
+            continue
+        if not old or not new:
+            return True
+        if any(old.get(field, "") != new.get(field, "")
+               for field in _AUTH_IDENTITY):
+            return True
+    return False
 
 def preserve_local_oauth_tokens(remote_raw, local_raw):
     """Conserva token local si el remoto mantiene la misma identidad OAuth.
