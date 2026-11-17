@@ -8,7 +8,7 @@ import sys
 import tempfile
 import urllib.request
 
-REF = "049b0d67d165ab353d53924f30f701b9691b9aa5"
+REF = "23ec52b3b8662b43d2c2e871ae8ef5dedc44fd86"
 SOURCE = ("https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/"
           + REF + "/service.cloud.masqelec/lib/")
 UNITS = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/develop/system.d/"
@@ -92,10 +92,35 @@ def run():
         for index, (service, remote, _folder, _mount) in enumerate(
                 module.MOUNT_SPECS, 1):
             kind = sections.get(remote, {}).get("type", "").strip().lower()
-            provider = ("ONEDRIVE" if kind == "onedrive" else
+            provider = ("CRYPT" if kind == "crypt" else
+                        "ONEDRIVE" if kind == "onedrive" else
                         "DRIVE" if kind == "drive" else
                         "MISSING" if not kind else "OTHER")
             print("UNIT_{}_REMOTE_PROVIDER={}".format(index, provider))
+            LAB_STAGE = "RESOLVE_DEPENDENCIES_{}".format(index)
+            chain = module.dependency_closure(original, remote)
+            oauth = module.policy.oauth_tokens(original)
+            onedrive_dependencies = sum(
+                sections[name].get("type", "").strip().lower() == "onedrive"
+                for name in chain
+            )
+            print("UNIT_{}_CHAIN_SECTIONS={}".format(index, len(chain)))
+            print("UNIT_{}_ONEDRIVE_DEPENDENCIES={}".format(
+                index, onedrive_dependencies))
+            print("UNIT_{}_OAUTH_DEPENDENCIES={}".format(
+                index, len(chain.intersection(oauth))))
+            if kind == "crypt":
+                wrapper = sections[remote]
+                filename_mode = wrapper.get("filename_encryption", "").lower()
+                data_encryption_off = (
+                    wrapper.get("no_data_encryption", "false").lower()
+                    in ("true", "yes", "1")
+                )
+                print("UNIT_{}_FILENAME_ENCRYPTION={}".format(
+                    index, "OFF" if filename_mode == "off" else
+                    "DEFAULT_OR_OTHER"))
+                print("UNIT_{}_DATA_ENCRYPTION={}".format(
+                    index, "OFF" if data_encryption_off else "ON"))
             LAB_STAGE = "SELECT_REMOTE_{}".format(index)
             module.select_remote(original, remote)
             LAB_STAGE = "PROPOSE_UNIT_{}".format(index)

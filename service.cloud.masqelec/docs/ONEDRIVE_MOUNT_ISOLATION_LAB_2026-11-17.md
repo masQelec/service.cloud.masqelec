@@ -153,3 +153,23 @@ original. El plan no convierte, migra ni reescribe datos remotos.
 Se añaden pruebas que comparan exactamente los ajustes de `crypt`,
 verifican aislamiento entre las dos cuentas y bloquean dependencias
 ausentes. Total previsto de pruebas tras este cambio: **152**.
+
+## Laboratorio con la cadena `crypt -> OneDrive`
+
+El laboratorio `tools/rclone_mount_isolation_lab.py` queda fijado al
+commit `23ec52b3b8662b43d2c2e871ae8ef5dedc44fd86` para descargar el
+nuevo generador. Para cada unidad muestra sin secretos:
+
+- `UNIT_N_REMOTE_PROVIDER`: se espera `CRYPT`.
+- `UNIT_N_CHAIN_SECTIONS`: se esperan normalmente 2 secciones
+  (wrapper crypt y remoto OAuth), salvo dependencias adicionales.
+- `UNIT_N_ONEDRIVE_DEPENDENCIES`: se espera 1 por unidad.
+- `UNIT_N_OAUTH_DEPENDENCIES`: se espera 1 por unidad.
+- `UNIT_N_FILENAME_ENCRYPTION`: se espera `OFF` según el operador.
+- `UNIT_N_DATA_ENCRYPTION`: se espera `ON` según el operador.
+- `LAB_RESULT=PASS` si se han generado los 4 planes independientes,
+  comprobado la consistencia y preservado la configuración operativa.
+
+No se han instalado las propuestas systemd, no se toca `rclone.conf`
+real y la sincronización OAuth sigue desactivada. Sigue sin existir
+una recuperación transparente de montajes en caliente.
