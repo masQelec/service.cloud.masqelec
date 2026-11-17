@@ -287,7 +287,9 @@ class MountIsolationTests(unittest.TestCase):
             snapshots = {service: iso.select_remote(config, remote)
                          for service, remote, _, _ in iso.MOUNT_SPECS}
             flags = iso.account_divergence(snapshots)
-            self.assertEqual(len(flags), 2 if kind == "alias" else 4)
+            self.assertEqual(
+                len(flags), 2 if kind in ("alias", "crypt") else 4
+            )
             self.assertTrue(all(x == "consistent" for x in flags.values()))
 
     def test_virtual_roots_divergent_one_account_not_promoted(self):
