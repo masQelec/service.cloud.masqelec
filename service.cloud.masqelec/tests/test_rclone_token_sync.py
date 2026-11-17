@@ -82,6 +82,10 @@ class RcloneTokenSyncTests(unittest.TestCase):
         os.utime(self.path, (old, old))
         self.sync.CONF_PATH = self.path
         self.sync.REMOTE_PATH = "rclone/rclone.conf.crypt"
+        # Ningún test unitario ejecuta rclone ni consulta la red.
+        self.sync._master_probe_local = lambda raw, names: {
+            name: "ok" for name in names
+        }
 
     def _disk(self):
         with open(self.path, "rb") as stream:
@@ -258,6 +262,199 @@ class RcloneTokenSyncTests(unittest.TestCase):
             self.sync.tick()
         self.assertEqual(actions, ["check", "check"])
 
+
+
+    def _set_bad_local(self, bad):
+        with open(self.path, "wb") as out:
+            out.write(bad)
+        old = time.time() - 30
+        os.utime(self.path, (old, old))
+
+    def _master_setup(self, published=None, probe_status="ok"):
+        self.sync.device_utils.is_master_device = lambda: True
+        self.sync._remote_config = lambda key: (published if published is not None
+                                                else self.local)
+        self.sync._probe = lambda name, config: probe_status
+
+    def _master_backup_files(self):
+        prefix = os.path.basename(self.path) + ".pre-master-recovery-"
+        return [os.path.join(self.tmp.name, name)
+                for name in os.listdir(self.tmp.name) if name.startswith(prefix)]
+
+    def test_master_corrupt_config_requires_two_observations(self):
+        damaged = b"[series]\ntype = onedrive\ntoken = {broken-json\n"
+        self._set_bad_local(damaged)
+        self._master_setup()
+        self.assertEqual(self.sync._master_cycle(5000), "master_corrupt_pending")
+        self.assertEqual(self._disk(), damaged)
+        self.assertEqual(self._master_backup_files(), [])
+        self.assertEqual(self.sync._master_cycle(5020), "master_corrupt_pending")
+        self.assertEqual(self._disk(), damaged)
+
+    def test_master_corrupt_config_restored_after_confirmation_with_backup(self):
+        damaged = self.local.replace(
+            b'"refresh_token": "old-one"', b'"refresh_token": {broken'
+        )
+        self._set_bad_local(damaged)
+        self._master_setup()
+        with mock.patch.object(self.sync.catalog_utils, "_upload_file") as upload:
+            self.assertEqual(self.sync._master_cycle(5000), "master_corrupt_pending")
+            self.assertEqual(self.sync._master_cycle(5061),
+                             "master_recovered_restart_pending")
+            upload.assert_not_called()
+        self.assertEqual(self._disk(), self.local)
+        backups = self._master_backup_files()
+        self.assertEqual(len(backups), 1)
+        with open(backups[0], "rb") as stream:
+            self.assertEqual(stream.read(), damaged)
+        self.assertEqual(os.stat(backups[0]).st_mode & 0o777, 0o600)
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600)
+
+    def test_master_truncated_three_remotes_restored_from_reserve(self):
+        damaged = self.local.split(b"[logs]")[0]
+        self._set_bad_local(damaged)
+        self._master_setup()
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_recovered_restart_pending")
+        self.assertEqual(self._disk(), self.local)
+
+    def test_master_missing_config_recovers_without_backup(self):
+        os.unlink(self.path)
+        self._master_setup()
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_recovered_restart_pending")
+        self.assertEqual(self._disk(), self.local)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_master_corrupt_identity_drift_is_blocked(self):
+        damaged = self.local.replace(b"drive_id = id-series",
+                                     b"drive_id = wrong-drive")
+        damaged = damaged.replace(
+            b'"refresh_token": "old-two"', b'"refresh_token": {broken'
+        )
+        self._set_bad_local(damaged)
+        self._master_setup()
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_identity_mismatch")
+        self.assertEqual(self._disk(), damaged)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_master_corrupt_recovery_rejects_invalid_published_layout(self):
+        damaged = b"truncated"
+        self._set_bad_local(damaged)
+        self._master_setup(published=b"[series]\ntype = drive\n")
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        with self.assertRaises(ValueError):
+            self.sync._master_cycle(1061)
+        self.assertEqual(self._disk(), damaged)
+
+    def test_master_corrupt_recovery_rejects_unavailable_candidate(self):
+        damaged = b"truncated"
+        self._set_bad_local(damaged)
+        self._master_setup(probe_status="unavailable")
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_candidate_unverified")
+        self.assertEqual(self._disk(), damaged)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_master_authorization_error_repairs_only_onedrive_token(self):
+        published = _mixed(series_refresh="new-one")
+        self._master_setup(published=published)
+        self.sync._master_probe_local = lambda local, names: {
+            name: ("auth" if name == "series" else "ok") for name in names
+        }
+        with mock.patch.object(self.sync.catalog_utils, "_upload_file") as upload:
+            self.assertEqual(self.sync._master_cycle(1000),
+                             "master_recovered_restart_pending")
+            upload.assert_not_called()
+        repaired = self._disk()
+        self.assertEqual(policy.oauth_tokens(repaired)["series"]["refresh_token"],
+                         "new-one")
+        for name in ("movies", "update", "logs"):
+            self.assertEqual(policy.oauth_tokens(repaired)[name],
+                             policy.oauth_tokens(self.local)[name])
+        self.assertEqual(len(self._master_backup_files()), 1)
+
+    def test_master_auth_with_same_refresh_different_access_can_repair(self):
+        published = self.local.replace(b"access-series", b"valid-access")
+        self._master_setup(published=published)
+        self.sync._master_probe_local = lambda local, names: {
+            name: ("auth" if name == "series" else "ok") for name in names
+        }
+        self.assertEqual(self.sync._master_cycle(1000),
+                         "master_recovered_restart_pending")
+        self.assertIn(b"valid-access", self._disk())
+
+    def test_master_auth_when_published_same_token_does_not_overwrite(self):
+        self._master_setup()
+        self.sync._master_probe_local = lambda local, names: {
+            name: ("auth" if name == "series" else "ok") for name in names
+        }
+        self.assertEqual(self.sync._master_cycle(1000), "no_new_token")
+        self.assertEqual(self._disk(), self.local)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_master_auth_rate_limit_not_treated_as_auth(self):
+        self._master_setup()
+        self.sync._remote_config = lambda key: self.fail("No descargar reserva")
+        self.sync._master_probe_local = lambda local, names: {
+            name: "unavailable" for name in names
+        }
+        with mock.patch.object(self.sync, "_publish_master", return_value="unchanged"):
+            self.assertEqual(self.sync._master_cycle(1000), "unchanged")
+        self.assertEqual(self._disk(), self.local)
+
+    def test_master_recovery_detects_concurrent_write(self):
+        self._master_setup()
+        self.sync._remote_config = lambda key: self.local
+        self.sync._probe = lambda name, config: "ok"
+        old = self.local
+        actual = self.local.replace(b"old-one", b"concurrent")
+        with open(self.path, "wb") as stream:
+            stream.write(actual)
+        with mock.patch.object(self.sync, "_read_damaged_snapshot",
+                               return_value=actual):
+            self.assertEqual(
+                self.sync._master_recover("corrupt", original=old),
+                "local_changed")
+        self.assertEqual(self._disk(), actual)
+
+    def test_master_stale_reserve_auth_failure_keeps_local(self):
+        published = _mixed(series_refresh="older-broken")
+        self._master_setup(published=published, probe_status="auth")
+        self.sync._master_probe_local = lambda raw, names: {
+            name: ("auth" if name == "series" else "ok") for name in names
+        }
+        self.assertEqual(self.sync._master_cycle(1000),
+                         "master_candidate_unverified")
+        self.assertEqual(self._disk(), self.local)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_master_second_failure_respects_recovery_cooldown(self):
+        damaged = b"truncated"
+        self._set_bad_local(damaged)
+        self._master_setup(probe_status="unavailable")
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061),
+                         "master_candidate_unverified")
+        self.assertEqual(self.sync._master_cycle(1121),
+                         "master_recovery_cooldown")
+        self.assertEqual(self._disk(), damaged)
+
+    def test_master_corrupt_symlink_is_not_replaced(self):
+        os.unlink(self.path)
+        outside = os.path.join(self.tmp.name, "outside.conf")
+        with open(outside, "wb") as stream:
+            stream.write(b"SECRET_TEST")
+        os.symlink(outside, self.path)
+        self._master_setup()
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_unsafe")
+        self.assertEqual(self.sync._master_cycle(1061), "master_corrupt_unsafe")
+        self.assertEqual(open(outside, "rb").read(), b"SECRET_TEST")
 
 
 if __name__ == "__main__":

@@ -159,5 +159,51 @@ class RcloneTokenPolicyTests(unittest.TestCase):
         self.assertFalse(policy.auth_failure(b"OneDrive 403 forbidden"))
 
 
+    def test_master_inventory_requires_four_oauth_remotes(self):
+        one = conf("one")
+        with self.assertRaisesRegex(ValueError, "Inventario"):
+            policy.validate_master_layout(one)
+
+    def test_master_inventory_rejects_truncated_token_json(self):
+        bad = (b'[a]\ntype = onedrive\ndrive_id = id_a\n'
+               b'drive_type = personal\ntoken = {invalid\n')
+        with self.assertRaisesRegex(ValueError, "JSON"):
+            policy.validate_master_layout(bad)
+
+    def test_master_partial_identity_rejects_wrong_onedrive_drive(self):
+        published = (b'[a]\ntype = onedrive\ndrive_id = right\n'
+                     b'drive_type = personal\ntoken = TOKEN\n')
+        damaged = (b'[a]\ntype = onedrive\ndrive_id = wrong\n'
+                   b'drive_type = personal\ntoken = {broken\n')
+        self.assertFalse(policy.master_partial_identity_compatible(
+            damaged, published))
+
+    def test_master_partial_identity_allows_incomplete_json_if_drive_matches(self):
+        published = (b'[a]\ntype = onedrive\ndrive_id = right\n'
+                     b'drive_type = personal\ntoken = TOKEN\n')
+        damaged = (b'[a]\ntype = onedrive\ndrive_id = right\n'
+                   b'drive_type = personal\ntoken = {broken\n')
+        self.assertTrue(policy.master_partial_identity_compatible(
+            damaged, published))
+
+    def test_master_can_restore_same_refresh_but_fixed_access_token(self):
+        local = conf("shared", access="broken")
+        remote = conf("shared", access="valid")
+        candidate = policy.tokens_from_master(
+            local, remote, ["cloud"], allow_same_refresh=True
+        )
+        self.assertIn(b'valid', candidate)
+        with self.assertRaisesRegex(ValueError, "diferente"):
+            policy.tokens_from_master(local, remote, ["cloud"])
+
+    def test_master_does_not_copy_identical_token_even_in_failure(self):
+        local = conf("shared", access="same")
+        with self.assertRaisesRegex(ValueError, "alternativo"):
+            policy.tokens_from_master(
+                local, local, ["cloud"], allow_same_refresh=True
+            )
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -37,6 +37,46 @@ def oauth_tokens(raw):
     return result
 
 
+
+def validate_master_layout(raw):
+    """El MASTER configurado debe tener exactamente 2 OneDrive + 2 Drive.
+
+    Distingue un archivo sintácticamente legible de uno incompleto o
+    truncado: si falta una sección OAuth, no autorizar publicación.
+    """
+    config = sections(raw)
+    tokens = oauth_tokens(raw)
+    counts = oauth_provider_counts(raw)
+    if (len(config) != 4 or len(tokens) != 4 or
+            counts != {"drive": 2, "onedrive": 2} or
+            set(config) != set(tokens)):
+        raise ValueError("Inventario MASTER OAuth incompleto o incompatible")
+    for name, options in config.items():
+        if options.get("type", "").strip().lower() == "onedrive":
+            if not options.get("drive_id") or not options.get("drive_type"):
+                raise ValueError("Identidad OneDrive incompleta")
+    return tuple(sorted(tokens))
+
+
+def master_partial_identity_compatible(partial_raw, published_raw):
+    """Validar campos de identidad presentes en un fichero dañado.
+
+    No interpreta un remoto ausente como identidad cambiada, pero impide
+    recuperar un token de otro proveedor/cuenta/unidad OneDrive.
+    """
+    published = sections(published_raw)
+    try:
+        current = sections(partial_raw)
+    except (ValueError, UnicodeError):
+        return True  # Ilegible: solo se usa copia remota MQC2 validada.
+    for name, old in current.items():
+        if name not in published:
+            return False
+        for key in conf._AUTH_IDENTITY:
+            if key in old and old[key] != published[name].get(key, ""):
+                return False
+    return True
+
 def oauth_provider_counts(raw):
     """Contar remotos recuperables sin revelar nombres ni credenciales."""
     opts = sections(raw)
@@ -97,7 +137,8 @@ def master_should_publish(local_raw, published_raw):
     return bool(changed_refresh_names(local_raw, published_raw))
 
 
-def tokens_from_master(local_raw, published_raw, broken_names):
+def tokens_from_master(local_raw, published_raw, broken_names,
+                       allow_same_refresh=False):
     """Actualiza únicamente tokens de remotos que han fallado por autenticación."""
     names = set(broken_names)
     local_lines = conf._lines(local_raw)
@@ -113,8 +154,11 @@ def tokens_from_master(local_raw, published_raw, broken_names):
         if any(current[name].get(key, "") != published[name].get(key, "")
                for key in conf._AUTH_IDENTITY):
             raise ValueError("Identidad OAuth diferente: recuperación no automática")
-        if ours[name]["refresh_token"] == theirs[name]["refresh_token"]:
+        if (ours[name]["refresh_token"] == theirs[name]["refresh_token"]
+                and not allow_same_refresh):
             raise ValueError("El MASTER no tiene un refresh_token diferente")
+        if current[name].get("token") == published[name].get("token"):
+            raise ValueError("No existe un token alternativo diferente")
         replacements[name] = published[name]["token"]
 
     result, section = [], None

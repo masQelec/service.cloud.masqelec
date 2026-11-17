@@ -74,9 +74,23 @@
   provocar una renovación adicional independiente; el archivo publicado
   corresponde a la última instantánea estable del MASTER, no a una
   supuesta fecha de creación de refresh_token.
-- El MASTER **no tiene recuperación automática desde GitHub** si falla
-  su propia autenticación en la versión actual; el código solo publica
-  desde MASTER y recupera en CLIENTES. Diseñar este fallback aparte.
+- El MASTER incorpora autorrecuperación desde la reserva MQC2:
+  * Corrupción estructural: dos observaciones iguales separadas por 60 s,
+    descarga de reserva, exige exactamente 2 OneDrive y 2 Google Drive
+    completos y valida acceso de los cuatro remotos mediante rclone.
+  * Fallo OAuth explícito: sondeo de OneDrive cada 15 min y Google Drive
+    cada 60 min, sustituyendo solo el token que falla tras verificar copia.
+  * Nunca se recupera por error de red, cuota, permisos o rate-limit.
+  * Una identidad OneDrive diferente (drive_id/drive_type) bloquea reemplazo.
+  * El fichero previo se guarda en backup privado único 0600; cambio atómico.
+  * Si la comprobación falla se conserva el archivo actual, incluso dañado;
+    no se ejecutan reinicios de montajes FUSE ni cambios de producción.
+  * Si GitHub o la clave no están disponibles, no puede autorrecuperarse.
+- Límite de concurrencia: aunque se compara antes del reemplazo, los procesos
+  rclone mount aún podrían escribir en el intervalo de la operación atómica;
+  no hay locking interproceso compartido. Requiere prueba real controlada.
+- La recuperación ocurre cuando arranca el worker; el flujo cloud_storage
+  de arranque se ejecuta antes y no queda sustituido por este mecanismo.
 - El mantenimiento de Kodi protege CleanLibrary con _mounts_ready()
   (montajes FUSE presentes, accesibles y no vacíos), pero **esto no
   demuestra por sí solo que OAuth OneDrive funcione ahora**; un FUSE
@@ -88,6 +102,10 @@
 ## Operaciones prohibidas en esta fase
 
 - NO poner RCLONE_TOKEN_SYNC_ENABLED = True.
+- **NO activar el worker por haber superado solo pruebas sintéticas**;
+  simular corrupción en una copia aislada y ejecutar pruebas en MASTER real
+  sin modificar rclone.conf hasta completar la validación.
+
 - NO subir credenciales durante el piloto.
 - NO reemplazar el rclone.conf real durante el piloto.
 - NO reiniciar automáticamente unidades de montaje.
