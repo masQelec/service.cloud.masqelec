@@ -1,0 +1,115 @@
+# -*- coding: utf-8 -*-
+"""Laboratorio SOLO LECTURA del aislamiento OneDrive (montajes intactos)."""
+import importlib
+import os
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+import urllib.request
+
+REF = "adbd506fa0a1a9237b81d19a379fd5bd1e41939a"
+SOURCE = ("https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/"
+          + REF + "/service.cloud.masqelec/lib/")
+UNITS = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/develop/system.d/"
+LIVE = "/storage/.config/rclone/rclone.conf"
+
+
+def _fetch(url):
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "masQelec-mount-isolation-lab/1.0",
+        "Cache-Control": "no-cache"
+    })
+    with urllib.request.urlopen(req, timeout=30) as response:
+        data = response.read(256 * 1024 + 1)
+    if not data or len(data) > 256 * 1024:
+        raise ValueError("Recurso de laboratorio inválido")
+    return data
+
+
+def _stable_live():
+    if os.path.islink(LIVE):
+        raise ValueError("Configuración operativa es symlink")
+    pre = os.stat(LIVE)
+    if not pre.st_size or pre.st_size > 1024 * 1024:
+        raise ValueError("Tamaño inesperado de configuración")
+    with open(LIVE, "rb") as fd:
+        result = fd.read(1024 * 1024 + 1)
+    post = os.stat(LIVE)
+    if (len(result) != pre.st_size or pre.st_ino != post.st_ino or
+            pre.st_size != post.st_size or pre.st_mtime_ns != post.st_mtime_ns):
+        raise ValueError("Configuración modificada durante la lectura")
+    return result
+
+
+def run():
+    print("LAB_MODE=PER_MOUNT_ONEDRIVE_CONFIG_ISOLATION")
+    print("SOURCE_REF=" + REF)
+    print("LIVE_CONFIG_WRITE=NO")
+    print("ADDON_WRITE=NO")
+    print("SYSTEMD_WRITE=NO")
+    print("MOUNT_RESTART=NO")
+    print("GITHUB_UPLOAD=NO")
+    stage = "CREATE_TMP"
+    with tempfile.TemporaryDirectory(prefix="masqelec-mount-isolation-", dir="/tmp") as dirname:
+        root = Path(dirname)
+        os.chmod(root, 0o700)
+        lib = root / "modules" / "lib"
+        lib.mkdir(parents=True)
+        os.chmod(lib.parent, 0o700)
+        os.chmod(lib, 0o700)
+        (lib / "__init__.py").write_bytes(b"")
+        for file in ("rclone_mount_isolation.py", "rclone_conf_merge.py",
+                     "rclone_token_policy.py"):
+            stage = "DOWNLOAD_MODULES"
+            target = lib / file
+            target.write_bytes(_fetch(SOURCE + file))
+            os.chmod(target, 0o600)
+        stage = "IMPORT_MODULES"
+        sys.path.insert(0, str(lib.parent))
+        module = importlib.import_module("lib.rclone_mount_isolation")
+        stage = "READ_LOCAL"
+        original = _stable_live()
+        stage = "DOWNLOAD_UNITS"
+        units = {}
+        for service, remote, _folder, _mount in module.MOUNT_SPECS:
+            units[service] = _fetch(UNITS + service)
+        stage = "VERIFY_UNITS"
+        module.inspect_units(units)
+        print("UNITS_MATCH_DEVELOP=PASS")
+        stage = "STAGE_PRIVATE"
+        destination = root / "proposal"
+        destination.mkdir(mode=0o700)
+        count = module.stage_in_directory(str(destination), original, units)
+        print("ISOLATED_CONFIG_FILES=" + str(count))
+        print("GENERATED_UNIT_PROPOSALS=" + str(count))
+        stage = "VERIFY_ACCOUNTS"
+        config_files = {}
+        for service, remote, _, _ in module.MOUNT_SPECS:
+            file = destination / (service.removesuffix(".service") + ".conf")
+            config_files[service] = file.read_bytes()
+        status = module.account_divergence(config_files)
+        print("ONEDRIVE_ACCOUNTS=" + str(len(status)))
+        print("ACCOUNT_TOKENS_CONSISTENT=" +
+              str(sum(v == "consistent" for v in status.values())))
+        print("ACCOUNT_TOKENS_DIVERGED=" +
+              str(sum(v == "diverged" for v in status.values())))
+        print("STAGED_FILES_MODE_0600=" +
+              ("PASS" if all(os.stat(p).st_mode & 0o777 == 0o600
+                             for p in destination.iterdir()) else "FAIL"))
+        stage = "VERIFY_LIVE"
+        refreshed = _stable_live()
+        print("LIVE_CHANGED_DURING_LAB=" +
+              ("NO" if refreshed == original else "YES"))
+        print("LAB_RESULT=PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    step = "START"
+    try:
+        sys.exit(run())
+    except Exception as exc:
+        # Errores genéricos: no mostrar secretos ni contenido rclone.conf.
+        print("LAB_RESULT=ERROR_" + type(exc).__name__)
+        sys.exit(1)

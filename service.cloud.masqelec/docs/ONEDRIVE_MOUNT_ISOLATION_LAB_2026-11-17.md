@@ -52,3 +52,23 @@ No modificar las cuatro unidades en cloud/develop todavía.
 - El ensayo en KodiELEC debe usar directorio temporal 0700, ficheros 0600,
   sin reiniciar servicios ni ejecutar OAuth automáticamente.
 - No confundir un laboratorio PASS con recuperación transparente real.
+
+## Laboratorio real de aislamiento, sin migrar
+
+El script `tools/rclone_mount_isolation_lab.py` crea 8 archivos
+temporales y privados: 4 configs con un único OneDrive y 4 propuestas de
+unidades. Importa los módulos desde el commit inmutable
+`adbd506fa0a1a9237b81d19a379fd5bd1e41939a` y descarga en modo
+solo lectura las unidades actuales de `cloud.masqelec/develop`.
+
+    wget -q https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/develop/service.cloud.masqelec/tools/rclone_mount_isolation_lab.py -O /tmp/rclone_mount_isolation_lab.py
+    python3 -m py_compile /tmp/rclone_mount_isolation_lab.py
+    python3 /tmp/rclone_mount_isolation_lab.py
+
+El ensayo no consulta OAuth, no escribe en el directorio de rclone y
+elimina automáticamente las copias privadas al finalizar. Verificar
+`UNITS_MATCH_DEVELOP=PASS`, `ISOLATED_CONFIG_FILES=4`,
+`GENERATED_UNIT_PROPOSALS=4`, `ONEDRIVE_ACCOUNTS=2`,
+`ACCOUNT_TOKENS_CONSISTENT=2`, `STAGED_FILES_MODE_0600=PASS` y
+`LAB_RESULT=PASS`. La prueba no confirma la adopción de nuevos tokens
+por montajes actualmente activos.
