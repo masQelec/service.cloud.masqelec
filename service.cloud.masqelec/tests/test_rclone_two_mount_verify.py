@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 import types
 import unittest
 
@@ -25,7 +26,7 @@ class OAuthV2RealProbeTests(unittest.TestCase):
         self.source = plan.account_snapshot(self.canonical, 0)
         self.calls = []
 
-    def _runner(self, status=0, stderr=b"", transform=None):
+    def _runner(self, status=0, simulated_stderr=b"", transform=None):
         def run(cmd, stdout, stderr, timeout, check):
             self.calls.append(cmd)
             self.assertEqual(cmd[1], "lsf")
@@ -38,7 +39,12 @@ class OAuthV2RealProbeTests(unittest.TestCase):
             self.assertEqual(Path(path).read_bytes(), self.source)
             if transform is not None:
                 Path(path).write_bytes(transform(self.source))
-            return types.SimpleNamespace(returncode=status, stderr=stderr)
+            # 'stderr' es el descriptor subprocess.PIPE (-1), NO el
+            # mensaje simulado que debe clasificar la función probada.
+            self.assertEqual(stderr, subprocess.PIPE)
+            return types.SimpleNamespace(
+                returncode=status, stderr=simulated_stderr
+            )
         return run
 
     def test_success_checks_actual_temporary_file(self):
