@@ -83,7 +83,9 @@ class RcloneTokenSyncTests(unittest.TestCase):
         os.utime(self.path, (old, old))
         self.sync.CONF_PATH = self.path
         self.sync.REMOTE_PATH = "rclone/rclone.conf.crypt"
-        # Por defecto el laboratorio no tiene montajes activos.
+        # Guardar la implementación real para ensayar /proc con procesos
+        # simulados. Los otros tests aíslan el entorno sin montajes.
+        self._real_mount_guard = self.sync._config_mounts_active
         self.sync._config_mounts_active = lambda: False
         # Ningún test unitario ejecuta rclone ni consulta la red.
         self.sync._master_probe_local = lambda raw, names: {
@@ -161,7 +163,8 @@ class RcloneTokenSyncTests(unittest.TestCase):
         for name in ("movies", "update", "logs"):
             self.assertEqual(policy.oauth_tokens(repaired)[name],
                              policy.oauth_tokens(self.local)[name])
-        self.assertEqual(open(self.path + ".pre-recovery", "rb").read(), self.local)
+        with open(self.path + ".pre-recovery", "rb") as stream:
+            self.assertEqual(stream.read(), self.local)
 
     def test_client_rate_limit_does_not_replace_config(self):
         self.sync._probe = lambda name, config: "unavailable"
@@ -457,7 +460,8 @@ class RcloneTokenSyncTests(unittest.TestCase):
         self._master_setup()
         self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_unsafe")
         self.assertEqual(self.sync._master_cycle(1061), "master_corrupt_unsafe")
-        self.assertEqual(open(outside, "rb").read(), b"SECRET_TEST")
+        with open(outside, "rb") as stream:
+            self.assertEqual(stream.read(), b"SECRET_TEST")
 
 
     def test_master_corrupt_google_rate_limit_does_not_block_onedrive(self):
@@ -547,7 +551,8 @@ class RcloneTokenSyncTests(unittest.TestCase):
         self.assertEqual(len(policy.sections(self._disk())), 6)
         backup = self._master_backup_files()
         self.assertEqual(len(backup), 1)
-        self.assertEqual(open(backup[0], "rb").read(), damaged)
+        with open(backup[0], "rb") as stream:
+            self.assertEqual(stream.read(), damaged)
 
     def test_master_six_sections_different_extra_identity_blocks_recovery(self):
         local = self._six_section_config()
@@ -737,7 +742,7 @@ class RcloneTokenSyncTests(unittest.TestCase):
                  "--config", self.path]]
         contexts = self._simulate_processes(argv)
         with contexts[0], contexts[1], contexts[2]:
-            self.assertTrue(self.sync._config_mounts_active())
+            self.assertTrue(self._real_mount_guard())
 
     def test_different_rclone_mount_config_does_not_block_lab(self):
         commands = [["/storage/.config/rclone/rclone", "mount", "cloud:",
@@ -745,13 +750,13 @@ class RcloneTokenSyncTests(unittest.TestCase):
                      "--config=/storage/.config/rclone/rclone.conf"]]
         contexts = self._simulate_processes(commands)
         with contexts[0], contexts[1], contexts[2]:
-            self.assertFalse(self.sync._config_mounts_active())
+            self.assertFalse(self._real_mount_guard())
 
     def test_rclone_mount_without_explicit_config_fails_closed(self):
         commands = [["rclone", "mount", "cloud:", "/storage/.mnt/a"]]
         contexts = self._simulate_processes(commands)
         with contexts[0], contexts[1], contexts[2]:
-            self.assertTrue(self.sync._config_mounts_active())
+            self.assertTrue(self._real_mount_guard())
 
 
 

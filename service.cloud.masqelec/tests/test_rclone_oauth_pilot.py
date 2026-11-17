@@ -84,7 +84,8 @@ class OAuthPilotTests(unittest.TestCase):
             with open(file, "wb") as stream:
                 stream.write(original)
             self.assertEqual(pilot._read(file), original)
-            self.assertEqual(open(file, "rb").read(), original)
+            with open(file, "rb") as stream:
+                self.assertEqual(stream.read(), original)
 
 
     def test_classifies_failure_without_exposing_secret(self):
