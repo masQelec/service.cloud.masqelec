@@ -65,3 +65,34 @@ python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
 2. Mantener las dos copias intactas y examinar la secuencia de renovación documentada y el estado de los montajes **sin solicitar un refresh OAuth**.
 3. Diseñar coordinación MASTER–CLIENTES y generaciones antes de autorizar cualquier recuperación controlada.
 4. Un `DIFFERENT` no determina qué token reemplazar. Cualquier paso con escritura o proveedor OAuth real requiere análisis adicional y permiso operativo específico.
+
+### Identidad real de las cuentas y arquitectura prevista (aclaración del operador)
+
+La pareja lógica **1** consta del remoto OAuth OneDrive `library_1` y el wrapper `crypt` `users_library_1`; la pareja lógica **2** utiliza el remoto OAuth `library_2` y el wrapper `crypt` `users_library_2`. El nombre `users_library_*` (plural) es el usado por las unidades y constantes actuales del repositorio. No confundir **remoto OAuth** con **wrapper crypt** ni cambiar sus nombres por esta anotación. La dependencia se valida desde `crypt.remote` al leer la configuración; los nombres OAuth aquí son los comunicados por el operador y no deben deducirse de los tests sintéticos `one_a/one_b`.
+
+| Par | OAuth subyacente | Wrapper `crypt` | Proceso FUSE futuro | Bind a Kodi |
+| --- | --- | --- | --- | --- |
+| 1 | `library_1` | `users_library_1` | `rclone_library_1.service` → `/storage/.mnt/cloud/1` | `movies` → `/storage/.mnt/videos/1`; `tvshows` → `/storage/.mnt/tvshows/1` |
+| 2 | `library_2` | `users_library_2` | `rclone_library_2.service` → `/storage/.mnt/cloud/2` | `movies` → `/storage/.mnt/videos/2`; `tvshows` → `/storage/.mnt/tvshows/2` |
+
+**LEGACY:** cuatro procesos `rclone mount` (vídeos y series por cada `crypt`), cuatro puntos FUSE. **Objetivo aún NO desplegado:** dos procesos `rclone mount` (uno por wrapper/OneDrive) más **cuatro bind mounts**, conservando las mismas rutas Kodi; esto no significa seis procesos rclone. El problema OAuth observado es que **ambos tokens OneDrive** difieren del MQC2; ambos Google Drive coinciden. El cambio estructural no garantiza coordinación de refresh entre dispositivos.
+
+### Evidencia nueva del segundo preflight KodiELEC
+
+```text
+GH_BRANCH_COMMIT_STABLE=YES
+LIVE_CONFIG_CHANGED=NO
+BASELINE_REFRESH_ONEDRIVE_1=DIFFERENT
+BASELINE_REFRESH_ONEDRIVE_2=DIFFERENT
+BASELINE_REFRESH_DRIVE_1=SAME
+BASELINE_REFRESH_DRIVE_2=SAME
+GH_OAUTH_BASELINE=DIFFERENT
+REAL_OAUTH_PROBE=NOT_EXECUTED
+GITHUB_PUBLISH_ALLOWED=NO
+LAB_RESULT=BLOCKED_BASELINE_DIVERGED
+```
+
+**Resultado observado en equipo real** (segundo preflight): `2/2 OneDrive = DIFFERENT`, `2/2 Google Drive = SAME`. SHA GitHub/autenticidad MQC2/opciones estáticas PASS. **Seguridad: bloqueo correcto; coherencia OAuth OneDrive: BLOCKED.** El script no sondeó OAuth, no subió el respaldo y no cambió los montajes.
+
+Histórico remoto (solo metadatos): última actualización del archivo cifrado `cloud/develop/rclone/rclone.conf.crypt` en commit `da412cd09191033731b7a7e7dff6e77196ad743f`, 2026-11-17 00:05:09 UTC. Una renovación posterior es plausible pero no demostrada. No establecer frescura/validez con fecha, `expiry` o mtime.
+

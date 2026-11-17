@@ -121,3 +121,19 @@ En `service.cloud.masqelec/develop` se añadieron commits `17cb2901`, `41b9f033`
 ### Gate P0-A — discrepancia detectada
 
 El preflight real en KodiELEC devolvió `GH_OAUTH_BASELINE=DIFFERENT` y `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`, con SHA/autenticidad MQC2 e identidad estática PASS. No se conoce qué refresh es posterior/usable, ni se efectuaron modificaciones. `P0-A=BLOCKED` hasta diagnóstico de las cuatro cuentas. Implementado desglose anónimo y recheck local + HEAD GitHub (commits `f1c6ba1`, `20f924c`, `07b008d`); GitHub Actions `239/239 OK`, run `44191814025`. Código aún no probado en dispositivo. El siguiente paso es el preflight fijado a `07b008d`, nunca sondeo OAuth real ni restauración automática.
+
+## 9. Segundo preflight real y topología confirmada — 17-11-2026
+
+### Identidad real de las cuentas y arquitectura prevista (aclaración del operador)
+
+La pareja lógica **1** consta del remoto OAuth OneDrive `library_1` y el wrapper `crypt` `users_library_1`; la pareja lógica **2** utiliza el remoto OAuth `library_2` y el wrapper `crypt` `users_library_2`. El nombre `users_library_*` (plural) es el usado por las unidades y constantes actuales del repositorio. No confundir **remoto OAuth** con **wrapper crypt** ni cambiar sus nombres por esta anotación. La dependencia se valida desde `crypt.remote` al leer la configuración; los nombres OAuth aquí son los comunicados por el operador y no deben deducirse de los tests sintéticos `one_a/one_b`.
+
+| Par | OAuth subyacente | Wrapper `crypt` | Proceso FUSE futuro | Bind a Kodi |
+| --- | --- | --- | --- | --- |
+| 1 | `library_1` | `users_library_1` | `rclone_library_1.service` → `/storage/.mnt/cloud/1` | `movies` → `/storage/.mnt/videos/1`; `tvshows` → `/storage/.mnt/tvshows/1` |
+| 2 | `library_2` | `users_library_2` | `rclone_library_2.service` → `/storage/.mnt/cloud/2` | `movies` → `/storage/.mnt/videos/2`; `tvshows` → `/storage/.mnt/tvshows/2` |
+
+**LEGACY:** cuatro procesos `rclone mount` (vídeos y series por cada `crypt`), cuatro puntos FUSE. **Objetivo aún NO desplegado:** dos procesos `rclone mount` (uno por wrapper/OneDrive) más **cuatro bind mounts**, conservando las mismas rutas Kodi; esto no significa seis procesos rclone. El problema OAuth observado es que **ambos tokens OneDrive** difieren del MQC2; ambos Google Drive coinciden. El cambio estructural no garantiza coordinación de refresh entre dispositivos.
+
+
+**L5/P0-A:** `MASTER_CANONICAL_LAYOUT=PASS`, `GH_BLOB_SHA_VALID=PASS`, `MQC2_AUTHENTICATED=PASS`, `GH_STATIC_IDENTITY=PASS`, `GH_BRANCH_COMMIT_STABLE=YES`, `LIVE_CONFIG_CHANGED=NO`. Cuentas: `BASELINE_REFRESH_ONEDRIVE_1=DIFFERENT`, `BASELINE_REFRESH_ONEDRIVE_2=DIFFERENT`, `BASELINE_REFRESH_DRIVE_1=SAME`, `BASELINE_REFRESH_DRIVE_2=SAME`. Resultado final `BLOCKED_BASELINE_DIVERGED`. **No hay validación de token ni despliegue.** Continuar con análisis de concurrencia/generaciones sin escrituras.

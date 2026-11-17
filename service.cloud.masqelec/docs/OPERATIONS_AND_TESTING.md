@@ -130,9 +130,13 @@ Código fijado del script: `c701e74e5a677e3d300094f9ea112eb830749c3f`; el script
 Para observar qué cuenta tiene un refresh diferente, sin mostrar tokens ni hashes, ejecutar exclusivamente en KodiELEC:
 
 ```bash
-wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/${source_commit}/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' -O /tmp/rclone_two_mount_real_probe_lab.py
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/07b008db93ad524e9cbfec5b5e0e4b63704fe15e/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' -O /tmp/rclone_two_mount_real_probe_lab.py
 python3 -m py_compile /tmp/rclone_two_mount_real_probe_lab.py
 python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
 ```
 
-En caso de discrepancia estable, salida adicional `BASELINE_REFRESH_ONEDRIVE_1|2` y `BASELINE_REFRESH_DRIVE_1|2` con `SAME/DIFFERENT`, junto a `GH_BRANCH_COMMIT_STABLE=YES`. Resultado esperado de seguridad: `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`, **no** PASS. Si cambia la fuente durante la lectura: `INCONCLUSIVE_*`. No usar `--real-probe`; no copiar ni publicar ninguno de los tokens. **No se ha ejecutado todavía este script actualizado en el KodiELEC real.** Pruebas de laboratorio GitHub Actions: **239/239 OK** (run `${run}`). [Informe completo](PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md).
+En caso de discrepancia estable, salida adicional `BASELINE_REFRESH_ONEDRIVE_1|2` y `BASELINE_REFRESH_DRIVE_1|2` con `SAME/DIFFERENT`, junto a `GH_BRANCH_COMMIT_STABLE=YES`. Resultado esperado de seguridad: `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`, **no** PASS. Si cambia la fuente durante la lectura: `INCONCLUSIVE_*`. No usar `--real-probe`; no copiar ni publicar ninguno de los tokens. **No se ha ejecutado todavía este script actualizado en el KodiELEC real.** Pruebas de laboratorio GitHub Actions: **239/239 OK** (run `44191814025`). [Informe completo](PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md).
+
+## 8. Resultado real del segundo preflight
+
+El operador comunicó `ONEDRIVE_1=DIFFERENT`, `ONEDRIVE_2=DIFFERENT`, `DRIVE_1=SAME`, `DRIVE_2=SAME` en etiquetas `BASELINE_REFRESH_*`, `GH_BRANCH_COMMIT_STABLE=YES`, `LIVE_CONFIG_CHANGED=NO`, `LAB_RESULT=BLOCKED_BASELINE_DIVERGED`. El bloqueo protege frente a una sobrescritura sin evidencia de validez OAuth. **No repetir el preflight sin una nueva pregunta diagnóstica**. No hacer `rclone lsf`, `config reconnect`, OAuth real, PUT GitHub ni cambios en montajes/unidades. Arquitectura objetivo: 2 FUSE (cada `users_library_N` crypt sobre OneDrive `library_N`) + 4 bind a las rutas Kodi originales; sin desplegar.
