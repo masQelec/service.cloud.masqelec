@@ -585,36 +585,19 @@ def _startup_maintenance_wrapper():
         else:
             log("Mantenimiento de arranque: CleanLibrary desactivado por ajustes")
 
-        # DEVELOP: mantenimiento de arranque UpdateLibrary desactivado temporalmente.
-        # Para restaurarlo, descomentar el bloque siguiente.
-        log("DEVELOP: UpdateLibrary de arranque omitido para pruebas (incluye generación/subida de catálogo).")
-        # # 3) UpdateLibrary
-        # if prefs.get("update_enabled", True) and prefs.get("update_on_start", True):
-        #     if utils.is_client():
-        #         do_scan = False
-        #         if sync_applied:
-        #             do_scan = True
-        #         else:
-        #             tot = (verify or {}).get("total") or {}
-        #             missing = int(tot.get("missing", 0) or 0)
-        #             extra   = int(tot.get("extra", 0) or 0)
-        #             do_scan = (missing > 0) or (extra > 0)
+        # DEVELOP: se omite SOLO el escaneo VideoLibrary.Scan al arrancar.
+        # update_library_silent()  # temporalmente comentado para acelerar pruebas
+        # Se inicia el periodo de espera normal para que el worker periódico
+        # no dispare inmediatamente un Scan al minuto de arrancar.
+        _last_update_ts = time.time()
+        log("DEVELOP: UpdateLibrary (Scan) al arranque omitido; periódico activo.")
 
-        #         if do_scan:
-        #             log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> inicio")
-        #             update_library_silent()
-        #             log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> finalizado")
-        #             _last_update_ts = time.time()
-        #     else:
-        #         log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> inicio")
-        #         update_library_silent()
-        #         _last_update_ts = time.time()
-        #         log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> finalizado")
-        #         log("Iniciando carga del catalogo")
-        #         core_catalog.generate_catalog()
-        #         utils.load_catalog_github()
-        # else:
-        #     log("Mantenimiento de arranque: UpdateLibrary al inicio desactivado por ajustes")
+        # MASTER: generar y publicar STRM a partir de la biblioteca ya existente.
+        # Así se reflejan películas/episodios eliminados sin forzar un Scan.
+        if not utils.is_client():
+            log("Iniciando carga del catalogo (sin Scan de arranque)")
+            core_catalog.generate_catalog()
+            utils.load_catalog_github()
 
     except Exception:
         log(
