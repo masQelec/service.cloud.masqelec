@@ -133,4 +133,7 @@ La documentación mantenida está en [**docs/README.md**](service.cloud.masqelec
 
 ### Endurecimiento posterior al corte documental (17-11-2026)
 
-En `develop` se incorporaron cinco pruebas nuevas y dos barreras: `--real-probe` falla con `BLOCKED_FLEET_COORDINATION` aunque no existan montajes rclone locales; `--preflight` lee el MQC2 desde el commit GitHub fijado y comprueba también `GH_BRANCH_COMMIT_STABLE=YES` para detectar cambios del HEAD remoto. Commits: `17cb2901`, `41b9f033`, `c701e74e`, `75cb8b48`. **La suite ampliada aún no tiene una ejecución confirmada**; el último `228/228 OK` corresponde al corte previo. El preflight en KodiELEC sigue **PENDIENTE**.
+En `develop` se incorporaron cinco pruebas nuevas y dos barreras: `--real-probe` falla con `BLOCKED_FLEET_COORDINATION` aunque no existan montajes rclone locales; `--preflight` lee el MQC2 desde el commit GitHub fijado y comprueba también `GH_BRANCH_COMMIT_STABLE=YES` para detectar cambios del HEAD remoto. Commits: `17cb2901`, `41b9f033`, `c701e74e`, `75cb8b48`. **La suite ampliada quedó validada en GitHub Actions: 233/233 OK** sobre el commit `70543894` (run `44188131468`). Los 228/228 corresponden al corte anterior comunicado por el operador. El preflight en KodiELEC sigue **PENDIENTE**.
+
+
+**CI registrado (17-11-2026):** workflow `develop unit tests (no deployment)` con `permissions: contents: read`, checkout sin credenciales persistentes y Python 3.11. Run: https://github.com/masQelec/service.cloud.masqelec/actions/runs/44188131468; `Ran 233 tests in 0.359s / OK`. Esto **no** verifica ejecución en KodiELEC, dispositivos remotos, publicación GitHub MQC2 ni migración real. `main`, `cloud/master`, `cloud/develop/system.d` y montajes no se han modificado.

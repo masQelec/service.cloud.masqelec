@@ -92,5 +92,8 @@ Fuentes de implementación: `lib/rclone_token_policy.py`, `lib/rclone_token_sync
 
 - `17cb2901` / `41b9f033`: defensa conservadora frente a refrescos entre CLIENTES, y escaneo `/proc` que no declara seguro un `cmdline` truncado o un `mount` desplazado por parámetros. **No se ha probado en KodiELEC**.
 - `c701e74e` / `75cb8b48`: el preflight consulta el HEAD de `cloud/develop`, recupera el MQC2 por SHA de commit inmutable y vuelve a comprobar el HEAD. `GH_BRANCH_COMMIT_STABLE=NO` => `INCONCLUSIVE_GITHUB_UPDATED`; no restaura, publica ni toca unidades. Sigue existiendo la limitación de cambios forzados de ref o carrera ajena al lector.
-- Se añadieron **5 pruebas unitarias**, **pendientes de ejecutar**. Última suite acreditada: 228/228 OK **antes** de estos commits.
+- Se añadieron **5 pruebas unitarias** y quedaron **233/233 PASS** en GitHub Actions (commit `70543894`, run `44188131468`, Python 3.11). La suite de 228/228 sigue siendo evidencia histórica independiente del operador.
 - Gate L5 (dispositivo real): **NOT RUN**. Coordinación distribuida OAuth, CAS/readback operativo y montajes reales: **NOT RUN**. No hay autorización de release.
+
+
+**CI registrado (17-11-2026):** workflow `develop unit tests (no deployment)` con `permissions: contents: read`, checkout sin credenciales persistentes y Python 3.11. Run: https://github.com/masQelec/service.cloud.masqelec/actions/runs/44188131468; `Ran 233 tests in 0.359s / OK`. Esto **no** verifica ejecución en KodiELEC, dispositivos remotos, publicación GitHub MQC2 ni migración real. `main`, `cloud/master`, `cloud/develop/system.d` y montajes no se han modificado.
