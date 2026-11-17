@@ -78,7 +78,18 @@
 
 ## Ensayo en KodiELEC (solo lectura)
 
-Primero ejecutar el piloto actualizado sin simulación y confirmar:
+**No usar el piloto antiguo suelto en /tmp**: podría importar la política
+antigua desde el addon instalado y omitir ambos OneDrive.
+
+Descargar y ejecutar tools/rclone_oauth_lab_setup.sh en KodiELEC.
+El script crea /tmp/masqelec-oauth-lab con los módulos del commit fijado,
+sin instalar código en el addon y sin modificar el conf activo.
+
+Usar:
+
+python3 /tmp/masqelec-oauth-lab/tools/rclone_oauth_pilot.py
+
+Confirmar:
 
 LOCAL_ONEDRIVE_REMOTES=2
 PUBLISHED_ONEDRIVE_REMOTES=2
@@ -87,8 +98,8 @@ PUBLISHED_GOOGLE_DRIVE_REMOTES=2
 
 Luego simular un CLIENTE inválido en configuración temporal:
 
-python3 /tmp/rclone_oauth_pilot.py --simulate-client --remote-index 1
-python3 /tmp/rclone_oauth_pilot.py --simulate-client --remote-index 2
+python3 /tmp/masqelec-oauth-lab/tools/rclone_oauth_pilot.py --simulate-client --remote-index 1
+python3 /tmp/masqelec-oauth-lab/tools/rclone_oauth_pilot.py --simulate-client --remote-index 2
 
 Si hay RATE_LIMIT no repetir hasta que se normalice.
 
