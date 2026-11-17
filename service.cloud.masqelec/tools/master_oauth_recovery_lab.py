@@ -16,7 +16,7 @@ import time
 import types
 import urllib.request
 
-SOURCE_COMMIT = "5b58cc00d065f73341d67401e3337aa382fb704e"
+SOURCE_COMMIT = "c3d1fa5fcf756da2ea594cdb308fba079dd22150"
 SOURCE_BASE = (
     "https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/"
     + SOURCE_COMMIT + "/service.cloud.masqelec/lib/"
@@ -40,6 +40,7 @@ def _safe_layout_report(label, raw, policy):
         return
     print(label + "_SECTIONS=" + str(len(sections)))
     print(label + "_OAUTH_REMOTES=" + str(len(tokens)))
+    print(label + "_AUXILIARY_SECTIONS=" + str(len(sections) - len(tokens)))
     print(label + "_ONEDRIVE=" + str(counts.get("onedrive", 0)))
     print(label + "_GOOGLE_DRIVE=" + str(counts.get("drive", 0)))
     onedrive = [sec for sec in sections.values()

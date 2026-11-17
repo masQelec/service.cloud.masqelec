@@ -153,7 +153,7 @@ La suite local de regresión pasó 100/100 en Ubuntu (informado por operador,
 2026-11-17). Falta validación de integración en KodiELEC.
 
 El script tools/master_oauth_recovery_lab.py descarga únicamente módulos Python
-del commit fijo 5b58cc0 de develop a un directorio privado de /tmp; descarga
+del commit fijo c3d1fa5 de develop a un directorio privado de /tmp; descarga
 el respaldo MQC2 ya existente desde cloud/develop y crea una copia de
 rclone.conf de laboratorio con un token JSON sintéticamente corrupto.
 No edita el conf activo, el addon, servicios ni GitHub.
@@ -186,3 +186,15 @@ tipos o parámetros estáticos de secciones auxiliares difieren del archivo
 actual, la recuperación completa debe bloquearse, sin eliminar secciones
 ni modificar la configuración operativa.
 
+
+## Validación tras soporte de seis secciones
+
+Las 100 pruebas previas no cubrían secciones auxiliares: se añadieron
+11 pruebas (8 de política y 3 del worker). Total previsto: 111.
+La integración del MASTER exige exactamente cuatro OAuth válidos (dos
+OneDrive, dos Google Drive), pero admite otras secciones sin token OAuth.
+El laboratorio informa también LOCAL_AUXILIARY_SECTIONS y
+GITHUB_AUXILIARY_SECTIONS; no se publican nombres ni parámetros.
+La prueba real debe confirmar que las secciones adicionales coinciden
+entre MASTER y GitHub. En caso contrario, informar
+BLOCKED_DIFFERENT_REMOTE_IDENTITIES y no restaurar ni publicar.
