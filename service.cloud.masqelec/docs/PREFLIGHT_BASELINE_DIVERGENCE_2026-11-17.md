@@ -1,5 +1,18 @@
 # Cloud masQelec — preflight MQC2 con refresh divergente
 
+## Confirmación causal del operador — 17-11-2026
+
+**Causa confirmada por el operador:** después de la publicación del último respaldo MQC2, los procesos `rclone mount` activos renovaron los `refresh_token` de las dos cuentas OneDrive (`library_1` y `library_2`) en la configuración local. El MQC2 de `cloud/develop` retuvo los refresh anteriores. Esta información procede de la confirmación expresa del operador; el preflight por sí solo demostró la diferencia, **no** su secuencia temporal.
+
+- OneDrive 1 y 2: `DIFFERENT`; Google Drive 1 y 2: `SAME`.
+- Los datos `crypt` y opciones estáticas mantienen compatibilidad.
+- **No se ha demostrado vigencia del refresh local ni invalidación del remoto**, ni se ha coordinado el resto de CLIENTES.
+- No restaurar tokens antiguos; **tampoco** publicar automáticamente los locales mientras existan escritores concurrentes.
+- El riesgo activo es la falta de reconciliación de renovaciones OAuth; dos procesos FUSE por equipo reducirán los escritores locales, **no** los escritores entre equipos.
+- `P0-A` queda con **causa de divergencia identificada**, pero el gate de coherencia OAuth permanece **BLOCKED**.
+- Próximos gates P0-B/C/D: generaciones por fuente, detección de cambios concurrentes de ambos remotos y del MQC2, coordinación entre MASTER/CLIENTES, publicación CAS con readback y revalidación independiente en laboratorios sintéticos.
+- `RCLONE_TOKEN_SYNC_ENABLED=False`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; sin deploy, reinicios, ni escritura de credenciales en GitHub.
+
 **Fecha:** 17-11-2026 · **Máquina:** KodiELEC MASTER · **Clasificación:** Seguridad / P0-A · **Estado:** BLOCKED, sin corrección automática.
 
 ## Evidencia recibida
