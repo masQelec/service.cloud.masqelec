@@ -54,6 +54,42 @@ def github_branch_head():
     return sha
 
 
+def baseline_refresh_report(local, published, policy, plan):
+    """Solo diferencias de refresh por cuenta/proveedor. Nunca loguear tokens.
+
+    ONEDRIVE_{1,2} corresponde al wrapper crypt de ese índice.
+    DRIVE_{1,2} usa orden de sección estable, sin publicar nombres.
+    SAME no significa OAuth válido; DIFFERENT no determina frescura.
+    """
+    policy.validate_master_layout(local)
+    policy.validate_master_layout(published)
+    ours, theirs = policy.oauth_tokens(local), policy.oauth_tokens(published)
+    if set(ours) != set(theirs):
+        raise ValueError("Inventario de remotos OAuth incompatible")
+    sections = policy.sections(local)
+    seen = set()
+    pairs = []
+    for index in (0, 1):
+        snapshot = plan.account_snapshot(local, index)
+        tokens = policy.oauth_tokens(snapshot)
+        if len(tokens) != 1:
+            raise ValueError("OneDrive aislado incompatible")
+        name = next(iter(tokens))
+        if name in seen or sections[name].get("type", "").lower() != "onedrive":
+            raise ValueError("Identidad OneDrive incompatible")
+        seen.add(name)
+        pairs.append(("ONEDRIVE_{}".format(index + 1), name))
+    drives = sorted(name for name in ours
+                    if sections[name].get("type", "").strip().lower() == "drive")
+    if len(drives) != 2 or len(seen | set(drives)) != 4:
+        raise ValueError("Inventario de proveedores OAuth incompatible")
+    pairs.extend(("DRIVE_{}".format(index + 1), name)
+                 for index, name in enumerate(drives))
+    return tuple((label, "DIFFERENT" if
+                  ours[name]["refresh_token"] != theirs[name]["refresh_token"]
+                  else "SAME") for label, name in pairs)
+
+
 def read_live_stable():
     if os.path.islink(LIVE_CONFIG):
         raise ValueError("Configuración operativa en symlink")
@@ -226,7 +262,28 @@ def main():
             remote["canonical"],
         )
         if prepared["status"] == "published_baseline_diverged":
+            # Informe no sensible: nunca elegir token por expiry/mtime.
+            STAGE = "DIAGNOSE_REFRESH_DIFFERENCES"
+            report = baseline_refresh_report(
+                canonical, remote["canonical"], policy, plan)
+            # No declarar una comparación estable si cambió cualquiera de
+            # las dos fuentes mientras preparábamos el diagnóstico.
+            STAGE = "RECHECK_DIVERGED_LOCAL"
+            if read_live_stable() != canonical:
+                print("LAB_RESULT=INCONCLUSIVE_LOCAL_ROTATED")
+                return 2
+            STAGE = "RECHECK_DIVERGED_GITHUB_HEAD"
+            if github_branch_head() != branch_head:
+                print("GH_BRANCH_COMMIT_STABLE=NO")
+                print("LAB_RESULT=INCONCLUSIVE_GITHUB_UPDATED")
+                return 2
+            print("GH_BRANCH_COMMIT_STABLE=YES")
+            print("LIVE_CONFIG_CHANGED=NO")
+            for label, state in report:
+                print("BASELINE_REFRESH_{}={}".format(label, state))
             print("GH_OAUTH_BASELINE=DIFFERENT")
+            print("REAL_OAUTH_PROBE=NOT_EXECUTED")
+            print("GITHUB_PUBLISH_ALLOWED=NO")
             print("LAB_RESULT=BLOCKED_BASELINE_DIVERGED")
             return 2
         if prepared["status"] != "unchanged":
