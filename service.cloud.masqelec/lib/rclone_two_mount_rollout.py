@@ -101,3 +101,51 @@ def version_supported(bundle):
             and bundle.get("activation") == "operator_only"
             and bundle.get("credential_source") == "local_mqc2_verified"
             and bundle.get("candidate_id") == CANDIDATE_ID)
+
+
+def startup_decision(device_mode, *, feature_allowed=False,
+                     release_authorized=False, local_config_valid=False,
+                     runtime_compatible=False, playback_idle=False,
+                     rollback_ready=False):
+    """Decisión PURA al iniciar el addon actualizado, MASTER o CLIENTE.
+
+    La entrega de nuevas versiones del addon ya ocurre fuera de este módulo.
+    Si el CLIENTE arranca con código nuevo, podrá preparar el diseño con
+    sus tokens OAuth LOCALES. No exige coordinador de toda la flota.
+
+    DEVOLVER 'activate...' NO ejecuta systemctl/mount ni otorga permisos
+    operativos: estos booleanos todavía no están conectados a validadores
+    reales. Este módulo permanece en develop con feature=False.
+    """
+    if device_mode not in ("legacy", "prepared", "active", "unsafe"):
+        return "blocked_invalid_mode"
+    if type(feature_allowed) is not bool or type(release_authorized) is not bool:
+        return "blocked_invalid_release_flags"
+    readiness = (local_config_valid, runtime_compatible,
+                 playback_idle, rollback_ready)
+    if any(type(value) is not bool for value in readiness):
+        return "blocked_invalid_readiness"
+    if device_mode == "unsafe":
+        return "blocked_unsafe_state"
+    if device_mode == "active":
+        if not feature_allowed or not release_authorized:
+            return "blocked_active_without_release"
+        return "verify_existing_two_fuse_four_bind"
+    if not feature_allowed:
+        return "continue_legacy"
+    if not local_config_valid:
+        # Nunca construir aislados a partir de un config parcial o inválido.
+        return "blocked_local_config"
+    if device_mode == "legacy":
+        # Solo preparar: no interrumpir reproducción.
+        return "stage_two_accounts_locally"
+    if not release_authorized:
+        return "keep_legacy_release_not_authorized"
+    if not runtime_compatible:
+        return "keep_legacy_runtime_incompatible"
+    if not rollback_ready:
+        return "keep_legacy_rollback_unavailable"
+    if not playback_idle:
+        return "defer_migration_playback_active"
+    # Plan para la FUTURA versión final. No existe ejecución de cutover.
+    return "plan_local_two_fuse_four_bind_cutover"
