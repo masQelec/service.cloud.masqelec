@@ -146,3 +146,26 @@ Si hay RATE_LIMIT no repetir hasta que se normalice.
 - https://learn.microsoft.com/en-us/entra/identity-platform/refresh-tokens
 - https://rclone.org/onedrive/
 - https://rclone.org/docs/
+
+## Ensayo de autorrecuperación MASTER con respaldo real (solo /tmp)
+
+La suite local de regresión pasó 100/100 en Ubuntu (informado por operador,
+2026-11-17). Falta validación de integración en KodiELEC.
+
+El script tools/master_oauth_recovery_lab.py descarga únicamente módulos Python
+del commit fijo 5b58cc0 de develop a un directorio privado de /tmp; descarga
+el respaldo MQC2 ya existente desde cloud/develop y crea una copia de
+rclone.conf de laboratorio con un token JSON sintéticamente corrupto.
+No edita el conf activo, el addon, servicios ni GitHub.
+
+Ejecución en KodiELEC tras descargar el script al directorio /tmp:
+
+    python3 /tmp/master_oauth_recovery_lab.py
+
+Busca CORRUPTION_FIRST_CHECK=master_corrupt_pending,
+CORRUPTION_SECOND_CHECK=master_recovered_restart_pending, BACKUP_ISOLATED_0600=PASS,
+RESTORED_LAYOUT=PASS y LAB_RESULT=PASS. En RATE_LIMIT o
+master_candidate_unverified el ensayo es inconcluyente y el archivo real
+permanece intacto. No repetir de inmediato contra Microsoft/Google.
+Un éxito con lsf prueba el acceso actual, no necesariamente la posibilidad
+de renovar un refresh_token que caduque en el futuro.
