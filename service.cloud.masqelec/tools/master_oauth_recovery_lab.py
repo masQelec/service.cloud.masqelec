@@ -26,6 +26,32 @@ KEY_FILE = "/storage/.ssh/authorized_keys"
 LIB_FILES = ("rclone_token_sync.py", "rclone_token_policy.py",
              "rclone_conf_merge.py", "chacha_pure.py")
 
+LAB_STAGE = "BOOT"
+
+
+def _safe_layout_report(label, raw, policy):
+    """Mostrar únicamente recuentos de estructura; nunca nombres ni tokens."""
+    try:
+        sections = policy.sections(raw)
+        tokens = policy.oauth_tokens(raw)
+        counts = policy.oauth_provider_counts(raw)
+    except (ValueError, UnicodeError, TypeError):
+        print(label + "_STRUCTURE=INVALID")
+        return
+    print(label + "_SECTIONS=" + str(len(sections)))
+    print(label + "_OAUTH_REMOTES=" + str(len(tokens)))
+    print(label + "_ONEDRIVE=" + str(counts.get("onedrive", 0)))
+    print(label + "_GOOGLE_DRIVE=" + str(counts.get("drive", 0)))
+    onedrive = [sec for sec in sections.values()
+                if sec.get("type", "").strip().lower() == "onedrive"]
+    print(label + "_ONEDRIVE_NO_DRIVE_ID=" +
+          str(sum(not sec.get("drive_id") for sec in onedrive)))
+    print(label + "_ONEDRIVE_NO_DRIVE_TYPE=" +
+          str(sum(not sec.get("drive_type") for sec in onedrive)))
+
+
+
+
 
 def _download_modules(root):
     libdir = root / "lib"
@@ -105,6 +131,7 @@ def _fake_modules(lab, key, binary):
 
 
 def main():
+    global LAB_STAGE
     print("LAB_MODE=MASTER_CORRUPT_SELF_RECOVERY")
     print("ADDON_MODIFIED=NO")
     print("LIVE_RCLONE_CONF_WRITE=NO")
@@ -115,22 +142,35 @@ def main():
     with tempfile.TemporaryDirectory(prefix="masqelec-master-selfrecover-", dir="/tmp") as name:
         root = Path(name)
         os.chmod(root, 0o700)
+        LAB_STAGE = "DOWNLOAD_MODULES"
         _download_modules(root)
+        LAB_STAGE = "IMPORT_MODULES"
         sys.path.insert(0, str(root))
         from lib import rclone_conf_merge as merge
         from lib import rclone_token_policy as policy
+        LAB_STAGE = "READ_KEY"
         key = _get_key()
+        LAB_STAGE = "FIND_RCLONE"
         binary = _rclone_binary()
+        LAB_STAGE = "LOAD_WORKER"
         sync = _fake_modules(root, key, binary)
 
+        LAB_STAGE = "READ_LOCAL"
         local = sync._read_stable(LIVE_CONF)
+        _safe_layout_report("LOCAL", local, policy)
+        LAB_STAGE = "VALIDATE_LOCAL_LAYOUT"
         policy.validate_master_layout(local)
+        LAB_STAGE = "DOWNLOAD_DECRYPT_GITHUB"
         published = sync._remote_config(key)
+        _safe_layout_report("GITHUB", published, policy)
+        LAB_STAGE = "VALIDATE_GITHUB_LAYOUT"
         policy.validate_master_layout(published)
+        LAB_STAGE = "COMPARE_IDENTITIES"
         if not merge.same_non_token_settings(local, published):
             print("LAB_RESULT=BLOCKED_DIFFERENT_REMOTE_IDENTITIES")
             return 2
         print("MQC2_AND_FOUR_REMOTES=PASS")
+        LAB_STAGE = "CREATE_BROKEN_COPY"
         broken = _corrupt_one_token(local, merge)
         tmpconf = str(root / "rclone.conf")
         with open(tmpconf, "xb") as stream:
@@ -142,6 +182,7 @@ def main():
         sync._publish_master = lambda: (_ for _ in ()).throw(
             AssertionError("LAB_PUBLISH_FORBIDDEN")
         )
+        LAB_STAGE = "FIRST_CORRUPTION_CHECK"
         first = sync._master_cycle(1000.0)
         print("CORRUPTION_FIRST_CHECK=" + first)
         if first != "master_corrupt_pending":
@@ -150,11 +191,13 @@ def main():
         if Path(tmpconf).read_bytes() != broken:
             print("LAB_RESULT=FAIL_EARLY_WRITE")
             return 2
+        LAB_STAGE = "SECOND_CORRUPTION_CHECK"
         second = sync._master_cycle(1061.0)
         print("CORRUPTION_SECOND_CHECK=" + second)
         if second != "master_recovered_restart_pending":
             print("LAB_RESULT=INCONCLUSIVE")
             return 2
+        LAB_STAGE = "VERIFY_RECOVERY"
         recovered = Path(tmpconf).read_bytes()
         policy.validate_master_layout(recovered)
         if not merge.same_non_token_settings(recovered, published):
@@ -181,5 +224,6 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as exc:
         # No exponer tracebacks: pueden contener rutas u otros valores sensibles.
+        print("LAB_FAILED_AT=" + LAB_STAGE)
         print("LAB_RESULT=ERROR_" + type(exc).__name__)
         sys.exit(1)
