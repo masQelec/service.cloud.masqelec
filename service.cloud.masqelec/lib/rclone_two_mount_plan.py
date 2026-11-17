@@ -176,6 +176,7 @@ def public_manifest(artifacts):
     return {
         "schema": rollout.SCHEMA,
         "layout": rollout.LAYOUT,
+        "candidate_id": rollout.CANDIDATE_ID,
         "activation": "operator_only",
         "credential_source": "local_mqc2_verified",
         "kodi_paths_unchanged": True,

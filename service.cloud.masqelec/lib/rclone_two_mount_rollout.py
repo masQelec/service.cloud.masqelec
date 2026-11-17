@@ -11,6 +11,7 @@ import os
 STATE_PATH = "/storage/.config/masqelec/rclone-mount-mode.json"
 SCHEMA = 1
 LAYOUT = "two-fuse-v1"
+CANDIDATE_ID = "2026-11-17-two-fuse-v1"
 LEGACY_SERVICES = (
     "rclone_tvshows_1.service", "rclone_tvshows_2.service",
     "rclone_videos_1.service", "rclone_videos_2.service",
@@ -30,11 +31,13 @@ def parse_state(data):
     if isinstance(data, bytes):
         data = data.decode("utf-8", "strict")
     obj = json.loads(data)
-    if not isinstance(obj, dict) or set(obj) != {"schema", "layout", "state"}:
+    if not isinstance(obj, dict) or set(obj) != {
+            "schema", "layout", "state", "candidate_id"}:
         raise ValueError("Marcador de arquitectura inválido")
     if type(obj["schema"]) is not int or obj["schema"] != SCHEMA:
         raise ValueError("Versión de marcador no admitida")
-    if obj["layout"] != LAYOUT or obj["state"] not in _ALLOWED_STATES:
+    if (obj["layout"] != LAYOUT or obj["state"] not in _ALLOWED_STATES
+            or obj["candidate_id"] != CANDIDATE_ID):
         raise ValueError("Estado de arquitectura no admitido")
     return obj["state"]
 
@@ -96,4 +99,5 @@ def version_supported(bundle):
     return (type(bundle.get("schema")) is int and bundle["schema"] == SCHEMA
             and bundle.get("layout") == LAYOUT
             and bundle.get("activation") == "operator_only"
-            and bundle.get("credential_source") == "local_mqc2_verified")
+            and bundle.get("credential_source") == "local_mqc2_verified"
+            and bundle.get("candidate_id") == CANDIDATE_ID)

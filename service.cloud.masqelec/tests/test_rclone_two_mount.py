@@ -166,14 +166,14 @@ class TwoMountRolloutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             marker = os.path.join(root, "state.json")
             with open(marker, "w") as out:
-                out.write('{"schema":1,"layout":"two-fuse-v1","state":"active"}')
+                out.write('{"schema":1,"layout":"two-fuse-v1","state":"active","candidate_id":"2026-11-17-two-fuse-v1"}')
             self.assertEqual(rollout.mode(False, marker), "unsafe")
 
     def test_disabled_feature_keeps_prepared_client_legacy(self):
         with tempfile.TemporaryDirectory() as root:
             marker = os.path.join(root, "state.json")
             with open(marker, "w") as out:
-                out.write('{"schema":1,"layout":"two-fuse-v1","state":"prepared"}')
+                out.write('{"schema":1,"layout":"two-fuse-v1","state":"prepared","candidate_id":"2026-11-17-two-fuse-v1"}')
             self.assertEqual(rollout.mode(False, marker), "legacy")
 
     def test_no_marker_defaults_to_legacy(self):
@@ -184,7 +184,7 @@ class TwoMountRolloutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             marker = os.path.join(root, "state.json")
             with open(marker, "w") as out:
-                out.write('{"schema":1,"layout":"two-fuse-v1","state":"prepared"}')
+                out.write('{"schema":1,"layout":"two-fuse-v1","state":"prepared","candidate_id":"2026-11-17-two-fuse-v1"}')
             self.assertEqual(rollout.mode(True, marker), "prepared")
             self.assertEqual(rollout.managed_legacy_services("prepared"),
                              rollout.LEGACY_SERVICES)
@@ -194,7 +194,7 @@ class TwoMountRolloutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             marker = os.path.join(root, "state.json")
             with open(marker, "w") as out:
-                out.write('{"schema":1,"layout":"two-fuse-v1","state":"active"}')
+                out.write('{"schema":1,"layout":"two-fuse-v1","state":"active","candidate_id":"2026-11-17-two-fuse-v1"}')
             self.assertEqual(rollout.mode(True, marker), "active")
             self.assertEqual(rollout.managed_legacy_services("active"), ())
             self.assertEqual(rollout.apply_permission("active"),
@@ -212,11 +212,19 @@ class TwoMountRolloutTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     rollout.managed_legacy_services("unsafe")
 
+    def test_wrong_client_candidate_version_is_blocked(self):
+        with tempfile.TemporaryDirectory() as root:
+            marker = os.path.join(root, "state.json")
+            with open(marker, "w") as out:
+                out.write('{"schema":1,"layout":"two-fuse-v1","state":"active",'
+                          '"candidate_id":"some-future-pilot"}')
+            self.assertEqual(rollout.mode(True, marker), "unsafe")
+
     def test_symlink_marker_is_unsafe(self):
         with tempfile.TemporaryDirectory() as root:
             real = os.path.join(root, "state-real")
             with open(real, "w") as out:
-                out.write('{"schema":1,"layout":"two-fuse-v1","state":"active"}')
+                out.write('{"schema":1,"layout":"two-fuse-v1","state":"active","candidate_id":"2026-11-17-two-fuse-v1"}')
             link = os.path.join(root, "state-link")
             os.symlink(real, link)
             self.assertEqual(rollout.mode(True, link), "unsafe")
