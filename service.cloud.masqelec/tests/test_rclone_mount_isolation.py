@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 import sys
 
@@ -156,6 +157,36 @@ class MountIsolationTests(unittest.TestCase):
             iso.stage_in_directory(root, self.config, self.units)
         self.assertEqual(self.config, original)
         self.assertEqual(self.units, old_units)
+
+
+    def test_stage_accepts_tmp_symlink_target_inside_real_temp_tree(self):
+        with tempfile.TemporaryDirectory(prefix="masqelec-isolation-", dir="/tmp") as root:
+            os.chmod(root, 0o700)
+            actual_realpath = iso.os.path.realpath
+            def redirected(path):
+                if path == "/tmp":
+                    return "/var/tmpfs"
+                if path == root:
+                    return "/var/tmpfs/" + os.path.basename(root)
+                return actual_realpath(path)
+            with mock.patch.object(iso.os.path, "realpath", side_effect=redirected):
+                self.assertEqual(
+                    iso.stage_in_directory(root, self.config, self.units), 4
+                )
+
+    def test_stage_refuses_tmp_prefix_escape(self):
+        with tempfile.TemporaryDirectory(prefix="masqelec-isolation-", dir="/tmp") as root:
+            os.chmod(root, 0o700)
+            actual_realpath = iso.os.path.realpath
+            def redirected(path):
+                if path == "/tmp":
+                    return "/var/tmpfs"
+                if path == root:
+                    return "/var/tmpfs-other/escape"
+                return actual_realpath(path)
+            with mock.patch.object(iso.os.path, "realpath", side_effect=redirected):
+                with self.assertRaisesRegex(ValueError, "temporal seguro"):
+                    iso.stage_in_directory(root, self.config, self.units)
 
 
 if __name__ == "__main__":

@@ -192,8 +192,14 @@ def stage_in_directory(root, live_conf, units):
         raise ValueError("Directorio de laboratorio debe ser 0700")
     if os.listdir(root):
         raise ValueError("Directorio de laboratorio no está vacío")
-    if not os.path.realpath(root).startswith("/tmp/"):
-        raise ValueError("Laboratorio fuera de /tmp")
+    # KodiELEC puede resolver /tmp mediante un enlace a otro tmpfs.
+    # Comparar ambos destinos reales; nunca aceptar una ruta fuera del
+    # árbol autorizado aunque su texto empiece por '/tmp'.
+    real_root = os.path.realpath(root)
+    real_tmp = os.path.realpath("/tmp")
+    if (real_root == real_tmp or
+            os.path.commonpath((real_root, real_tmp)) != real_tmp):
+        raise ValueError("Laboratorio fuera del directorio temporal seguro")
     policy.validate_master_layout(live_conf)
     inspect_units(units)
     for service, remote, _folder, _mount in MOUNT_SPECS:
