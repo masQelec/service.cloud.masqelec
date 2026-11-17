@@ -56,5 +56,16 @@ class CryptoV2Tests(unittest.TestCase):
                 cc.decrypt_v2(text, b"\x00" * 32)
 
 
+    def test_legacy_format_rejected(self):
+        device_key = hashlib.sha256(b"test-device-key").digest()
+        with self.assertRaises(ValueError):
+            cc.decrypt_v2("AAAAAA==", device_key)
+
+    def test_configured_tokens_are_mqc2(self):
+        from lib import constants
+        self.assertTrue(constants.GITHUB_TOKEN_B64.startswith(cc.MAGIC))
+        self.assertTrue(constants.TG_TOKEN_B64.startswith(cc.MAGIC))
+
+
 if __name__ == "__main__":
     unittest.main()

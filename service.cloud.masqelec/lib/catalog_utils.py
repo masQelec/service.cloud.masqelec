@@ -6,7 +6,7 @@ Funcionalidad:
 - Master: sube catalog.zip y catalog.version a GitHub (API contents PUT).
 - Orden: primero ZIP y luego VERSION.
 - Control tamaño: <= 75MB raw y <= 100MB base64 (como antes).
-- Token GitHub: cifrado (base64+Feistel) -> se descifra con key de authorized_keys.
+- Token GitHub: formato MQC2 autenticado (ChaCha20-Poly1305) -> clave del dispositivo.
 """
 
 import os
@@ -33,9 +33,7 @@ REPO = constants.CLOUD_REPO
 BRANCH = constants.CLOUD_BRANCH
 API_BASE = f"https://api.github.com/repos/{OWNER}/{REPO}/contents"
 
-# Estos valores heredados se mantienen hasta la migración de tokens.
-GITHUB_TOKEN_B64 = getattr(constants, "GITHUB_TOKEN_B64", "rwfU5iQ5OjtJt7ihpPMwbIu3fP6OIAAAAChnaHBfOFQ0OWlsT0tMWEtDQTQ=")
-GITHUB_FEISTEL_ROUNDS = getattr(constants, "GITHUB_FEISTEL_ROUNDS", 8)
+GITHUB_TOKEN_B64 = constants.GITHUB_TOKEN_B64
 SRC_DIR = getattr(constants, "SRC_DIR", "/storage/.catalog")
 FILES = getattr(constants, "FILES", [
     ("catalog.zip", "catalog/catalog.zip"),
@@ -57,7 +55,7 @@ def _gh_get_plain_token():
         if not key:
             return ""
 
-        plain = crypto_utils.decrypt(GITHUB_TOKEN_B64, key, rounds=int(GITHUB_FEISTEL_ROUNDS))
+        plain = crypto_utils.decrypt(GITHUB_TOKEN_B64, key)
         if not plain:
             return ""
 

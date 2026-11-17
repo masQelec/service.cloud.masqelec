@@ -138,7 +138,7 @@ def download_to_file(url: str, dst_path: str) -> bool:
         log_utils.write_log(f"Error descargando '{url}': {e}\n{traceback.format_exc()}", "ERROR")
         return False
 
-def decrypt_file_to_file(src_path: str, key: bytes, dst_path: str, rounds: int = 8) -> bool:
+def decrypt_file_to_file(src_path: str, key: bytes, dst_path: str) -> bool:
     try:
         with open(src_path, "rb") as f:
             blob = f.read() or b""
@@ -147,10 +147,10 @@ def decrypt_file_to_file(src_path: str, key: bytes, dst_path: str, rounds: int =
         if len(blob) >= 2 and blob[0] == 0x1F and blob[1] == 0x8B:
             blob = gzip.decompress(blob)
 
-        # El cipher esperado por decrypt() es base64 en texto ASCII
+        # El formato MQC2 incluye prefijo ASCII y contenido base64 autenticado
         encrypted_text = blob.decode("ascii", "strict")
 
-        decrypted = utils.decrypt(encrypted_text, key, rounds=rounds)
+        decrypted = utils.decrypt(encrypted_text, key)
         if decrypted is None:
             return False
 
@@ -284,7 +284,7 @@ def start_cloud_storage():
             log_utils.write_log("No se pudo descargar rclone.conf.crypt.", "WARNING")
             return
 
-        if not decrypt_file_to_file(enc_tmp, key, dec_tmp, rounds=8):
+        if not decrypt_file_to_file(enc_tmp, key, dec_tmp):
             log_utils.write_log("Falló el desencriptado de rclone.conf.", "ERROR")
             return
 
