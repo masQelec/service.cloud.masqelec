@@ -71,6 +71,37 @@ class TwoMountRealProbeFenceTests(unittest.TestCase):
                                side_effect=PermissionError):
             self.assertTrue(lab.any_rclone_mounts_alive())
 
+    def test_mount_after_many_global_flags_is_still_detected(self):
+        args = ["rclone"] + ["--test-flag-{}".format(i) for i in range(12)]
+        args += ["mount", "users_library_1:", "/tmp/mount"]
+        ctx = self.scan([args])
+        with ctx[0], ctx[1], ctx[2]:
+            self.assertTrue(lab.any_rclone_mounts_alive())
+
+    def test_oversized_proc_cmdline_fails_closed(self):
+        ctx = self.scan([["rclone", "lsf", "x" * 20000]])
+        with ctx[0], ctx[1], ctx[2]:
+            self.assertTrue(lab.any_rclone_mounts_alive())
+
+    def test_no_local_mounts_still_blocks_uncoordinated_fleet_probe(self):
+        output = io.StringIO()
+        with mock.patch.object(lab, "any_rclone_mounts_alive",
+                               return_value=False), \
+             mock.patch.object(lab, "fetch",
+                               side_effect=AssertionError("NO_NETWORK")), \
+             mock.patch.object(lab, "read_key",
+                               side_effect=AssertionError("NO_KEY")), \
+             mock.patch.object(sys, "argv",
+                               ["rclone_two_mount_real_probe_lab.py",
+                                "--real-probe"]), \
+             contextlib.redirect_stdout(output):
+            self.assertEqual(lab.main(), 2)
+        self.assertIn("FLEET_OAUTH_COORDINATION=NOT_VERIFIED",
+                      output.getvalue())
+        self.assertIn("LAB_RESULT=BLOCKED_FLEET_COORDINATION",
+                      output.getvalue())
+        self.assertNotIn("GH_BLOB_SHA_VALID=PASS", output.getvalue())
+
     def test_real_probe_main_exits_before_loading_credentials_if_mounts_alive(self):
         log = io.StringIO()
         with mock.patch.object(lab, "any_rclone_mounts_alive",
