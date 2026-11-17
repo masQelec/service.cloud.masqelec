@@ -17,3 +17,6 @@ CLOUD_RAW_BASE = (
 GITHUB_TOKEN_B64 = "MQC2:AwG1YFgnxM1JAzAqgP/+okWCLqJcylA/P8mO6GNNLwNlpD48Fc9lCNygWWnByUHczB0BsSvE1xXKDqj2CHPrwuAHpOE="
 TG_TOKEN_B64 = "MQC2:Sc32WIFmcAFNH3TO5aiAo9w0yOC5WB3tVCvZ+/l5HOtAtgOPC2GyRFBTP7a6AjexcWulmpSJw5A12FrcyLRJcR4JmmUBuGsG11c="
 TG_CHATID = "952051424"
+
+# Recuperación OAuth: preparado en develop, inicialmente inactivo hasta validación real.
+RCLONE_TOKEN_SYNC_ENABLED = False

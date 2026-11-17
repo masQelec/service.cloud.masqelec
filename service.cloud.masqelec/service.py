@@ -34,6 +34,7 @@ from lib.jsonrpc_utils import get_library_stats, get_installed_addons_filtered, 
 from lib.fix_settings import fix_skin_home_menu_visibility_and_reload
 from lib import utils
 from lib import core_catalog
+from lib import rclone_token_sync
 
 # ---- Config constante ----
 SLEEP_INTERVAL_SECS = 10
@@ -974,6 +975,7 @@ def run_service():
         StoppableWorker("periodic_pvr_tick", _periodic_pvr_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_clean_tick", _periodic_clean_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_update_tick", _periodic_update_worker, monitor, interval=CHECK_TICK_SECS),
+        StoppableWorker("periodic_rclone_token_tick", rclone_token_sync.tick, monitor, interval=CHECK_TICK_SECS),
     ]
     for w in workers_periodic:
         try:
