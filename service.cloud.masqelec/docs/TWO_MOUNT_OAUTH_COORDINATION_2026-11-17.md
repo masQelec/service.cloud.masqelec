@@ -82,3 +82,34 @@ El manifiesto público en \`cloud.masqelec/develop/rollouts\` sigue
 
 La batería anterior fue 179 PASS. Se añadieron 23 pruebas de política,
 total previsto 202, aún pendiente de ejecución por el operador.
+
+## Ensayo adicional con seis secciones reales, sin claves ni OAuth externo
+
+`tools/rclone_two_mount_oauth_lab.py` descarga el código de una
+referencia inmutable y lee **únicamente** el `rclone.conf` actual.
+Las dos configuraciones crypt/OneDrive se construyen en memoria. El
+respaldo MQC2 remoto no se consulta en este ensayo, por lo que se utiliza
+la configuración canónica local como referencia para comprobar la política;
+esto NO prueba ausencia de divergencias frente a GitHub.
+
+Se prueba el caso normal sin rotación (no publicar), un refresh_token
+FICTICIO sustituido solo en memoria (exigir validación rclone y
+bloquear su promoción) y la ruta de recuperación selectiva de un CLIENTE
+(sondeo + aplicación segura todavía pendientes). La simulación **no**
+realiza solicitudes de autenticación ni guarda el marcador inválido.
+Comprueba además que crypt, Google Drive y la configuración real no
+cambiaron. El ensayo no instala unidades ni reinicia montajes.
+
+    wget -q https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/develop/service.cloud.masqelec/tools/rclone_two_mount_oauth_lab.py -O /tmp/rclone_two_mount_oauth_lab.py
+    python3 -m py_compile /tmp/rclone_two_mount_oauth_lab.py
+    python3 /tmp/rclone_two_mount_oauth_lab.py
+
+Salida buscada: CANONICAL_LAYOUT=PASS,
+ISOLATED_CRYPT_ONEDRIVE_CONFIGS=2,
+BASELINE_POLICY=UNCHANGED,
+SIMULATED_ROTATION=REQUIRES_REAL_PROBE,
+GOOGLE_DRIVE_AND_CRYPT_PRESERVED=PASS,
+CLIENT_SELECTIVE_RECOVERY=PROBE_AND_SAFE_APPLY_REQUIRED,
+LIVE_CONFIG_CHANGED=NO, LAB_RESULT=PASS.
+
+Estos resultados NO habilitan un publicador ni una recuperación en caliente.
