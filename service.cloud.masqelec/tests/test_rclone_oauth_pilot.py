@@ -38,11 +38,13 @@ class OAuthPilotTests(unittest.TestCase):
         def stub_probe(binary, name, path):
             with open(path, "rb") as f:
                 raw = f.read()
-            return ("AUTH" if b"invalid-test-refresh-token" in raw else "OK")
+            if b"invalid-test-refresh-token" in raw:
+                return ("AUTH", "AUTH", 1)
+            return ("OK", "OK", 0)
 
         buf = io.StringIO()
         with mock.patch.object(pilot, "_rclone", return_value="/rclone"):
-            with mock.patch.object(pilot, "_probe", side_effect=stub_probe):
+            with mock.patch.object(pilot, "_probe_details", side_effect=stub_probe):
                 with contextlib.redirect_stdout(buf):
                     result = pilot._client_simulation(original)
         self.assertEqual(result, 0)
@@ -67,6 +69,56 @@ class OAuthPilotTests(unittest.TestCase):
                 stream.write(original)
             self.assertEqual(pilot._read(file), original)
             self.assertEqual(open(file, "rb").read(), original)
+
+
+    def test_classifies_failure_without_exposing_secret(self):
+        cases = [
+            (b"oauth2: cannot fetch token: invalid_grant", "AUTH"),
+            (b"Failed to list: directory not found", "REMOTE_PATH"),
+            (b"network is unreachable", "NETWORK"),
+            (b"429 Too Many Requests", "RATE_LIMIT"),
+            (b"403 forbidden", "PERMISSION"),
+            (b"certificate verify failed", "TLS"),
+            (b"private information: MY_SECRET", "UNCLASSIFIED"),
+        ]
+        for stderr, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(pilot._classify_failure(stderr), expected)
+
+    def test_inconclusive_includes_local_baseline_reason_no_secret(self):
+        original = _config()
+        seen = []
+
+        def stub_probe(binary, name, path):
+            with open(path, "rb") as stream:
+                raw = stream.read()
+            seen.append(path)
+            if b"invalid-test-refresh-token" in raw:
+                return ("AUTH", "AUTH", 1)
+            if os.path.basename(path) == "candidate.conf":
+                return ("UNKNOWN", "REMOTE_PATH", 3)
+            return ("OK", "OK", 0)
+
+        buf = io.StringIO()
+        with mock.patch.object(pilot, "_rclone", return_value="/rclone"):
+            with mock.patch.object(pilot, "_probe_details", side_effect=stub_probe):
+                with contextlib.redirect_stdout(buf):
+                    result = pilot._client_simulation(original, local=original)
+        self.assertEqual(result, 2)
+        report = buf.getvalue()
+        self.assertIn("SIMULATED_RECOVERY_REASON=REMOTE_PATH", report)
+        self.assertIn("LOCAL_COPY_BASELINE=OK", report)
+        self.assertNotIn("live-refresh", report)
+        self.assertNotIn("live-access", report)
+        self.assertEqual(len(seen), 3)
+        self.assertTrue(all("/tmp/" in path for path in seen))
+
+    def test_remote_index_invalid_returns_no_sensitive_data(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            result = pilot._client_simulation(_config(), remote_index=99)
+        self.assertEqual(result, 2)
+        self.assertIn("SIMULATION=INVALID_REMOTE_INDEX", buf.getvalue())
 
 
 if __name__ == "__main__":

@@ -101,21 +101,80 @@ def _rclone():
     raise FileNotFoundError("rclone no disponible")
 
 
-def _probe(binary, name, config_path):
+def _classify_failure(stderr):
+    """Clasifica sin registrar el stderr: algunas URLs contienen credenciales."""
+    if isinstance(stderr, bytes):
+        value = stderr[-8192:].decode("utf-8", "replace").lower()
+    else:
+        value = str(stderr or "")[-8192:].lower()
+    if rclone_token_policy.auth_failure(value):
+        return "AUTH"
+    if any(word in value for word in (
+        "invalid_grant", "invalid_token", "401 unauthorized", "oauth2",
+        "couldn't fetch token", "token expired", "token has expired",
+    )):
+        # El detalle exacto se revisará en el motor; no conceder acceso.
+        return "OAUTH_SUSPECT"
+    if any(word in value for word in (
+        "rate limit", "too many requests", "429", "ratelimitexceeded",
+    )):
+        return "RATE_LIMIT"
+    if "quota" in value:
+        return "QUOTA"
+    if any(word in value for word in (
+        "403", "forbidden", "insufficientpermissions",
+        "permission denied", "access denied",
+    )):
+        return "PERMISSION"
+    if any(word in value for word in (
+        "couldn't find root directory", "directory not found",
+        "path not found", "object not found", "file not found",
+        "404 not found",
+    )):
+        return "REMOTE_PATH"
+    if any(word in value for word in (
+        "didn't find section", "failed to load config",
+        "failed to parse config", "invalid configuration",
+        "failed to create file system for",
+    )):
+        return "RCLONE_CONFIG"
+    if any(word in value for word in (
+        "x509", "tls handshake", "certificate verify",
+    )):
+        return "TLS"
+    if any(word in value for word in (
+        "timeout", "connection", "no such host", "network is unreachable",
+        "no route to host", "temporary failure in name resolution",
+        "i/o timeout", "lookup ",
+    )):
+        return "NETWORK"
+    return "UNCLASSIFIED"
+
+
+def _probe_details(binary, name, config_path):
+    """(estado, causa, salida). No muestra ni conserva stderr sin filtrar."""
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", name):
-        return "UNKNOWN"
+        return ("UNKNOWN", "INVALID_REMOTE_NAME", None)
     cmd = [binary, "lsf", name + ":", "--max-depth=1", "--config", config_path,
            "--retries=1", "--low-level-retries=1",
            "--contimeout=10s", "--timeout=20s"]
     try:
         result = subprocess.run(cmd, stdout=subprocess.DEVNULL,
                                 stderr=subprocess.PIPE, timeout=45, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        return "UNKNOWN"
+    except subprocess.TimeoutExpired:
+        return ("UNKNOWN", "PROCESS_TIMEOUT", None)
+    except OSError:
+        return ("UNKNOWN", "EXEC_FAILURE", None)
     if result.returncode == 0:
-        return "OK"
-    return ("AUTH" if rclone_token_policy.auth_failure(result.stderr[-8192:])
-            else "UNKNOWN")
+        return ("OK", "OK", 0)
+    reason = _classify_failure(result.stderr)
+    return ("AUTH" if reason == "AUTH" else "UNKNOWN", reason,
+            result.returncode)
+
+
+def _probe(binary, name, config_path):
+    """Interfaz anterior para pruebas existentes."""
+    return _probe_details(binary, name, config_path)[0]
 
 
 def _private_file(folder, name, raw):
@@ -136,26 +195,48 @@ def _master_check(local, remote):
               ("CHANGED" if changed else "UNCHANGED"))
 
 
-def _client_simulation(remote):
+def _client_simulation(remote, local=None, remote_index=1):
     names = sorted(rclone_token_policy.oauth_tokens(remote))
     if not names:
         print("SIMULATION=NO_GOOGLE_DRIVE_TOKEN")
         return 2
+    if remote_index < 1 or remote_index > len(names):
+        print("SIMULATION=INVALID_REMOTE_INDEX")
+        print("AVAILABLE_GOOGLE_DRIVE_REMOTES=" + str(len(names)))
+        return 2
+    name = names[remote_index - 1]
+    print("TARGET_REMOTE_INDEX=" + str(remote_index))
     binary = _rclone()
     with tempfile.TemporaryDirectory(prefix="masqelec-oauth-pilot-", dir="/tmp") as temp:
         os.chmod(temp, 0o700)
-        # Cliente simulado: sólo el primer remoto Google Drive.
-        broken = _invalidate_for_test(remote, names[0])
-        candidate = rclone_token_policy.tokens_from_master(broken, remote, [names[0]])
+        broken = _invalidate_for_test(remote, name)
+        candidate = rclone_token_policy.tokens_from_master(broken, remote, [name])
         bad_path = _private_file(temp, "invalid.conf", broken)
         good_path = _private_file(temp, "candidate.conf", candidate)
-        before = _probe(binary, names[0], bad_path)
-        after = _probe(binary, names[0], good_path)
+        before, before_reason, before_rc = _probe_details(binary, name, bad_path)
+        after, after_reason, after_rc = _probe_details(binary, name, good_path)
         print("SIMULATED_BROKEN_TOKEN=" + before)
+        print("SIMULATED_BROKEN_REASON=" + before_reason)
         print("SIMULATED_RECOVERY=" + after)
+        print("SIMULATED_RECOVERY_REASON=" + after_reason)
+        print("SIMULATED_RECOVERY_EXIT=" + str(after_rc))
         if before == "AUTH" and after == "OK":
             print("SIMULATION=PASS")
             return 0
+
+        if after != "OK" and local is not None:
+            # Copia privada del local para determinar si también falla el
+            # acceso normal. NUNCA se pasa la ruta del rclone.conf activo.
+            local_names = rclone_token_policy.oauth_tokens(local)
+            if name in local_names:
+                local_path = _private_file(temp, "local-copy.conf", local)
+                baseline, baseline_reason, baseline_rc = _probe_details(
+                    binary, name, local_path)
+                print("LOCAL_COPY_BASELINE=" + baseline)
+                print("LOCAL_COPY_BASELINE_REASON=" + baseline_reason)
+                print("LOCAL_COPY_BASELINE_EXIT=" + str(baseline_rc))
+            else:
+                print("LOCAL_COPY_BASELINE=REMOTE_NOT_CONFIGURED")
         print("SIMULATION=INCONCLUSIVE")
         return 2
 
@@ -165,6 +246,8 @@ def main():
         description="Prueba OAuth sin alterar configuración real")
     parser.add_argument("--simulate-client", action="store_true",
                         help="simula un cliente roto usando exclusivamente /tmp")
+    parser.add_argument("--remote-index", type=int, default=1,
+                        help="índice 1..N de remoto Google Drive para simular (sin mostrar nombre)")
     parser.add_argument("--config", default=LOCAL_CONF)
     parser.add_argument("--key-file", default=AUTHORIZED_KEYS)
     opts = parser.parse_args()
@@ -181,7 +264,7 @@ def main():
           str(len(rclone_token_policy.oauth_tokens(remote))))
     _master_check(local, remote)
     if opts.simulate_client:
-        return _client_simulation(remote)
+        return _client_simulation(remote, local=local, remote_index=opts.remote_index)
     return 0
 
 
