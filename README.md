@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 17-11-2026.** GitHub Actions **352/352 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+> **Estado actualizado: 18-11-2026.** GitHub Actions **371/371 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## ¿Qué es?
 
@@ -153,3 +153,7 @@ Modelados inventario global, exclusión de legacy/offline/desconocidos, confirma
 ### Actualización del addon y migración local (corrección de arquitectura)
 
 Los CLIENTES reciben actualizaciones del addon y arrancan con el código nuevo. MASTER publica catálogo; CLIENTES reproducen mediante rutas `.strm` idénticas. La versión definitiva preparará en cada dispositivo 2 FUSE + 4 bind a partir de sus credenciales locales, sin coordinador central ni lecturas de directorios para poblar la biblioteca. Nuevo modelo de decisión de arranque y 15 tests; GitHub Actions **352/352 PASS**. **Sin activación**. [Procedimiento](service.cloud.masqelec/docs/ADDON_STARTUP_ROLLOUT_2026-11-17.md).
+
+### Preparación privada al iniciar el addon (18-11-2026)
+
+La fase 1 del addon tiene un hook **desactivado** para preparar localmente dos `account*.conf`, dos propuestas FUSE, cuatro bind y un manifiesto sin secretos. No instala unidades ni requiere inspeccionar los directorios de OneDrive. El token de origen es el `rclone.conf` local, no una restauración forzada del MQC2. **371/371 PASS** en GitHub Actions; staging real de KodiELEC **NOT RUN**. [Diseño y resultados](service.cloud.masqelec/docs/ADDON_STARTUP_ROLLOUT_2026-11-17.md).

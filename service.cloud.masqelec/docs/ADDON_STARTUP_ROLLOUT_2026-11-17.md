@@ -63,4 +63,25 @@ LIVE_MOUNTS_CHANGED=NO
 
 ## Próximo trabajo concreto
 
-Implementar el **staging local idempotente** invocado en el futuro arranque del addon usando `rclone_two_mount_plan.generate`, validar dependencias y permisos sin modificar `system.d`, y después preparar un piloto de FUSE/bind en rutas que no interfieran con los cuatro montajes activos. Solo entonces desarrollar el ejecutor de transición y reversión por dispositivo. No crear servidor, coordinador de flota, ni rediseñar el catálogo para este objetivo.
+**Implementado** el staging local en el hook de arranque, pero **desactivado por flag**. Lo siguiente es verificar prerrequisitos de dispositivos y montar dos FUSE + cuatro bind solo en rutas alternativas de laboratorio, antes de desarrollar el ejecutor de transición/reversión. No crear servidor, coordinador de flota ni rediseñar catálogo.
+
+## Fase siguiente: staging privado en el arranque (18-11-2026)
+
+Código en `develop` (commit `3553df3b`, corrección de fixture de test `c782b1c2`): se ha integrado en la fase 1 de `service.py`, **después** de `start_cloud_storage()`, la llamada a `lib/rclone_two_mount_startup_stage.py`. Está protegida por un nuevo flag real:
+
+```python
+RCLONE_TWO_MOUNT_STAGING_ENABLED = False
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
+RCLONE_TOKEN_SYNC_ENABLED = False
+```
+
+Con el flag de staging `False`, no se invocan las lecturas ni el generador y no se escribe ningún fichero; el código legacy sigue igual. En una versión futura **expresamente habilitada**, con credenciales locales válidas, generará un staging privado de **dos configs OneDrive+crypt, seis propuestas de unidades y un manifiesto sin secretos**, partiendo del `rclone.conf` local ya renovado por el propio rclone. No consulta OAuth, no usa tokens del MQC2 para sustituir los locales, no recorre directorios OneDrive, no instala unidades ni toca los cuatro montajes Kodi.
+
+Ubicación RESERVADA para esa versión futura (no creada en ningún equipo por estos commits): `/storage/.config/masqelec/rclone-v2-staging/2026-11-17-two-fuse-v1/`. Permisos: directorio raíz y candidato `0700`; `account1.conf`, `account2.conf` y manifiesto `0600`; propuestas de unidades `0644` dentro del directorio privado. El manifiesto distingue `credential_source=existing_local_config_unverified`, `activation=stage_only` y `live_install_allowed=false`. **No afirmar que MQC2 haya sido autenticado por el staging**: no lo descarga.
+
+Controles: valida inventario `crypt→OneDrive`, las cuatro unidades legacy compatibles, fuentes locales regulares (no enlaces simbólicos) y configuración `0600`; comprueba datos y metadatos de origen antes/después de generar; prepara un directorio temporal privado y lo mueve a su destino final sin tocar `system.d`. Reintento con la misma fuente = `already_staged` sin reescribir. Si rclone renovó después el refresh local y el contenido staged difiere, = `blocked_stale_or_unsafe_stage`: **el borrador antiguo no se instala ni se reescribe automáticamente**. La recuperación/reemplazo versionado del staging obsoleto y el cutover reversible se implementarán más adelante; no forzar etapas.
+
+**Evidencia:** fallo inicial del test por no modificar el token ficticio correcto, corregido sin cambiar código de producción; CI final en [GitHub Actions run 44201463687](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44201463687) = **371/371 OK**, 19 pruebas nuevas. Es prueba sintética de filesystem aislado, **no** ejecución en KodiELEC ni autorización de migración.
+
+Próximo paso: piloto de verificación read-only de prerrequisitos KodiELEC y, posteriormente, **dos FUSE + cuatro bind exclusivamente en rutas alternativas**, prueba de reproducción y rollback. El modo operativo legacy seguirá intacto hasta autorización explícita.
+

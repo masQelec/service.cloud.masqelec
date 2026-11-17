@@ -1,6 +1,6 @@
 # Operaciones, pruebas y diagnóstico — masQelec
 
-**Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **352/352 OK** (GitHub Actions run 44196168382). Preflight real BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-C/P0-D: laboratorios, **no** despliegue ni sincronización.
+**Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **371/371 OK** (GitHub Actions run 44201463687). Preflight real BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-C/P0-D: laboratorios, **no** despliegue ni sincronización.
 
 ## 1. Protocolo de cambios
 
@@ -188,3 +188,24 @@ No usar pruebas OAuth en proveedores ni unit tests en una máquina de producció
 El operador confirma: MASTER publica el catálogo de biblioteca, los CLIENTES ya reciben versiones del addon y el servicio arranca con el código actualizado. Los .strm apuntan a las **cuatro rutas Kodi existentes** y no requieren que el CLIENTE haga barridos de directorios OneDrive para descubrir archivos. La migración se hace **localmente en el arranque de cada versión definitiva**: leer/preservar credenciales locales, preparar los dos snapshots crypt→OneDrive, y sustituir 4 FUSE por 2 FUSE+4 bind únicamente al tener pruebas de idoneidad y rollback. **No hace falta un coordinador central** para esa migración; la sincronización OAuth entre dispositivos es independiente y sigue bloqueada. El addon todavía no ejecuta el cutover. Ver [ADDON_STARTUP_ROLLOUT_2026-11-17.md](ADDON_STARTUP_ROLLOUT_2026-11-17.md). `startup_decision()` es política pura, no ejecución; GitHub Actions **352/352 OK** (run 44197364926).
 
 El código nuevo `startup_decision()` no realiza comprobaciones reales ni instalaciones. No ejecutarlo como si activara el esquema; cada una de las condiciones (conf local válido, runtime, Kodi libre, rollback) debe implementarse con verificaciones del dispositivo antes del cutover.
+
+## Fase siguiente: staging privado en el arranque (18-11-2026)
+
+Código en `develop` (commit `3553df3b`, corrección de fixture de test `c782b1c2`): se ha integrado en la fase 1 de `service.py`, **después** de `start_cloud_storage()`, la llamada a `lib/rclone_two_mount_startup_stage.py`. Está protegida por un nuevo flag real:
+
+```python
+RCLONE_TWO_MOUNT_STAGING_ENABLED = False
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
+RCLONE_TOKEN_SYNC_ENABLED = False
+```
+
+Con el flag de staging `False`, no se invocan las lecturas ni el generador y no se escribe ningún fichero; el código legacy sigue igual. En una versión futura **expresamente habilitada**, con credenciales locales válidas, generará un staging privado de **dos configs OneDrive+crypt, seis propuestas de unidades y un manifiesto sin secretos**, partiendo del `rclone.conf` local ya renovado por el propio rclone. No consulta OAuth, no usa tokens del MQC2 para sustituir los locales, no recorre directorios OneDrive, no instala unidades ni toca los cuatro montajes Kodi.
+
+Ubicación RESERVADA para esa versión futura (no creada en ningún equipo por estos commits): `/storage/.config/masqelec/rclone-v2-staging/2026-11-17-two-fuse-v1/`. Permisos: directorio raíz y candidato `0700`; `account1.conf`, `account2.conf` y manifiesto `0600`; propuestas de unidades `0644` dentro del directorio privado. El manifiesto distingue `credential_source=existing_local_config_unverified`, `activation=stage_only` y `live_install_allowed=false`. **No afirmar que MQC2 haya sido autenticado por el staging**: no lo descarga.
+
+Controles: valida inventario `crypt→OneDrive`, las cuatro unidades legacy compatibles, fuentes locales regulares (no enlaces simbólicos) y configuración `0600`; comprueba datos y metadatos de origen antes/después de generar; prepara un directorio temporal privado y lo mueve a su destino final sin tocar `system.d`. Reintento con la misma fuente = `already_staged` sin reescribir. Si rclone renovó después el refresh local y el contenido staged difiere, = `blocked_stale_or_unsafe_stage`: **el borrador antiguo no se instala ni se reescribe automáticamente**. La recuperación/reemplazo versionado del staging obsoleto y el cutover reversible se implementarán más adelante; no forzar etapas.
+
+**Evidencia:** fallo inicial del test por no modificar el token ficticio correcto, corregido sin cambiar código de producción; CI final en [GitHub Actions run 44201463687](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44201463687) = **371/371 OK**, 19 pruebas nuevas. Es prueba sintética de filesystem aislado, **no** ejecución en KodiELEC ni autorización de migración.
+
+Próximo paso: piloto de verificación read-only de prerrequisitos KodiELEC y, posteriormente, **dos FUSE + cuatro bind exclusivamente en rutas alternativas**, prueba de reproducción y rollback. El modo operativo legacy seguirá intacto hasta autorización explícita.
+
