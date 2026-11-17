@@ -35,7 +35,7 @@ systemctl is-active rclone_tvshows_1.service rclone_tvshows_2.service \
 cat /proc/self/mountinfo | grep -E '(/storage/\.mnt/(videos|tvshows)/[12]|/storage/\.mnt/cloud/[12])'
 
 # Preflight MQC2 remoto y SHA; NO realiza consultas OAuth a Microsoft
-wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/develop/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' \
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/c701e74e5a677e3d300094f9ea112eb830749c3f/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' \
   -O /tmp/rclone_two_mount_real_probe_lab.py
 python3 -m py_compile /tmp/rclone_two_mount_real_probe_lab.py
 python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
@@ -53,7 +53,7 @@ El preflight necesita HTTPS a GitHub y acceso local a la clave de dispositivo, p
 | `rclone_two_mount_plan_lab.py` | Genera 2 configuraciones, 2 FUSE y 4 bind; **no instala** | PASS |
 | `rclone_two_mount_oauth_lab.py` | Rotación ficticia y reconciliación OAuth en memoria | PASS |
 | `rclone_two_mount_real_probe_lab.py --preflight` | Lee MQC2 GitHub, SHA Git y compara estructura/tokens | **PENDIENTE** |
-| `rclone_two_mount_real_probe_lab.py --real-probe` | Consulta OneDrive en copia privada; puede rotar OAuth en Microsoft | **NO AUTORIZADO con mounts activos; no se ha ejecutado** |
+| `rclone_two_mount_real_probe_lab.py --real-probe` | Potencial renovación OAuth remota | **BLOQUEADO aun sin mounts locales**; falta coordinación entre CLIENTES |
 
 **No reutilizar laboratorios antiguos sin leer sus parámetros**: algunos validan credenciales reales con `lsf`, cuya renovación puede afectar a otros escritores. Los resultados históricos deben interpretarse según las versiones fijadas de los scripts.
 
@@ -63,7 +63,9 @@ El preflight necesita HTTPS a GitHub y acceso local a la clave de dispositivo, p
 | --- | --- |
 | `LAB_RESULT=PASS` | Registrar alcance, commit y restricciones. **No** activar releases automáticamente. |
 | `LAB_RESULT=ERROR_*` / `LAB_FAILED_AT=...` | Investigar módulo y fase exacta; no imprimir tokens ni el fichero real. |
-| `BLOCKED_ACTIVE_MOUNTS` | Comportamiento esperado del fence para un `--real-probe` con montajes activos; no desmontar solo para obtener PASS. |
+| `BLOCKED_ACTIVE_MOUNTS` | Bloqueo local esperado; no desmontar solo para obtener PASS. |
+| `BLOCKED_FLEET_COORDINATION` | Aunque no haya mounts locales, no existe coordinación entre CLIENTES; no habilitar probe. |
+| `GH_BRANCH_COMMIT_STABLE=NO` | GitHub `cloud/develop` cambió durante preflight; resultado inconcluso y ninguna escritura. |
 | `BLOCKED_BASELINE_DIVERGED` | El backup MQC2 y el canónico contienen distintos refresh tokens; no ordenar por `expiry` ni por mtime. |
 | `BLOCKED_STATIC_IDENTITY` / `GH_STATIC_IDENTITY=MISMATCH` | Cambiaron secciones/identidad; no fusionar automáticamente. |
 | `429`, `RATE_LIMITED`, `UNAVAILABLE` | No implica OAuth inválido; evitar reintentos repetitivos. |
@@ -115,3 +117,7 @@ Siguiente gate y responsable:
 El rollback v2 exige detener nuevos bind sin producción activa, parar procesos FUSE nuevos, restaurar unidades y configs legacy guardadas, iniciar y verificar las cuatro rutas Kodi. **Este procedimiento aún no ha sido ensayado**; no convertirlo en script operativo sin validación en dispositivo aislado y ventana coordinada. Si falla un ensayo de solo lectura, simplemente conservar los montajes actuales y no iniciar cutover.
 
 Más contexto: [CLIENT_ROLLOUT.md](CLIENT_ROLLOUT.md), [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
+
+## 7. Gate posterior al endurecimiento
+
+Código fijado del script: `c701e74e5a677e3d300094f9ea112eb830749c3f`; el script mantiene sus librerías internas ancladas a su `SOURCE_REF` independiente. El preflight obtiene `cloud/develop` mediante HTTPS, lee el MQC2 en esa **revisión inmutable** y vuelve a comparar la revisión. Resultado adicional exigible: `GH_BRANCH_COMMIT_STABLE=YES`. Si falla, **no** actualizar credenciales ni intentar la publicación. Nuevas pruebas en `test_rclone_two_mount_probe_fence.py` (**5 añadidas, todavía sin ejecución confirmada**). Ejecutar primero `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'` en Ubuntu. Ni la prueba de unidad ni esta documentación sustituyen el gate L5 en KodiELEC.
