@@ -108,3 +108,9 @@ Los últimos marcadores son **de estado documental**, no variables de entorno qu
 Al cerrar cada hito: guardar salida anónima, máquina/rol, commit de fuente del laboratorio, script exacto y si hubo escritura, subida o reinicio; actualizar tabla, auditoría, próximos gates y [HANDOFF_2026-11-17.md](HANDOFF_2026-11-17.md) (o generar handoff nuevo con fecha). Dejar explícito si algo fue **PASS**, **BLOCKED**, **FAIL** o **NOT RUN**.
 
 **Siguiente acción segura:** [OPERATIONS_AND_TESTING.md](OPERATIONS_AND_TESTING.md) — solo `rclone_two_mount_real_probe_lab.py --preflight`.
+
+## 8. Continuación de 17-11-2026 — endurecimiento sin despliegue
+
+En `service.cloud.masqelec/develop` se añadieron commits `17cb2901`, `41b9f033`, `c701e74e`, `75cb8b48`. Dos cambios: (1) sondeo OAuth real bloqueado por falta de prueba de coordinación global incluso con cero montajes locales; (2) preflight MQC2 anclado a SHA de commit de `cloud/develop` con revalidación del HEAD para impedir aceptar cambios concurrentes del repositorio. `cloud/master`, `cloud/develop/system.d` y `addon/main` permanecen fuera del alcance.
+
+**Gates actualizados:** tests adicionales = 5, **NOT RUN**; suite histórica = 228/228 PASS; preflight KodiELEC = **NOT RUN**; publicación OAuth v2 = **NO**; montaje FUSE/bind real = **NOT RUN**. El siguiente paso sigue siendo ejecutar la suite ampliada en Ubuntu y el `--preflight` fijado a `c701e74e` en KodiELEC. El retorno `BLOCKED_FLEET_COORDINATION` de `--real-probe` es intencional. Los gates P0-B/P0-C/P0-D y migración aún no están resueltos.
