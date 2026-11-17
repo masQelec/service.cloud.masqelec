@@ -15,6 +15,7 @@ import urllib.error
 from lib import log_utils
 from lib import utils
 from lib import constants
+from lib import catalog_safety
 import xbmc
 
 # ==========================
@@ -287,21 +288,8 @@ def build_tv_strm():
 # VERSION / ZIP
 # ==========================
 def compute_version_hash(root):
-    h = hashlib.sha256()
-    files = []
-    for base, dirs, fns in os.walk(root):
-        for fn in fns:
-            if fn.endswith(".strm"):
-                files.append(os.path.join(base, fn))
-    files.sort()
-
-    for p in files:
-        rel = os.path.relpath(p, root).replace("\\", "/")
-        h.update(rel.encode("utf-8"))
-        with open(p, "rb") as f:
-            h.update(f.read())
-
-    return h.hexdigest(), len(files)
+    """Hash histórico del conjunto STRM: rutas relativas ordenadas + contenido."""
+    return catalog_safety.compute_catalog_hash(root)
 
 def make_zip(src_root, out_zip):
     os.makedirs(os.path.dirname(out_zip), exist_ok=True)
@@ -739,6 +727,17 @@ def sync_catalog_https() -> bool:
             utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "download_zip"})
             return False
 
+        # Rechazar ZIPs con rutas anómalas, duplicados o tamaños peligrosos
+        # antes de escribir ningún archivo en el área de staging.
+        try:
+            archive_count = catalog_safety.validate_catalog_zip(TMP_ZIP)
+            log_utils.write_log(f"ZIP validado: {archive_count} archivos STRM")
+        except Exception as e:
+            log_utils.write_log(f"ZIP rechazado por validación: {e}", "ERROR")
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "zip_safety"})
+            return False
+
         # Extraer ZIP en staging + fijar mtime desde ZipInfo
         try:
             log_utils.write_log("Extrayendo ZIP en staging (preservando fechas)…")
@@ -762,6 +761,18 @@ def sync_catalog_https() -> bool:
             log_utils.write_log("Staging vacío tras extraer. No aplico.", "ERROR")
             return False
 
+        # El hash del manifest corresponde a la concatenación de los STRM,
+        # NO al hash binario del ZIP. Rechazar antes de borrar/copiar.
+        try:
+            verified_count = catalog_safety.verify_staging(STAGING_DIR, remote_ver)
+            if verified_count != archive_count or len(staged) != verified_count:
+                raise ValueError("Número de STRM distinto entre ZIP, staging y manifest")
+        except Exception as e:
+            log_utils.write_log(f"Catálogo rechazado por integridad: {e}", "ERROR")
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "manifest_mismatch"})
+            return False
+
         # Estado local
         local_movies = _collect_strm(MOVIES_DIR)
         local_tv     = _collect_strm(TV_DIR)
@@ -778,6 +789,16 @@ def sync_catalog_https() -> bool:
         to_delete = sorted(local_keys - staged_keys)
         to_apply  = sorted(staged_keys)
 
+        # Un cambio de catálogo legítimo puede requerir más borrados, pero
+        # no se ejecuta automáticamente hasta revisar ese caso.
+        try:
+            catalog_safety.validate_deletions(len(local_keys), len(to_delete))
+        except ValueError as e:
+            log_utils.write_log(f"Sincronización detenida: {e}", "ERROR")
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "delete_fence"})
+            return False
+
         # Asegurar carpetas base
         try:
             os.makedirs(MOVIES_DIR, exist_ok=True)
@@ -786,27 +807,10 @@ def sync_catalog_https() -> bool:
             log_utils.write_log(f"No se pudieron crear carpetas base del catálogo: {e}", "ERROR")
             return False
 
-        # Eliminar sobrantes
-        deleted = 0
-        if to_delete:
-            log_utils.write_log(f"Eliminando {len(to_delete)} .strm obsoletos…")
-        for rel in to_delete:
-            if rel.startswith("videos/"):
-                dst = os.path.join(MOVIES_DIR, rel[len("videos/"):])
-            elif rel.startswith("tvshows/"):
-                dst = os.path.join(TV_DIR, rel[len("tvshows/"):])
-            else:
-                continue
-
-            if os.path.isfile(dst):
-                try:
-                    os.remove(dst)
-                    deleted += 1
-                except Exception as e:
-                    log_utils.write_log(f"No se pudo borrar {dst}: {e}", "WARNING")
-
-        # Añadir / actualizar
+        # Añadir / actualizar ANTES de borrar. Si falla una sola copia,
+        # la versión local no se actualiza y el siguiente intento puede reparar.
         changed = 0
+        copy_errors = 0
         for rel in to_apply:
             src = os.path.join(STAGING_DIR, rel.replace("/", os.sep))
             if rel.startswith("videos/"):
@@ -818,15 +822,52 @@ def sync_catalog_https() -> bool:
 
             old_hash = local_all.get(rel)
             new_hash = staged.get(rel)
-
             if old_hash == new_hash and os.path.isfile(dst):
                 continue
-
             try:
                 _atomic_copy(src, dst)
                 changed += 1
-            except Exception as e:
-                log_utils.write_log(f"Error copiando {rel} -> {dst}: {e}", "ERROR")
+            except Exception as exc:
+                copy_errors += 1
+                log_utils.write_log(f"Error copiando {rel} -> {dst}: {exc}", "ERROR")
+
+        if copy_errors:
+            log_utils.write_log(
+                f"Sincronización incompleta: {copy_errors} fallos de copia; se conservan los STRM existentes.",
+                "ERROR",
+            )
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "copy_error"})
+            return False
+
+        # Eliminar obsoletos solo después de verificar el catálogo y copiar.
+        deleted = 0
+        delete_errors = 0
+        if to_delete:
+            log_utils.write_log(f"Eliminando {len(to_delete)} .strm obsoletos…")
+        for rel in to_delete:
+            if rel.startswith("videos/"):
+                dst = os.path.join(MOVIES_DIR, rel[len("videos/"):])
+            elif rel.startswith("tvshows/"):
+                dst = os.path.join(TV_DIR, rel[len("tvshows/"):])
+            else:
+                continue
+            if os.path.isfile(dst):
+                try:
+                    os.remove(dst)
+                    deleted += 1
+                except Exception as exc:
+                    delete_errors += 1
+                    log_utils.write_log(f"No se pudo borrar {dst}: {exc}", "ERROR")
+
+        if delete_errors:
+            log_utils.write_log(
+                f"Sincronización incompleta: {delete_errors} fallos de borrado; no se guarda catalog.version.",
+                "ERROR",
+            )
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "delete_error"})
+            return False
 
         _cleanup_empty_dirs(MOVIES_DIR)
         _cleanup_empty_dirs(TV_DIR)

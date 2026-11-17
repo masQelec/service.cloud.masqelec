@@ -229,9 +229,8 @@ def load_catalog_github():
         log_utils.write_log("Token GitHub no disponible, abortando subida", "ERROR")
         return False
 
-    ok_all = True
-
-    # Orden fijo: ZIP primero, VERSION después
+    # Orden fijo: ZIP primero, VERSION después. En fallo del ZIP,
+    # queda prohibido publicar una VERSION nueva.
     for fname, dst in FILES:
         src = os.path.join(SRC_DIR, fname)
 
@@ -242,11 +241,10 @@ def load_catalog_github():
 
         log_utils.write_log("Subiendo {} -> {}".format(src, dst), "INFO")
         if not _upload_file(token, src, dst):
-            log_utils.write_log("Fallo subiendo {}".format(dst), "ERROR")
-            ok_all = False
-        else:
-            log_utils.write_log("{} subido correctamente".format(dst), "INFO")
+            log_utils.write_log("Fallo subiendo {}; no se publicarán más archivos".format(dst), "ERROR")
+            return False
+        log_utils.write_log("{} subido correctamente".format(dst), "INFO")
 
-    return ok_all
+    return True
 
 
