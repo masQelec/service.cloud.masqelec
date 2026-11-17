@@ -66,6 +66,82 @@ def _read_stable(path):
     raise RuntimeError("rclone.conf cambió durante la lectura")
 
 
+
+def _file_generation(path):
+    """Identidad del fichero para detectar reemplazos incluso con bytes iguales.
+
+    Esto NO es un bloqueo con rclone: solo detecta cambios ya completados.
+    """
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    if not os.path.isfile(path) or os.path.islink(path):
+        raise ValueError("rclone.conf no es archivo regular seguro")
+    return (info.st_dev, info.st_ino, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _config_mounts_active():
+    """Fence conservador: procesos rclone mount usando este rclone.conf.
+
+    Los procesos rclone NO respetan locks Python; nunca escribir su
+    configuración compartida mientras alguno siga usando ese fichero.
+    Se reconoce el --config de las unidades systemd de cloud/develop.
+    Un mount rclone sin --config explícito se considera desconocido/busy.
+    """
+    target = os.path.realpath(CONF_PATH)
+    try:
+        entries = os.scandir("/proc")
+    except OSError:
+        return True  # No podemos demostrar que no haya otros escritores.
+    try:
+        for entry in entries:
+            if not entry.name.isdigit() or int(entry.name) == os.getpid():
+                continue
+            try:
+                with open(entry.path + "/cmdline", "rb") as stream:
+                    args = [part.decode("utf-8", "replace")
+                            for part in stream.read(16384).split(b"\x00") if part]
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+            except OSError:
+                # Si proc es parcialmente inaccesible, no demostrar inactividad.
+                return True
+            if not args or not os.path.basename(args[0]).startswith("rclone"):
+                continue
+            if "mount" not in args[1:10]:
+                continue
+            config = None
+            for i, arg in enumerate(args[1:], 1):
+                if arg == "--config" and i + 1 < len(args):
+                    config = args[i + 1]
+                    break
+                if arg.startswith("--config="):
+                    config = arg[len("--config="):]
+                    break
+            if config is None or os.path.realpath(config) == target:
+                return True
+        return False
+    finally:
+        entries.close()
+
+
+def _install_generation_unchanged(path, expected, original):
+    """Fence antes de os.replace: datos y generación deben coincidir."""
+    if _config_mounts_active():
+        return "mounts_active"
+    if _file_generation(path) != expected:
+        return "local_changed"
+    try:
+        current = _read_damaged_snapshot() if path == CONF_PATH else _read_stable(path)
+    except (OSError, ValueError, RuntimeError):
+        return "local_changed"
+    if current != original:
+        return "local_changed"
+    return None
+
+
 def _remote_config(key):
     """Descarga en HTTPS y autentica MQC2 antes de utilizarlo."""
     url = (
@@ -174,6 +250,9 @@ def _publish_master():
     finally:
         if os.path.isfile(temp):
             os.unlink(temp)
+    # Otra rotación durante la subida debe publicarse en el ciclo siguiente.
+    if _read_stable(CONF_PATH) != local:
+        return "published_local_advanced"
     return "published"
 
 
@@ -235,8 +314,11 @@ def _master_recover(mode, original=None, broken_names=()):
         return "no_key"
 
     # Si se produjo una renovación concurrente, no hacer nada destructivo.
+    if _config_mounts_active():
+        return "mounts_active"
     if _read_damaged_snapshot() != original:
         return "local_changed"
+    initial_generation = _file_generation(CONF_PATH)
     if os.path.exists(CONF_PATH) and (
             time.time() - os.stat(CONF_PATH).st_mtime < MASTER_SETTLE_SECONDS):
         return "local_settling"
@@ -287,8 +369,11 @@ def _master_recover(mode, original=None, broken_names=()):
         if mode == "corrupt" and original is not None:
             if not policy.master_partial_identity_compatible(original, verified):
                 return "master_identity_mismatch"
-        if _read_damaged_snapshot() != original:
-            return "local_changed"
+        state = _install_generation_unchanged(
+            CONF_PATH, initial_generation, original
+        )
+        if state:
+            return state
         if original == verified:
             return "unchanged"
 
@@ -303,6 +388,12 @@ def _master_recover(mode, original=None, broken_names=()):
             )
             os.replace(backup_tmp, backup)
 
+        # Segunda comprobación justo antes de cambiar el fichero activo.
+        state = _install_generation_unchanged(
+            CONF_PATH, initial_generation, original
+        )
+        if state:
+            return state
         os.chmod(tmp, 0o600)
         os.replace(tmp, CONF_PATH)
         tmp = None
@@ -323,6 +414,7 @@ def _recover_client():
     if not os.path.isfile(CONF_PATH):
         return "no_local"
     local = _read_stable(CONF_PATH)
+    initial_generation = _file_generation(CONF_PATH)
     names = sorted(policy.oauth_tokens(local))
     if not names:
         return "no_oauth"
@@ -344,6 +436,8 @@ def _recover_client():
             os.unlink(probe_file)
     if not bad:
         return "unavailable" if unknown else "healthy"
+    if _config_mounts_active():
+        return "mounts_active"
 
     key = device_utils.get_key_from_authorized_keys()
     if not key:
@@ -363,8 +457,11 @@ def _recover_client():
                 return "candidate_failed"
 
         # No sobreescribir una renovación concurrente de rclone.
-        if _read_stable(CONF_PATH) != local:
-            return "local_changed"
+        state = _install_generation_unchanged(
+            CONF_PATH, initial_generation, local
+        )
+        if state:
+            return state
 
         recovered = _read_stable(tmp)
         policy.oauth_tokens(recovered)
@@ -376,6 +473,11 @@ def _recover_client():
             if os.path.exists(backup_tmp):
                 os.unlink(backup_tmp)
 
+        state = _install_generation_unchanged(
+            CONF_PATH, initial_generation, local
+        )
+        if state:
+            return state
         os.chmod(tmp, 0o600)
         os.replace(tmp, CONF_PATH)
         tmp = None

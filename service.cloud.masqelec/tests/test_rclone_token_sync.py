@@ -2,6 +2,7 @@
 """Regresión OAuth de 4 remotos sin Kodi, red o tokens reales."""
 import contextlib
 import importlib.util
+import io
 import json
 import os
 import sys
@@ -82,6 +83,8 @@ class RcloneTokenSyncTests(unittest.TestCase):
         os.utime(self.path, (old, old))
         self.sync.CONF_PATH = self.path
         self.sync.REMOTE_PATH = "rclone/rclone.conf.crypt"
+        # Por defecto el laboratorio no tiene montajes activos.
+        self.sync._config_mounts_active = lambda: False
         # Ningún test unitario ejecuta rclone ni consulta la red.
         self.sync._master_probe_local = lambda raw, names: {
             name: "ok" for name in names
@@ -559,6 +562,195 @@ class RcloneTokenSyncTests(unittest.TestCase):
         self.assertEqual(self.sync._master_cycle(1061),
                          "master_identity_mismatch")
         self.assertEqual(self._disk(), damaged)
+
+
+    def test_master_mounts_active_blocks_corrupt_restore_before_network(self):
+        damaged = b"broken-config-while-mount-alive"
+        self._set_bad_local(damaged)
+        self._master_setup()
+        self.sync._config_mounts_active = lambda: True
+        self.sync._remote_config = lambda key: self.fail("No remote download")
+        self.assertEqual(self.sync._master_cycle(1000), "master_corrupt_pending")
+        self.assertEqual(self.sync._master_cycle(1061), "mounts_active")
+        self.assertEqual(self._disk(), damaged)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_master_mounts_active_blocks_oauth_restore(self):
+        self._master_setup(published=_mixed(series_refresh="new-one"))
+        self.sync._config_mounts_active = lambda: True
+        self.sync._remote_config = lambda key: self.fail("No remote download")
+        self.sync._master_probe_local = lambda raw, names: {
+            name: ("auth" if name == "series" else "ok") for name in names
+        }
+        self.assertEqual(self.sync._master_cycle(1000), "mounts_active")
+        self.assertEqual(self._disk(), self.local)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_client_mounts_active_blocks_install(self):
+        self.sync._config_mounts_active = lambda: True
+        self.sync._remote_config = lambda key: self.fail("No remote download")
+        self.sync._probe = lambda name, path: (
+            "auth" if name == "series" else "ok")
+        self.assertEqual(self.sync._recover_client(), "mounts_active")
+        self.assertEqual(self._disk(), self.local)
+        self.assertFalse(os.path.exists(self.path + ".pre-recovery"))
+
+    def test_master_mount_starts_during_probe_blocks_replace(self):
+        damaged = b"truncated"
+        self._set_bad_local(damaged)
+        self._master_setup()
+        checks = []
+        def becomes_busy():
+            checks.append(True)
+            return len(checks) >= 2
+        self.sync._config_mounts_active = becomes_busy
+        self.assertEqual(
+            self.sync._master_recover("corrupt", original=damaged),
+            "mounts_active")
+        self.assertEqual(self._disk(), damaged)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_client_mount_starts_after_candidate_validation_blocks_replace(self):
+        self.sync._remote_config = lambda key: _mixed(series_refresh="new-one")
+        self.sync._probe = lambda name, path: (
+            "auth" if name == "series" and "pre-recovery" not in path
+            else "ok"
+        )
+        counts = []
+        def guard():
+            counts.append(True)
+            return len(counts) >= 2
+        self.sync._config_mounts_active = guard
+        # El primer sondeo usa una copia .rclone-recovery; distinguiéndolo por
+        # el contenido podemos simular AUTH original y OK del candidato.
+        def probe(name, path):
+            if name != "series":
+                return "ok"
+            with open(path, "rb") as fd:
+                token = policy.oauth_tokens(fd.read())["series"]
+            return "auth" if token["refresh_token"] == "old-one" else "ok"
+        self.sync._probe = probe
+        self.assertEqual(self.sync._recover_client(), "mounts_active")
+        self.assertEqual(self._disk(), self.local)
+        self.assertFalse(os.path.exists(self.path + ".pre-recovery"))
+
+    def test_same_bytes_replaced_in_other_inode_blocks_master_restore(self):
+        self._master_setup()
+        self.sync._remote_config = lambda key: self.local
+        changed = []
+        def change_at_probe(name, conf):
+            if not changed:
+                replacement = self.sync._write_candidate(self.path, self.local)
+                os.replace(replacement, self.path)
+                changed.append(True)
+            return "ok"
+        self.sync._probe = change_at_probe
+        self.assertEqual(self.sync._master_recover("corrupt", original=self.local),
+                         "local_changed")
+        self.assertEqual(self._disk(), self.local)
+        self.assertEqual(self._master_backup_files(), [])
+
+    def test_same_bytes_replaced_in_other_inode_blocks_client_restore(self):
+        self.sync._remote_config = lambda key: _mixed(series_refresh="new-one")
+        changed = []
+        def probe(name, conf):
+            if name != "series":
+                return "ok"
+            with open(conf, "rb") as fd:
+                current = policy.oauth_tokens(fd.read())["series"]["refresh_token"]
+            if current == "old-one":
+                return "auth"
+            if not changed:
+                replacement = self.sync._write_candidate(self.path, self.local)
+                os.replace(replacement, self.path)
+                changed.append(True)
+            return "ok"
+        self.sync._probe = probe
+        self.assertEqual(self.sync._recover_client(), "local_changed")
+        self.assertEqual(self._disk(), self.local)
+
+    def test_master_upload_detects_subsequent_token_rotation(self):
+        previous = _mixed(series_refresh="older-one")
+        self._master_setup(published=previous)
+        self.sync._probe = lambda name, conf: "ok"
+        def upload(token, src, dest):
+            refreshed = self.local.replace(b"old-one", b"newer-one")
+            with open(self.path, "wb") as fd:
+                fd.write(refreshed)
+            return True
+        self.sync.catalog_utils._upload_file = upload
+        self.assertEqual(self.sync._publish_master(), "published_local_advanced")
+        self.assertIn(b"newer-one", self._disk())
+
+    def test_master_retry_when_local_rotates_during_upload(self):
+        previous = _mixed(series_refresh="older-one")
+        self._master_setup(published=previous)
+        self.sync._probe = lambda name, conf: "ok"
+        calls = []
+        def upload(token, src, dest):
+            calls.append(True)
+            if len(calls) == 1:
+                rotated = self.local.replace(b"old-one", b"newer-one")
+                with open(self.path, "wb") as fd:
+                    fd.write(rotated)
+            return True
+        self.sync.catalog_utils._upload_file = upload
+        self.assertEqual(self.sync._master_cycle(1000), "published_local_advanced")
+        self.assertIsNone(self.sync._last_master_confirmed_fp)
+        # Tras estabilizarse el fichero, la rotación vuelve a publicarse.
+        os.utime(self.path, (time.time() - 30, time.time() - 30))
+        self.assertEqual(self.sync._master_cycle(1061), "published")
+        self.assertEqual(len(calls), 2)
+
+
+
+    def _simulate_processes(self, commands):
+        class Scan:
+            def __init__(self, entries):
+                self.entries = entries
+            def __iter__(self):
+                return iter(self.entries)
+            def close(self):
+                pass
+        entries = [types.SimpleNamespace(name=str(i + 2000),
+                                         path="/proc/{}".format(i + 2000))
+                   for i in range(len(commands))]
+        by_path = {entries[i].path + "/cmdline": (b"\0".join(
+            word.encode("utf-8") for word in argv) + b"\0")
+                   for i, argv in enumerate(commands)}
+        def open_proc(path, mode="rb"):
+            return io.BytesIO(by_path[path])
+        return (mock.patch.object(self.sync.os, "scandir",
+                                  return_value=Scan(entries)),
+                mock.patch("builtins.open", side_effect=open_proc))
+
+    def test_detects_one_of_four_rclone_mount_writers(self):
+        argv = [["/storage/.config/rclone/rclone", "mount", "cloud:tv",
+                 "/storage/.mnt/one", "--config", "/other/rclone.conf"],
+                ["/storage/.config/rclone/rclone", "mount", "cloud:movies",
+                 "/storage/.mnt/two", "--config", self.path],
+                ["/storage/.config/rclone/rclone", "mount", "cloud:shows",
+                 "/storage/.mnt/three", "--config", "/other/rclone.conf"],
+                ["/storage/.config/rclone/rclone", "lsf", "cloud:",
+                 "--config", self.path]]
+        contexts = self._simulate_processes(argv)
+        with contexts[0], contexts[1]:
+            self.assertTrue(self.sync._config_mounts_active())
+
+    def test_different_rclone_mount_config_does_not_block_lab(self):
+        commands = [["/storage/.config/rclone/rclone", "mount", "cloud:",
+                     "/storage/.mnt/a",
+                     "--config=/storage/.config/rclone/rclone.conf"]]
+        contexts = self._simulate_processes(commands)
+        with contexts[0], contexts[1]:
+            self.assertFalse(self.sync._config_mounts_active())
+
+    def test_rclone_mount_without_explicit_config_fails_closed(self):
+        commands = [["rclone", "mount", "cloud:", "/storage/.mnt/a"]]
+        contexts = self._simulate_processes(commands)
+        with contexts[0], contexts[1]:
+            self.assertTrue(self.sync._config_mounts_active())
+
 
 
 if __name__ == "__main__":

@@ -198,3 +198,41 @@ GITHUB_AUXILIARY_SECTIONS; no se publican nombres ni parámetros.
 La prueba real debe confirmar que las secciones adicionales coinciden
 entre MASTER y GitHub. En caso contrario, informar
 BLOCKED_DIFFERENT_REMOTE_IDENTITIES y no restaurar ni publicar.
+
+## Fence de concurrencia con rclone mount (2026-11-17)
+
+Los cuatro servicios systemd del cloud/develop utilizan el mismo
+`/storage/.config/rclone/rclone.conf` (cada uno con `--config`).
+Rclone guarda tokens renovados mediante un temporal y renombrados, sin
+cooperar con un `threading.Lock` del addon. Un `os.replace` local no
+es un compare-and-swap interproceso y puede perder una escritura de rclone.
+
+Guardas del worker:
+
+- Inspección read-only de `/proc/*/cmdline` para localizar procesos
+  `rclone mount` que usen exactamente `CONF_PATH`. Los mounts sin
+  `--config` se tratan conservadoramente como posibles escritores.
+- MASTER y CLIENT no sustituyen `rclone.conf` si detectan mounts activos
+  sobre el mismo archivo. Devuelven `mounts_active` y reintentan al próximo
+  ciclo. No detienen servicios, ni interrumpen reproducción.
+- Se compara la **generación** (dev/inodo/tamaño/mtime_ns/ctime_ns) y los
+  bytes antes de instalar y otra vez justo antes del reemplazo. Así se
+  detectan renovaciones que incluso escriban los mismos bytes y reemplazos
+  durante la validación. La comprobación **no es atómica con os.replace**.
+- La publicación MASTER sigue funcionando durante los montajes porque
+  únicamente **lee** el archivo. Si el local rota durante el upload,
+  devuelve `published_local_advanced` y no memoriza esa publicación como
+  sincronización final. El siguiente minuto volverá a conciliar.
+- Sin confirmación del estado de `/proc`, se bloquea la sustitución.
+
+**Limitación deliberada:** con cuatro `rclone mount` permanentes no puede
+haber recuperación en caliente del archivo compartido mediante el worker.
+No activar la bandera hasta diseñar mantenimiento/remontaje seguro o aislar
+la escritura de tokens. El fence es la mitigación más segura sin cambiar
+systemd ni interrumpir Kodi; no equivale a locking compartido real.
+
+La documentación oficial describe el guardado con temporal y cambios de
+nombre: https://rclone.org/docs/#config-string. En los servicios
+`cloud.masqelec/develop/system.d` no hay un mecanismo de lock interproceso.
+
+Pruebas previstas tras este cambio: 123 (111 anteriores + 12 de concurrencia).
