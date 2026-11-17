@@ -71,6 +71,21 @@ class TwoMountRealProbeFenceTests(unittest.TestCase):
                                side_effect=PermissionError):
             self.assertTrue(lab.any_rclone_mounts_alive())
 
+    def test_github_branch_head_accepted_only_with_full_sha(self):
+        good_sha = "a" * 40
+        with mock.patch.object(lab, "fetch", return_value=(
+                '{"commit":{"sha":"' + good_sha + '"}}').encode()):
+            self.assertEqual(lab.github_branch_head(), good_sha)
+
+    def test_github_branch_head_rejects_invalid_response(self):
+        for response in (b'{}', b'{"commit":{}}',
+                         b'{"commit":{"sha":"abc"}}',
+                         b'{"commit":{"sha":"G' + b'a' * 39 + b'"}}'):
+            with self.subTest(response=response[:16]), \
+                 mock.patch.object(lab, "fetch", return_value=response):
+                with self.assertRaises(ValueError):
+                    lab.github_branch_head()
+
     def test_mount_after_many_global_flags_is_still_detected(self):
         args = ["rclone"] + ["--test-flag-{}".format(i) for i in range(12)]
         args += ["mount", "users_library_1:", "/tmp/mount"]
