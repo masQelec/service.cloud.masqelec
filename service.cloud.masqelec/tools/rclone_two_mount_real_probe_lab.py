@@ -22,6 +22,7 @@ CONTENTS_URL = (
     "https://api.github.com/repos/masQelec/cloud.masqelec/"
     "contents/rclone/rclone.conf.crypt?ref=develop"
 )
+BRANCH_URL = "https://api.github.com/repos/masQelec/cloud.masqelec/branches/develop"
 LIVE_CONFIG = "/storage/.config/rclone/rclone.conf"
 AUTH_KEYS = "/storage/.ssh/authorized_keys"
 STAGE = "BOOT"
@@ -38,6 +39,19 @@ def fetch(url):
     if len(body) < 1 or len(body) > 2 * 1024 * 1024:
         raise ValueError("Respuesta de red fuera de límite")
     return body
+
+
+def github_branch_head():
+    """HEAD de cloud/develop: fence adicional frente a blob SHA tipo ABA."""
+    response = json.loads(fetch(BRANCH_URL))
+    try:
+        sha = response["commit"]["sha"]
+    except (TypeError, KeyError):
+        raise ValueError("HEAD remoto de GitHub inválido")
+    if not isinstance(sha, str) or len(sha) != 40 or any(
+            c not in "0123456789abcdef" for c in sha):
+        raise ValueError("SHA de commit remoto inválido")
+    return sha
 
 
 def read_live_stable():
@@ -180,8 +194,12 @@ def main():
 
         STAGE = "READ_DEVICE_KEY"
         key = read_key()
+        STAGE = "READ_GITHUB_BRANCH_HEAD"
+        branch_head = github_branch_head()
+        # Se lee el fichero de la revisión INMUTABLE, no del puntero móvil.
+        pinned_url = CONTENTS_URL.replace("?ref=develop", "?ref=" + branch_head)
         STAGE = "READ_AUTHENTICATED_GITHUB_MQC2"
-        remote = publisher.decode_remote_contents(fetch(CONTENTS_URL), key)
+        remote = publisher.decode_remote_contents(fetch(pinned_url), key)
         print("GH_BLOB_SHA_VALID=PASS")
         print("MQC2_AUTHENTICATED=PASS")
 
@@ -248,12 +266,18 @@ def main():
         if read_live_stable() != canonical:
             print("LAB_RESULT=INCONCLUSIVE_LOCAL_ROTATED")
             return 2
-        second = publisher.decode_remote_contents(fetch(CONTENTS_URL), key)
+        second = publisher.decode_remote_contents(fetch(pinned_url), key)
         if second["sha"] != remote["sha"]:
             print("GH_BLOB_SHA_STABLE=NO")
             print("LAB_RESULT=INCONCLUSIVE_GITHUB_UPDATED")
             return 2
         print("GH_BLOB_SHA_STABLE=YES")
+        STAGE = "RECHECK_GITHUB_BRANCH_HEAD"
+        if github_branch_head() != branch_head:
+            print("GH_BRANCH_COMMIT_STABLE=NO")
+            print("LAB_RESULT=INCONCLUSIVE_GITHUB_UPDATED")
+            return 2
+        print("GH_BRANCH_COMMIT_STABLE=YES")
         print("LIVE_CONFIG_CHANGED=NO")
         print("GITHUB_PUBLISH_ALLOWED=NO")
         print("LAB_RESULT=PASS")
