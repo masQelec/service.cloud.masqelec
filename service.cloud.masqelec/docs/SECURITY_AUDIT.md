@@ -27,7 +27,7 @@ Los comandos de laboratorio deben ocultar nombres de cuentas, secretos y stderr 
 | SEC-03 | `expiry` de access token usado para ordenar versiones de refresh | **Mitigado en política** | Se compara refresh exacto; no se afirma cuál es posterior sin probe/consistencia |
 | SEC-04 | Cuatro montajes comparten escritor `rclone.conf` | **Riesgo activo legacy** | `_config_mounts_active`, fences en `/proc`, lectura estable; lab real PASS; recuperación hot bloqueada |
 | SEC-05 | `os.replace` + comparación no son CAS frente a rclone mount | **Pendiente operativo** | Bloqueo de reemplazo con mounts activos; ningún locking mutuo con proceso rclone |
-| SEC-06 | Copiar tokens en archivo de prueba puede rotarlos en Microsoft | **Riesgo operativo** | `--real-probe` bloquea ante rclone mounts locales; se requiere coordinación de otros equipos |
+| SEC-06 | Copiar tokens en archivo de prueba puede rotarlos en Microsoft | **Riesgo operativo** | `--real-probe` se bloquea tanto con mounts locales como sin ellos hasta disponer de coordinación verificable de los demás equipos (commits `17cb2901`, `41b9f033`) |
 | SEC-07 | Dos wrappers `crypt` desconocidos podían eliminarse al aislar | **Mitigado en código** | Resolución de dependencias `crypt→OneDrive` y conservación exacta; laboratorio 4/4 PASS |
 | SEC-08 | Publicador `catalog_utils._upload_file` reintenta con SHA nuevo en 409/422 | **No utilizar para OAuth v2** | `rclone_two_mount_publish_guard.strict_put` hace un PUT máximo; no está conectado |
 | SEC-09 | Confundir éxito HTTP PUT con backup definitivamente verificado | **Pendiente integración** | `strict_put` devuelve `accepted_requires_remote_confirmation`; falta relectura independiente |
@@ -87,3 +87,10 @@ Clasificar:
 **P0:** preflight GitHub SHA/MQC2 y comparación de refresh. **P0:** estrategia que evite carreras entre dos archivos por equipo y muchos equipos. **P0:** probar FUSE/bind real en rutas no utilizadas y revertirlo. **P0:** ruta de actualización del addon CLIENTE con versiones y no aplicación automática. **P1:** métricas reales de memoria/latencia y caída por cuenta. **P1:** rotación/recovery de claves MQC2 sin bloquear clientes antiguos.
 
 Fuentes de implementación: `lib/rclone_token_policy.py`, `lib/rclone_token_sync.py`, `lib/rclone_two_mount_oauth.py`, `lib/rclone_two_mount_verify.py`, `lib/rclone_two_mount_publish_guard.py`, `lib/cloud_storage.py`, `service.py` y `cloud/system.d/`. Informes antiguos en [docs/README.md](README.md).
+
+## 7. Revisión adicional del preflight (17-11-2026, sin ejecución real)
+
+- `17cb2901` / `41b9f033`: defensa conservadora frente a refrescos entre CLIENTES, y escaneo `/proc` que no declara seguro un `cmdline` truncado o un `mount` desplazado por parámetros. **No se ha probado en KodiELEC**.
+- `c701e74e` / `75cb8b48`: el preflight consulta el HEAD de `cloud/develop`, recupera el MQC2 por SHA de commit inmutable y vuelve a comprobar el HEAD. `GH_BRANCH_COMMIT_STABLE=NO` => `INCONCLUSIVE_GITHUB_UPDATED`; no restaura, publica ni toca unidades. Sigue existiendo la limitación de cambios forzados de ref o carrera ajena al lector.
+- Se añadieron **5 pruebas unitarias**, **pendientes de ejecutar**. Última suite acreditada: 228/228 OK **antes** de estos commits.
+- Gate L5 (dispositivo real): **NOT RUN**. Coordinación distribuida OAuth, CAS/readback operativo y montajes reales: **NOT RUN**. No hay autorización de release.
