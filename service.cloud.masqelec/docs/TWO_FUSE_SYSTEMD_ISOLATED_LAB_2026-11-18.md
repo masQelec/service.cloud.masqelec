@@ -120,3 +120,31 @@ journalctl -b -u 'UNIDAD_FALLIDA_DEL_LAB.service' -n 35 --no-pager
 Sustituir `UNIDAD_FALLIDA_DEL_LAB.service` por la unidad literal indicada por el script; **no** consultar logs de los servicios legacy ni pegar configuraciones/credenciales. Si `FAIL_SYSTEMD_CLEANUP`, no repetir: conservar la raíz temporal y diagnosticar antes de desmontar o borrar nada.
 
 **Pendientes reales**: causa de `FAIL_SERVICE_START`, primer PASS real de 2 FUSE+4 bind gestionados por systemd, reproducción `.strm` y prueba de recuperación ante reinicio real. Tres banderas `False`, ningún cutover de OneDrive autorizado.
+
+## 18-11-2026 — Causa REAL identificada y corregida en develop, pendiente reensayo físico
+
+La nueva ejecución del operador con diagnóstico produjo `FAILED_STAGE=BIND_VIDEOS_1`, `SYSTEMD_RESULT=exit-code`, `SYSTEMD_PRE_STATUS=1`, `SYSTEMD_DIAG_CLASS=EXECSTARTPRE_FAILURE`, `CLEANUP=COMPLETE` y `LAB_RESULT=FAIL_SERVICE_START`. El journal de la primera ejecución muestra unas 30 repeticiones de:
+
+```text
+/bin/sh: line 1: /bin/test: No such file or directory
+```
+
+**Causa confirmada:** las unidades bind (tanto el laboratorio en `tools/rclone_two_mount_systemd_local_lab.py` como el generador de producción en `lib/rclone_two_mount_plan.py`) llamaban `/bin/test -d <directorio>`. KodiELEC no proporciona ese ejecutable. Esta llamada provocó el error 1 durante la espera de 30 s de `ExecStartPre`. El registro **no prueba** una avería de OAuth, crypt, rclone ni FUSE.
+
+**Solución aplicada:** sustituida la dependencia por el builtin POSIX `[ -d <directorio> ]` dentro de la misma orden `/bin/sh -c`, manteniendo el guard de punto de montaje, el timeout de 30 intentos, el fail-closed y los paths Kodi. Nuevas pruebas regresivas en `tests/test_rclone_two_mount.py` y `tests/test_rclone_two_mount_systemd_local_lab.py` verifican que los seis servicios se generan sin `/bin/test` y que el bind tiene `[ -d ... ]`. CI **624/624 tests PASS**: [GitHub Actions 44399373367](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44399373367). **No se ha ejecutado aún la versión corregida en KodiELEC real.**
+
+Descargar **versión exacta corregida** y comprobar antes de ejecutar:
+
+```sh
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/d79a6fd3d4a64b0d0cf93f76d1fd77fa7d09a95c/service.cloud.masqelec/tools/rclone_two_mount_systemd_local_lab.py' -O /tmp/rclone_two_mount_systemd_local_lab.py && python3 -m py_compile /tmp/rclone_two_mount_systemd_local_lab.py && python3 /tmp/rclone_two_mount_systemd_local_lab.py --preflight
+```
+
+Solo si el resultado es `LAB_RESULT=READY_FOR_ISOLATED_SYSTEMD`:
+
+```sh
+python3 /tmp/rclone_two_mount_systemd_local_lab.py --run-isolated-systemd --confirm-isolated-only
+```
+
+Resultado objetivo: `CLEANUP=COMPLETE` y `LAB_RESULT=PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL`. Si vuelve a fallar, conservar `FAILED_STAGE`, `SYSTEMD_DIAG_CLASS`, `SYSTEMD_PRE_STATUS`, `CLEANUP` y `LAB_RESULT`, **sin activar ni modificar servicios legacy**. Si limpieza incompleta, no repetir el piloto. `systemctl daemon-reload` forma parte del ensayo (relee unidades globales, no reinicia legacy). Nada se ha desplegado en los dispositivos; las banderas continúan en `False`.
+
+**Próximo gate:** obtener PASS físico en el MASTER con esta revisión y luego avanzar a ensayo crypt/OneDrive real bajo autorización operativa. No declarar el problema resuelto en dispositivo solo porque CI pasó.

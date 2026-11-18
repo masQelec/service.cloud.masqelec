@@ -197,3 +197,7 @@ Preparado script para comprobar **2 FUSE + 4 bind gestionados por systemd** sin 
 ### Primer ensayo real de systemd: diagnóstico pendiente (18-11-2026)
 
 KodiELEC: preflight READY; piloto `FAIL_SERVICE_START` con `CLEANUP=COMPLETE`. Preparado diagnóstico de unidad fallida, 622/622 tests CI OK; aún **no** existe PASS systemd real. [Runbook y siguiente comando](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
+
+### Fix KodiELEC systemd: `/bin/test` ausente (18/11/2026)
+
+Causa real del fallo de `BIND_VIDEOS_1`: KodiELEC no tiene `/bin/test`. Ambas generaciones de bind (laboratorio y unidades candidatas) usan ahora el builtin `[ -d ... ]`. **624/624 CI OK**; reensayo real pendiente. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
