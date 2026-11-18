@@ -104,7 +104,8 @@ class FleetInventoryTests(unittest.TestCase):
         self.assertEqual(m["extra_fuse"], 1)
 
     def test_zero_processes_is_not_fleet_authorization(self):
-        with mock.patch.object(lab, "inventory",
+        with mock.patch.object(lab.os, "geteuid", return_value=0), \
+             mock.patch.object(lab, "inventory",
                                return_value=(
                                    {"complete": True, "rclone": 0,
                                     "mount": 0, "other": 0, "uncertain": 0},
@@ -118,6 +119,18 @@ class FleetInventoryTests(unittest.TestCase):
         self.assertIn("REAL_OAUTH_PROBE_ALLOWED=NO", output)
         self.assertIn("OTHER_DEVICES_INSPECTED=NO", output)
         self.assertNotIn("CUTOVER_AUTHORIZED=YES", output)
+
+    def test_non_root_never_claims_complete_inventory(self):
+        p = {"complete": True, "rclone": 0,
+             "mount": 0, "other": 0, "uncertain": 0}
+        m = {"complete": True, "fuse_total": 0, "legacy": 0,
+             "new": 0, "stacked": 0, "extra_fuse": 0}
+        with mock.patch.object(lab.os, "geteuid", return_value=1000), \
+             mock.patch.object(lab, "inventory", return_value=(p, m)), \
+             contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(lab.main(["--inventory"]), 2)
+        self.assertIn("ROOT=NO", out.getvalue())
+        self.assertIn("INVENTORY_RESULT=BLOCKED_", out.getvalue())
 
     def test_four_live_rclone_mount_processes(self):
         for idx in range(4):
@@ -169,7 +182,8 @@ class FleetInventoryTests(unittest.TestCase):
                            b"SECRET_REMOTE:", b"--config",
                            b"/secret/tokens/file.conf",
                            b"--password=DO_NOT_PRINT"))
-        with mock.patch.object(lab, "inventory",
+        with mock.patch.object(lab.os, "geteuid", return_value=0), \
+             mock.patch.object(lab, "inventory",
                                side_effect=lambda: (
                                    lab.inspect_processes(str(self.proc)),
                                    lab.inspect_mounts(mock_mounts()))), \

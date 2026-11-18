@@ -157,6 +157,8 @@ def main(argv=None):
     print("PROCESS_ARGUMENTS_PRINTED=NO")
     print("MOUNT_OR_SYSTEMD_MUTATIONS=NO")
     print("DEVICE_ROLE=NOT_ATTESTED")
+    running_as_root = os.geteuid() == 0
+    print("ROOT=" + ("YES" if running_as_root else "NO"))
     processes, mounts = inventory()
     print("PROC_INSPECTION=" + (
         "COMPLETE" if processes["complete"] else "INCOMPLETE"))
@@ -176,7 +178,9 @@ def main(argv=None):
     print("FLEET_OAUTH_COORDINATION=NOT_VERIFIED")
     print("REAL_OAUTH_PROBE_ALLOWED=NO")
     print("CUTOVER_AUTHORIZED=NO")
-    good = processes["complete"] and mounts["complete"]
+    # Sin root, un /proc filtrado (hidepid) puede omitir escritores.
+    # Nunca declarar inventario completo si no se puede ver la máquina.
+    good = running_as_root and processes["complete"] and mounts["complete"]
     print("INVENTORY_RESULT=" + (
         "PASS_READ_ONLY" if good else "BLOCKED_INCOMPLETE_LOCAL_INSPECTION"))
     return 0 if good else 2
