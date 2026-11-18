@@ -29,3 +29,6 @@ RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
 # Preparación privada local al arrancar (NO instala montajes/unidades).
 RCLONE_TWO_MOUNT_STAGING_ENABLED = False
 
+
+# Publicación automática MASTER del MQC2 v2 (requiere gates físicos de release).
+RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED = False
