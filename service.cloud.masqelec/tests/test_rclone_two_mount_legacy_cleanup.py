@@ -182,6 +182,20 @@ class CleanupTests(unittest.TestCase):
         self.a.fail_reload = False
         self.assertEqual(self.run_cleanup(), "CLEANED")
 
+    def test_missing_all_files_without_done_requires_healthy_v2(self):
+        for unit in rollout.LEGACY_SERVICES:
+            Path(self.a.unit_dir, unit).unlink()
+        self.a.good = False
+        self.assertEqual(self.run_cleanup(), "BLOCKED_V2_UNHEALTHY")
+        self.assertFalse(Path(self.txn, cleanup.DONE_NAME).exists())
+
+    def test_missing_all_files_without_done_requires_stopped_legacy(self):
+        for unit in rollout.LEGACY_SERVICES:
+            Path(self.a.unit_dir, unit).unlink()
+        self.a.active.add(rollout.LEGACY_SERVICES[0])
+        self.assertEqual(self.run_cleanup(), "BLOCKED_LEGACY_RUNNING")
+        self.assertFalse(Path(self.txn, cleanup.DONE_NAME).exists())
+
     def test_done_marker_with_old_unit_is_blocked(self):
         (self.txn / cleanup.DONE_NAME).write_bytes(cleanup.DONE_BYTES)
         (self.txn / cleanup.DONE_NAME).chmod(0o600)

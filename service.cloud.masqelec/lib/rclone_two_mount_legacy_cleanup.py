@@ -81,21 +81,21 @@ def retire_after_active(adapter, *, authorized=False):
                 _verified_unit(path, backup[unit])
                 present.append((path, backup[unit]))
 
-            # Si no quedaron ficheros, todavía hay que comprobar reload y
-            # grabar el marcador durable: un error anterior pudo saltarlos.
-            if present:
-                if not adapter.complete_health():
-                    return "BLOCKED_V2_UNHEALTHY"
-                for unit in rollout.LEGACY_SERVICES:
-                    if adapter._active(unit):
-                        return "BLOCKED_LEGACY_RUNNING"
-                    # False == no está enabled. True o None bloquean.
-                    if adapter.runner(
-                            ["systemctl", "is-enabled", "--quiet", unit]
-                    ) is not False:
-                        return "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN"
-                for path, original in present:
-                    atomic.remove_if_identical(path, original)
+            # Incluso cuando un crash dejó ya los cuatro archivos ausentes,
+            # NO confirmar la retirada sin seis montajes sanos y ninguna
+            # unidad legacy activa/enabled. Evita finalizar sobre v2 roto.
+            if not adapter.complete_health():
+                return "BLOCKED_V2_UNHEALTHY"
+            for unit in rollout.LEGACY_SERVICES:
+                if adapter._active(unit):
+                    return "BLOCKED_LEGACY_RUNNING"
+                # False == no está enabled. True o None bloquean.
+                if adapter.runner(
+                        ["systemctl", "is-enabled", "--quiet", unit]
+                ) is not False:
+                    return "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN"
+            for path, original in present:
+                atomic.remove_if_identical(path, original)
             adapter._systemctl("daemon-reload")
             journal._write_new(done, DONE_BYTES)
             journal._sync(target)
