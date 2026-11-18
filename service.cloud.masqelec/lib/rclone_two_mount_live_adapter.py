@@ -455,6 +455,79 @@ class LocalAdapter:
         else:
             raise ValueError("Missing baseline")
 
+    def recover_pending_from_disk(self):
+        """Recuperación EXPLÍCITA tras interrupción, con journal persistente.
+
+        Llamar SOLO bajo journal.locked() y con Kodi sin reproducción. No
+        invocada automáticamente por service.py. La restauración no presume
+        que cuatro FUSE legacy estén bien por recibir OK de systemctl.
+        """
+        self._require_enabled()
+        if self.txn is not None:
+            return "MANUAL_RECOVERY_REQUIRED"
+        txn = os.path.join(self.txn_parent, rollout.CANDIDATE_ID)
+        try:
+            saved_phase = journal.phase(txn)
+            if saved_phase not in ("cutover_started", "rollback_required"):
+                return "BLOCKED_NOT_INTERRUPTED"
+            self.txn = txn
+            self.baseline = stage._read_file(
+                os.path.join(txn, "canonical.conf"),
+                confidential=True)[0]
+            self.units = {
+                unit: stage._read_file(
+                    os.path.join(txn, unit), confidential=True)[0]
+                for unit in rollout.LEGACY_SERVICES
+            }
+            # Fail closed on journal or legacy unit tampering.
+            plan.generate(self.baseline, self.units)
+            at_stop_path = os.path.join(txn, "canonical-at-stop.conf")
+            if os.path.lexists(at_stop_path):
+                self.at_stop = stage._read_file(
+                    at_stop_path, confidential=True)[0]
+                if not conf.same_non_token_settings(
+                        self.baseline, self.at_stop):
+                    raise ValueError("Historical identity changed")
+                self.candidate = plan.generate(self.at_stop, self.units)
+                # Si se instaló un snapshot, ambos han de existir. No
+                # reconstruir token antiguo después de un posible refresh.
+                if any(not os.path.lexists(path)
+                       for path in self.account_confs):
+                    raise ValueError("Missing isolated account recovery state")
+            else:
+                self.at_stop = None
+                self.candidate = None
+            self.installed = {}
+            if self.candidate is not None:
+                for i, path in enumerate(self.account_confs):
+                    # Contenido exacto se relee tras detener los escritores.
+                    self.installed[path] = self.candidate[
+                        "account{}.conf".format(i + 1)][0]
+                for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
+                    path = os.path.join(self.unit_dir, unit)
+                    if os.path.lexists(path):
+                        self.installed[path] = self.candidate[unit][0]
+            else:
+                # Sin at_stop no debería haber unidades v2 ya instaladas.
+                if any(os.path.lexists(
+                        os.path.join(self.unit_dir, unit))
+                       for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES):
+                    raise ValueError("Incomplete historical candidate")
+            if not self.playback_still_idle():
+                return "BLOCKED_PLAYBACK_CHANGED"
+            self.stop_binds()
+            self.stop_fuse()
+            if not self.new_fully_unmounted():
+                return "MANUAL_RECOVERY_REQUIRED"
+            self.reconcile_and_restore_legacy()
+            self.start_legacy()
+            if not self.legacy_healthy():
+                return "MANUAL_RECOVERY_REQUIRED"
+            self.mark_legacy_restored()
+            return "ROLLED_BACK"
+        except Exception:
+            return "MANUAL_RECOVERY_REQUIRED"
+
     def start_legacy(self):
         self._require_enabled()
         for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
@@ -492,6 +565,24 @@ class LocalAdapter:
                                "legacy_restored")
         elif phase != "prepared":
             raise ValueError("Inconsistent restored phase")
+
+
+def recover_with_local_lock(adapter, *, authorized=False,
+                            verified_rollback=False):
+    """Ruta de recuperación con gates explícitos, no se activa al boot."""
+    if (authorized is not True or not adapter.enabled or
+            getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                    False) is not True):
+        return "BLOCKED_NOT_AUTHORIZED"
+    if verified_rollback is not True:
+        return "BLOCKED_ROLLBACK_NOT_READY"
+    try:
+        with journal.locked(adapter.txn_parent):
+            if not kodi_idle.is_playback_idle(adapter.rpc):
+                return "BLOCKED_PLAYBACK_NOT_VERIFIED"
+            return adapter.recover_pending_from_disk()
+    except (OSError, ValueError, BlockingIOError):
+        return "MANUAL_RECOVERY_REQUIRED"
 
 
 def execute_with_local_lock(adapter, *, authorized=False,

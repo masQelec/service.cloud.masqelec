@@ -261,6 +261,101 @@ class IntegratedCutoverTests(unittest.TestCase):
             self.assertIn(str(recovery), dropin.read_text())
             self.assertIn(b"--config", dropin.read_bytes())
 
+    def new_process_adapter(self):
+        """Nueva instancia: simula pérdida completa de RAM tras reinicio."""
+        return live.LocalAdapter(
+            rpc_call=lambda _: '{"jsonrpc":"2.0","id":1,"result":[]}',
+            live_enabled=True, canonical=str(self.conf),
+            unit_dir=str(self.units),
+            account_confs=(
+                str(self.accounts / "account1.conf"),
+                str(self.accounts / "account2.conf")),
+            state_path=str(self.marker),
+            txn_parent=str(self.txn_parent),
+            runner=self.system, mount_reader=self.system.mountinfo,
+        )
+
+    def resume_after_crash(self):
+        clean = self.new_process_adapter()
+        with mock.patch.object(
+                constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", True):
+            return live.recover_with_local_lock(
+                clean, authorized=True, verified_rollback=True)
+
+    def test_crash_after_legacy_stopped_recovers_from_disk(self):
+        with journal.locked(str(self.txn_parent)):
+            self.assertTrue(self.adapter.legacy_preflight())
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+            self.adapter.stop_legacy()
+        self.assertEqual(self.resume_after_crash(), "ROLLED_BACK")
+        self.assertEqual(self.system.active, set(rollout.LEGACY_SERVICES))
+        self.assertFalse(self.marker.exists())
+        target = self.txn_parent / rollout.CANDIDATE_ID
+        self.assertEqual(journal.phase(str(target)), "legacy_restored")
+
+    def test_crash_after_v2_root_started_recovers_both_accounts(self):
+        with journal.locked(str(self.txn_parent)):
+            self.assertTrue(self.adapter.legacy_preflight())
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+            self.adapter.stop_legacy()
+            self.assertTrue(self.adapter.legacy_fully_unmounted())
+            self.adapter.install_current_v2()
+            self.adapter.start_fuse()
+        self.assertEqual(self.resume_after_crash(), "ROLLED_BACK")
+        self.assertEqual(self.system.active, set(rollout.LEGACY_SERVICES))
+        self.assertEqual(len(self.system.mounts), 4)
+        self.assertTrue(all(not Path(p).exists()
+                            for p in self.adapter.account_confs))
+        self.assertFalse(self.marker.exists())
+
+    def test_crash_with_rotated_onedrive_restores_private_config(self):
+        with journal.locked(str(self.txn_parent)):
+            self.assertTrue(self.adapter.legacy_preflight())
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+            self.adapter.stop_legacy()
+            self.adapter.install_current_v2()
+            self.adapter.start_fuse()
+        raw = Path(self.adapter.account_confs[0]).read_bytes()
+        rotated = raw.replace(
+            b"refresh-users_library_1", b"ROTATED_AFTER_REBOOT")
+        self.assertNotEqual(raw, rotated)
+        Path(self.adapter.account_confs[0]).write_bytes(rotated)
+        self.assertEqual(self.resume_after_crash(), "ROLLED_BACK")
+        self.assertEqual(self.original, self.conf.read_bytes())
+        target = self.txn_parent / rollout.CANDIDATE_ID
+        self.assertIn(
+            b"ROTATED_AFTER_REBOOT",
+            Path(target, "canonical-recovery-candidate.conf").read_bytes())
+        self.assertTrue(all(
+            (self.units / (unit + ".d") /
+             "90-masqelec-oauth-recovery.conf").exists()
+            for unit in rollout.LEGACY_SERVICES))
+
+    def test_crash_missing_isolated_account_blocks_recovery(self):
+        with journal.locked(str(self.txn_parent)):
+            self.assertTrue(self.adapter.legacy_preflight())
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+            self.adapter.stop_legacy()
+            self.adapter.install_current_v2()
+            self.adapter.start_fuse()
+        Path(self.adapter.account_confs[0]).unlink()
+        self.assertEqual(self.resume_after_crash(),
+                         "MANUAL_RECOVERY_REQUIRED")
+        self.assertTrue(self.marker.exists())
+        self.assertFalse(self.system.active.intersection(
+            set(rollout.LEGACY_SERVICES)))
+
+    def test_crash_recovery_requires_explicit_authorization(self):
+        clean = self.new_process_adapter()
+        self.assertEqual(
+            live.recover_with_local_lock(clean),
+            "BLOCKED_NOT_AUTHORIZED")
+        self.assertFalse(self.txn_parent.exists())
+
     def test_crash_after_marker_requires_recovery_without_legacy_restart(self):
         with journal.locked(str(self.txn_parent)):
             self.assertTrue(self.adapter.legacy_preflight())
