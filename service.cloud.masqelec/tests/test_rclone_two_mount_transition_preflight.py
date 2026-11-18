@@ -81,7 +81,7 @@ class TransitionGateTests(unittest.TestCase):
         self.assertFalse(self.inspect(config=broken)["CONFIG"])
 
     def test_missing_refresh_blocks(self):
-        broken = self.conf.replace(b"refresh-one_a", b"")
+        broken = self.conf.replace(b"refresh-users_library_1", b"")
         self.assertFalse(self.inspect(config=broken)["CONFIG"])
 
     def test_drive_identity_mismatch_blocks(self):
