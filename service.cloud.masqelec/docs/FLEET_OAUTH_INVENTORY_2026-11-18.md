@@ -1,0 +1,72 @@
+# Inventario OAuth de la flota — MASTER y CLIENTES
+**18 de noviembre de 2026 · Fase de diagnóstico local, NO autorización de sondeo OAuth ni cutover.**
+
+## Evidencia de partida
+
+El MASTER KodiELEC ha confirmado **`CLEANUP=COMPLETE`** y **`LAB_RESULT=PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL`** en un laboratorio de 2 FUSE+4 bind con origen LOCAL ficticio. También ha confirmado el preflight legacy de solo lectura con las cuatro rutas correctas. Esto **no demuestra** que las dos conexiones crypt→OneDrive reales puedan convivir con otras instancias OAuth en MASTER y CLIENTES.
+
+La función existente `tools/rclone_two_mount_real_probe_lab.py --real-probe` **bloquea** mientras haya montajes rclone y mientras no se haya demostrado la coordinación de tokens de otros dispositivos. Mantener esos bloqueos: incluso una operación `rclone lsf` puede renovar refresh tokens aunque solo lea datos remotos.
+
+## Nuevo diagnóstico 100% local
+
+`tools/rclone_two_mount_fleet_inventory.py` es autocontenido y solo admite `--inventory`. Lee los nombres de proceso en `/proc/<pid>/comm`, **inspecciona localmente** sus argumentos en `/proc/<pid>/cmdline` para clasificar `rclone mount` frente a otros subcomandos, y consulta `/proc/self/mountinfo` para contar montajes `fuse.rclone` en cuatro rutas legacy y dos raíces v2. **Nunca imprime argumentos, nombre de cuenta, PID o tokens.** No abre los ficheros de configuración, no ejecuta binarios rclone, no hace peticiones remotas y no modifica systemd ni montajes. **Exige root** para no declarar completo un `/proc` filtrado por permisos.
+
+### Ejecutar en MASTER (solo lectura)
+
+```sh
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/662bc955342fd9f4d1eaed3f3dab8eed753db5db/service.cloud.masqelec/tools/rclone_two_mount_fleet_inventory.py' -O /tmp/rclone_two_mount_fleet_inventory.py
+python3 -m py_compile /tmp/rclone_two_mount_fleet_inventory.py
+python3 /tmp/rclone_two_mount_fleet_inventory.py --inventory
+```
+
+Para cada CLIENTE se utiliza **el mismo script y comando**, exclusivamente si se tiene acceso administrativo a ese equipo. No reiniciar servicios, no parar rclone y no compartir archivos privados. Las salidas están diseñadas para copiarse sin secretos; aun así, revisar antes de publicarlas.
+
+### Interpretación de salida
+
+```text
+LAB_MODE=FLEET_OAUTH_LOCAL_INVENTORY_READ_ONLY
+REMOTE_REQUESTS=NO
+CANONICAL_CONFIG_READ=NO
+TOKEN_VALUES_PRINTED=NO
+COMMAND_LINE_INSPECTED=YES_LOCAL_ONLY
+PROCESS_ARGUMENTS_PRINTED=NO
+MOUNT_OR_SYSTEMD_MUTATIONS=NO
+DEVICE_ROLE=NOT_ATTESTED
+ROOT=YES
+PROC_INSPECTION=COMPLETE
+MOUNTINFO_INSPECTION=COMPLETE
+RCLONE_PROCESSES=<número>
+RCLONE_MOUNT_PROCESSES=<número>
+RCLONE_OTHER_PROCESSES=<número>
+RCLONE_UNCLASSIFIED=<número>
+RCLONE_FUSE_MOUNTS=<número>
+LEGACY_MOUNT_TARGETS=<número>/4
+V2_FUSE_ROOTS=<número>/2
+STACKED_KODI_OR_V2_TARGETS=<número>
+OTHER_RCLONE_FUSE_MOUNTS=<número>
+SINGLE_SNAPSHOT_STABILITY=NOT_VERIFIED
+OTHER_DEVICES_INSPECTED=NO
+FLEET_OAUTH_COORDINATION=NOT_VERIFIED
+REAL_OAUTH_PROBE_ALLOWED=NO
+CUTOVER_AUTHORIZED=NO
+INVENTORY_RESULT=PASS_READ_ONLY
+```
+
+`PASS_READ_ONLY` significa únicamente **inventario local legible**. No exige cero procesos rclone ni autoriza parar nada. En un MASTER legacy sano esperamos habitualmente cuatro montajes en sus rutas, pero **no presuponer** cuatro procesos por el tipo de unidades u otros usos de rclone. `RCLONE_OTHER_PROCESSES` no se debe confundir con un error: puede contener otros procesos activos, por ejemplo Google Drive. Cualquier `INCOMPLETE` exige investigar permisos y topología sin datos secretos.
+
+**Limitaciones materiales:** una captura de `/proc` es instantánea, no bloquea nuevos escritores, no ve otros dispositivos, puede omitir ejecutables renombrados o tareas programadas que aún no hayan arrancado y no acredita la frescura ni la validez de ningún refresh token. Un cero absoluto en los recuentos **NO** equivale a una flota coordinada. La salida tampoco acredita por sí misma el rol MASTER/CLIENTE.
+
+## Gates siguientes, sin saltos
+
+1. Obtener inventario de MASTER y del conjunto **completo y conocido** de CLIENTES que comparten las mismas cuentas OAuth. Registrar qué dispositivo cumple cada rol sin añadir identificadores personales al repositorio.
+2. Identificar **todas** las rutas de escritura de tokens (montajes, servicio cloud, importaciones, tareas programadas, scripts de mantenimiento, otros dispositivos). Establecer cómo se detienen y reanudan en una ventana aprobada, incluidas tareas Google Drive que escriben `rclone.conf`.
+3. Definir un cierre de escritores verificable y la fuente exacta de los dos refresh tokens por cuenta **sin copiarlos al chat**. Conservar copia privada durable y rollback probado. Una segunda conexión sin estas garantías está prohibida.
+4. Únicamente tras estos gates, preparar ensayo de 2 FUSE crypt→OneDrive con lectura exacta de un fichero conocido por cuenta, playback Kodi inactivo, sin escaneo general y rollback de las cuatro rutas originales.
+
+**Estado:** `REAL_OAUTH_PROBE_ALLOWED=NO`, `CUTOVER_AUTHORIZED=NO`, flags `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`, `RCLONE_TWO_MOUNT_STAGING_ENABLED=False`, `RCLONE_TOKEN_SYNC_ENABLED=False`.
+
+## Pruebas
+
+Código `662bc955342fd9f4d1eaed3f3dab8eed753db5db`, CI: 647 pruebas previstas (624 previas + 23 pruebas de inventario y root). Verificar resultado en Actions antes de usar. Los tests usan `/proc` y mountinfo ficticios en directorios temporales, **no** leen las cuentas del MASTER ni CLIENTES.
+
+**Handoff:** paso práctico siguiente: recibir el resumen de inventario LOCAL del MASTER, analizar recuentos y discrepancias, y continuar con CLIENTES sin arrancar OAuth v2. No repetir el laboratorio systemd local, que ya pasó físicamente.

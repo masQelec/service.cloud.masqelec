@@ -130,3 +130,5 @@ Se añadió `lib/rclone_two_mount_live_adapter.py` al código de `develop` con e
 | [Handoff 18-11: recuperación y OAuth sin clobber](HANDOFF_2026-11-18_CRASH_RECOVERY.md) | Estado actual de cutover, tests 588/588, rollback con drop-ins, condiciones pendientes |
 
 | [Piloto real systemd aislado 2 FUSE + 4 bind](TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md) | Comandos KodiELEC, seguridad, limpieza y límites; 617 tests sintéticos |
+
+| [Inventario OAuth MASTER/CLIENTES sin secretos](FLEET_OAUTH_INVENTORY_2026-11-18.md) | Script standalone de lectura, alcance de `/proc`, gates de flota y ejecución por dispositivo |
