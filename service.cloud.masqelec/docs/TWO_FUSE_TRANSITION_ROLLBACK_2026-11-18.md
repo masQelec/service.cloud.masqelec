@@ -191,3 +191,7 @@ El adaptador impide `execute_with_local_lock` si `RCLONE_TWO_MOUNT_FEATURE_ALLOW
 - **Pendiente antes de activar**: ensayo controlado del adaptador con systemd real/archivo conocido de cada cuenta, un recuperador tras reinicio real (o procedimiento manual probado), manejo del conflicto OAuth de forma que no bloquee rollback con renovación real, reproducción .strm y verificación del comportamiento tras el próximo arranque.
 - MASTER/CLIENTES y ZIP/STRM intactos. Los clientes siguen importando catálogo sin escanear OneDrive.
 
+
+## Actualización 2026-11-18 — recuperación desde journal y rollback OAuth sin clobber
+
+La última implementación de `addon/develop` incluye **reversión de dos a cuatro montajes con tokens OneDrive renovados mediante cuatro drop-ins systemd privados**, sin escribir en `rclone.conf`; recuperación **explícita** desde journal tras perder RAM por reboot; bloqueo al arranque si falta un drop-in/credencial de recuperación; y health kernel-only sin listados periódicos remotos. La arquitectura MASTER/CLIENTE no cambió. CI **588/588 PASS** en [run 44383466775](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44383466775). Los únicos PASS físicos siguen siendo el piloto 2 FUSE+4 bind LOCAL y el preflight legacy de solo lectura. **Sin activación, sin prueba de systemd drop-in real, sin corte OAuth/OneDrive real, sin recuperación automática en boot.** Documento actualizado: [HANDOFF_2026-11-18_CRASH_RECOVERY.md](HANDOFF_2026-11-18_CRASH_RECOVERY.md).

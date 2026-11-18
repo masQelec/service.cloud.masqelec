@@ -1,0 +1,71 @@
+# Handoff — transición rclone 4 FUSE → 2 FUSE + 4 bind
+**Fecha:** 2026-11-18 · **Repositorio:** masQelec/service.cloud.masqelec · **Única rama editada:** `develop`
+
+## Decisiones operativas invariables
+
+El addon ya identifica MASTER/CLIENTE; no reescribir roles ni el flujo de catálogo. El MASTER explora los remotos, genera rutas `.strm` y publica un ZIP. CLIENTES importan/difieren el ZIP y escanean los `.strm` locales: **no deben realizar listados periódicos de directorios OneDrive**, y solo acceden a los ficheros remotos al reproducir. Las cuatro rutas originales en los `.strm` deben seguir siendo idénticas:
+
+| Cuenta | Antes (cada uno FUSE) | Después |
+|---|---|---|
+| OneDrive 1 | `/storage/.mnt/videos/1` | bind de `/storage/.mnt/cloud/1/movies` |
+| OneDrive 1 | `/storage/.mnt/tvshows/1` | bind de `/storage/.mnt/cloud/1/tvshows` |
+| OneDrive 2 | `/storage/.mnt/videos/2` | bind de `/storage/.mnt/cloud/2/movies` |
+| OneDrive 2 | `/storage/.mnt/tvshows/2` | bind de `/storage/.mnt/cloud/2/tvshows` |
+
+Las dos raíces nuevas montan `users_library_1:` y `users_library_2:` respectivamente. Es el rclone antiguo del dispositivo con `Type=simple`, no instalar FUSE3 ni exigir `Type=notify`.
+
+## Evidencia real del usuario (KodiELEC MASTER)
+
+1. `LAB_RESULT=PASS_LOCAL_FUSE_BIND_LAB`: se montaron realmente dos FUSE sobre el backend **local con archivos ficticios**, cuatro bind, lecturas y desmontaje limpio. No probó OAuth.
+2. `PREFLIGHT_RESULT=PASS_READ_ONLY` con `CONFIG`, `LEGACY_UNITS`, `LEGACY_MOUNTS`, `LEGACY_SERVICES`, `NEW_MOUNTS_ABSENT`, `NEW_UNITS_ABSENT`, `ROLLOUT_STATE_LEGACY` = PASS. Solo lectura. Confirma que el MASTER mantiene los 4 FUSE legacy sanos y no ha iniciado la nueva arquitectura.
+
+**No repetir** estas dos pruebas salvo cambio real del binario/configuración o nueva hipótesis. **NO se ha probado un corte real con crypt/OneDrive ni reproducido un STRM durante la nueva arquitectura.**
+
+## Código hasta este handoff
+
+Rama `develop`, código validado en commit `8854f331609d7f6467dfbf7ea2f65f4636f9c10c` mediante GitHub Actions [44383466775](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44383466775): **588/588 tests PASS**. Las pruebas nuevas son sintéticas en Python 3.11, con sistema de ficheros temporal real, falsos montajes y comandos systemd simulados; no se ejecutó systemd en KodiELEC.
+
+| Componente | Estado concreto |
+|---|---|
+| `rclone_two_mount_plan.py` | 2 unidades FUSE `Type=simple`, 4 bind `Type=oneshot` y espera acotada de FUSE; rutas STRM inmutables. |
+| `rclone_two_mount_health.py` | valida `mountinfo`, superblock, carpeta y **rechaza montajes apilados** (2 FUSE+4 bind). |
+| `service.py::_mounts_ready` | comprobación por `/proc/mounts`/`mountinfo`, **sin `os.listdir` de OneDrive**, tanto en modo legacy como v2; el test de salud no prueba disponibilidad de red. |
+| `rclone_two_mount_token_rollback.py` | conciliación pura de dos OneDrive renovados, conserva secciones Google Drive y crypt. |
+| `rclone_two_mount_recovery_units.py` | cuatro drop-ins de `ExecStart` que apuntan a `canonical-recovery-candidate.conf` **privado**, sin sustituir el `rclone.conf` compartido. |
+| `rclone_two_mount_journal.py` | respaldo canónico y unidades anteriores 0600/0700, `flock`, `fsync` y fases durable `prepared → cutover_started → active/rollback_required → legacy_restored`. |
+| `rclone_two_mount_live_adapter.py` | adaptador systemd **desactivado por defecto**, con gates de autorización, reproducción Kodi inactiva, doble FUSE/cuatro bind, lectura exacta de un fichero multimedia por cuenta (15 s), operaciones reversibles y `recover_pending_from_disk()` tras proceso nuevo. `recover_with_local_lock` **requiere habilitación explícita y NO está conectado al arranque**. |
+| `rclone_two_mount_boot_guard.py` | comprueba journal y marcador antes de que el addon actualice servicios y bibliotecas. Si recuperación legacy usó tokens rotados, exige que existan y coincidan las cuatro overrides y la config privada; si no, bloquea. |
+| `rclone_two_mount_end_to_end.py` | prueba el cambio, error de arranque, tokens rotados, proceso nuevo tras crash, ausencia de una cuenta y reinicio justo tras guardar snapshot antes de instalar. |
+| `rclone_two_mount_atomic_install.py` | ficheros candidate-only con no-clobber y permisos cerrados; no modifica producción por sí solo. |
+
+En `mark_cutover_started`, el adaptador persiste journal/marcador y **deshabilita los cuatro servicios legacy antes de pararlos**, de modo que un reboot no los vuelve a montar con tokens potencialmente antiguos durante el cutover. En la activación final, se vuelven a confirmar deshabilitados antes de habilitar los 2+4 nuevos.
+
+### Reversión con refresh OneDrive renovado, sin pisar Google Drive
+
+Después de detener los dos escritores v2, el rollback reconcilia los tokens, escribe `canonical-recovery-candidate.conf` 0600 bajo el journal, instala cuatro drop-ins `rclone_*.service.d/90-masqelec-oauth-recovery.conf`, ejecuta `daemon-reload`, reactiva los cuatro legacy con esa copia privada y confirma montajes. `/storage/.config/rclone/rclone.conf` original **permanece intacto** y Google Drive puede seguir administrando sus propios tokens allí. Los drop-ins persistentes **no se deben borrar** sin migrar con seguridad esas credenciales: el siguiente preflight rechaza nueva transición si los detecta.
+
+En caso de apagón, el motor puede reconstruir `self.baseline`, `self.units`, `self.at_stop` y artefactos instalados desde journal al pedir `recover_with_local_lock`. El guard de arranque falla cerrado si detecta fase incompatible. **No hay autorecuperación invocada por `service.py` ni prueba física tras reboot.**
+
+## Candados de seguridad conservados
+
+```text
+RCLONE_TWO_MOUNT_STAGING_ENABLED=False
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False
+RCLONE_TOKEN_SYNC_ENABLED=False
+LIVE_CUTOVER_EXECUTED=NO
+REAL_ONEDRIVE_TWO_FUSE_PROBED=NO
+SYSTEMD_DROPIN_REAL_KODIELEC_VERIFIED=NO
+REAL_REBOOT_RECOVERY_VERIFIED=NO
+MASTER_CLIENT_LOGIC_CHANGED=NO
+CLOUD_REPOSITORY_MODIFIED=NO
+```
+
+Solo `addon/develop` puede cambiar. No tocar `addon/main`, `cloud/develop` ni `cloud/master`.
+
+## Qué sigue, sin crear un proyecto paralelo
+
+1. **Pilotar el adaptador con un laboratorio systemd aislado**, con unidades y rutas temporales y credenciales ficticias; comprobar parsing efectivo de `ExecStart=` en drop-ins y orden `disable legacy → stop → 2 FUSE + 4 bind`, recuperación ante fallo.
+2. Repetir el gate de inactividad con `xbmc.executeJSONRPC` REAL, sin reescribir el rol MASTER/CLIENTE. Preparar dos rutas multimedia **ya conocidas** (una por cuenta), sin recorrer OneDrive para descubrirlas.
+3. Solo con evidencia favorable, ventana controlada en MASTER para un ensayo de crypt→OneDrive real y reproducción `.strm`, con reversión y recuperación verificadas. **Un PASS en CI no equivale a autorización de cutover.** Nunca pedir ni imprimir tokens.
+
+**Advertencia técnica residual:** systemd puede iniciar unidades al comienzo del boot, antes de ejecutar el addon y su guard. La deshabilitación temprana reduce el riesgo de montar los cuatro legacy durante un corte; todavía se debe probar la secuencia con systemd real y caída de alimentación. El respaldo OAuth privado es duradero pero no garantiza que Microsoft acepte posteriormente cada refresh token; no suponerlo sin prueba real.

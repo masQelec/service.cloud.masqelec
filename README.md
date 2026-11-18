@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 18-11-2026.** GitHub Actions **552/552 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+> **Estado actualizado: 18-11-2026.** GitHub Actions **588/588 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## ¿Qué es?
 
@@ -185,3 +185,7 @@ Prototipo para ejecutar transición y rollback con journal, Kodi idle, dos FUSE 
 ### 18/11/2026 — guardas de arranque y protección OAuth
 
 La migración v2 continúa sin desplegar. El addon bloquea actualizaciones legacy y escaneos si detecta una transacción v2 interrumpida; la reversión conserva tokens nuevos en journal privado **sin sobrescribir el canónico compartido**. 552/552 pruebas OK. La recuperación automática con tokens rotados y un reinicio real siguen pendientes. [Detalles](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
+
+### 18/11/2026 — motor de recuperación y tokens aislados
+
+Versión `develop` con **588/588 tests PASS**. El rollback puede volver a los cuatro montajes con refresh OneDrive renovado usando configuración privada y drop-ins systemd, sin sobrescribir el canónico de Google Drive. Disponible recuperación explícita desde journal tras interrupción. Sin deploy, sin prueba de crypt real y con flags apagados. [Handoff actualizado](service.cloud.masqelec/docs/HANDOFF_2026-11-18_CRASH_RECOVERY.md).
