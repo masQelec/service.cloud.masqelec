@@ -119,7 +119,7 @@ def _root_unit(index, legacy_unit):
         "Wants=network-online.target\nAfter=network-online.target\n"
         "Requires=network-online.target\n\n"
         "[Service]\n"
-        "Type=notify\nNotifyAccess=main\n"
+        "Type=simple\n"
         "User=root\nGroup=root\nLimitNOFILE=65535\n"
         "KillMode=mixed\nKillSignal=SIGINT\nTimeoutStopSec=30\n"
         "TimeoutStartSec=120\n"

@@ -227,3 +227,26 @@ python3 /tmp/rclone_two_mount_fuse_bind_local_lab.py --preflight
 ```
 
 **No ejecutar** `--run-local-pilot --confirm-isolated-only` hasta obtener `RCLONE_MOUNT_FLAGS=YES` y `LAB_RESULT=READY_FOR_LOCAL_PILOT` en ese equipo. En ningún caso los 406 tests prueban mounts reales. El siguiente paso tras validar el preflight sería un ensayo temporal autorizado en `/tmp`, nunca un cambio de `system.d` o de las cuatro rutas Kodi.
+
+
+## KodiELEC: piloto real 2 FUSE + 4 bind SUPERADO (18-11-2026)
+
+**Evidencia textual proporcionada por el operador**, después del preflight con todas las opciones en `YES`:
+
+```text
+LAB_MODE=RCLONE_TWO_FUSE_FOUR_BIND_LOCAL
+ONEDRIVE_ACCESSED=NO
+RCLONE_LIVE_CONFIG_READ=NO
+KODI_PATHS_CHANGED=NO
+SYSTEMD_WRITE=NO
+GITHUB_UPLOAD=NO
+LAB_RESULT=PASS_LOCAL_FUSE_BIND_LAB
+```
+
+**Resultado: PASS real del laboratorio LOCAL en KodiELEC**. El programa solo devuelve PASS tras constatar dos montajes FUSE, cuatro bind, lecturas correctas y limpieza final. Sin secretos, no OneDrive, no modificaciones a `system.d`, rutas Kodi o catálogo.
+
+**Corrección de compatibilidad**: unidades actuales de `cloud/develop/system.d` son `Type=simple`; el generador candidato `lib/rclone_two_mount_plan.py` creaba `Type=notify` (sin evidencia de `sd_notify` en el rclone disponible). Ahora genera `Type=simple` sin `NotifyAccess`, al igual que las unidades vigentes. **No están instaladas** las unidades candidatas ni se ha realizado cutover. La preparación privada sigue deshabilitada.
+
+**Pendientes estrictos**: confirmar montaje de `crypt→OneDrive` sin sobrescribir refresh tokens, verificar lectura de una ruta exacta conocida (sin listado global remoto), probar reproducción `.strm`, diseñar espera/orden correcto al arrancar servicios bind bajo `Type=simple` y rollback local real. No activar montajes con el generador actual sin comprobar esas condiciones. MASTER genera catálogo y escanea originales; CLIENTES solo importan `.strm` sin barrido OneDrive.
+
+**No cambiar rclone ni introducir FUSE3** para este objetivo: el binario actual ha superado el montaje FUSE local.

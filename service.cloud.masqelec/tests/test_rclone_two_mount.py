@@ -82,7 +82,11 @@ class TwoMountPlanTests(unittest.TestCase):
         bundle = plan.generate(self.conf, self.units)
         for index, unit in enumerate(plan.ACCOUNT_UNITS):
             text = bundle[unit][0].decode()
-            self.assertIn("Type=notify", text)
+            # El rclone original de KodiELEC funciona con Type=simple.
+            # No introducir dependencia de sd_notify sin probarla.
+            self.assertIn("Type=simple", text)
+            self.assertNotIn("Type=notify", text)
+            self.assertNotIn("NotifyAccess=", text)
             self.assertIn("--read-only", text)
             self.assertIn("users_library_{}:".format(index+1), text)
             self.assertIn(plan.ACCOUNT_CONFS[index], text)
