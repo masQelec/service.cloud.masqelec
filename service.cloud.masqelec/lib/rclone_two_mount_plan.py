@@ -125,7 +125,7 @@ def _root_unit(index, legacy_unit):
         "TimeoutStartSec=120\n"
         "ExecStartPre=/bin/mkdir -p {}\n"
         "ExecStart={}\n"
-        "ExecStop=/bin/fusermount -uz {}\n"
+        "ExecStop=/bin/umount {}\n"
         "Restart=on-failure\nRestartSec=5\n\n"
         "[Install]\nWantedBy=multi-user.target\n"
     ).format(index+1, target, start, target).encode("utf-8")

@@ -92,6 +92,11 @@ class TwoMountPlanTests(unittest.TestCase):
             self.assertIn(plan.ACCOUNT_CONFS[index], text)
             self.assertIn("--buffer-size", text)
             self.assertIn("--vfs-cache-mode", text)
+            # El ensayo real systemd usó /bin/umount sin depender de
+            # /bin/fusermount; conservar el binario comprobado en KodiELEC.
+            self.assertIn("ExecStop=/bin/umount " + plan.FUSE_ROOTS[index],
+                          text)
+            self.assertNotIn("ExecStop=/bin/fusermount", text)
             self.assertNotIn("--config /storage/.config/rclone/rclone.conf",
                              text)
             self.assertNotIn("ExecStop=/bin/fusermount -uz /storage/.mnt/tvshows/",
