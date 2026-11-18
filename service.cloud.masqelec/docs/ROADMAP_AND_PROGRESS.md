@@ -250,3 +250,8 @@ LAB_RESULT=PASS_LOCAL_FUSE_BIND_LAB
 **Pendientes estrictos**: confirmar montaje de `crypt→OneDrive` sin sobrescribir refresh tokens, verificar lectura de una ruta exacta conocida (sin listado global remoto), probar reproducción `.strm`, diseñar espera/orden correcto al arrancar servicios bind bajo `Type=simple` y rollback local real. No activar montajes con el generador actual sin comprobar esas condiciones. MASTER genera catálogo y escanea originales; CLIENTES solo importan `.strm` sin barrido OneDrive.
 
 **No cambiar rclone ni introducir FUSE3** para este objetivo: el binario actual ha superado el montaje FUSE local.
+
+
+## Transición reversible: readiness de FUSE y fusión OAuth local (18-11-2026)
+
+Implementado en `develop`: los cuatro servicios bind generados tienen **espera limitada de FUSE (30 × 1 s)** y se niegan a montarse encima de las cuatro rutas Kodi si ya son mountpoints. Compatibilidad `Type=simple` conservada; no se introduce `Type=notify`. Nuevo `lib/rclone_two_mount_token_rollback.py` **puro** para conservar dos tokens OneDrive aislados al volver a cuatro rclone, sin alterar Google Drive/crypt y bloqueando cambios concurrentes o identidad distinta. **424/424 tests OK** — [GitHub Actions 44356523812](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44356523812). No hay ejecutor de cutover, copias instaladas ni ensayo real de OneDrive; el staging sigue en ruta privada distinta de los `ACCOUNT_CONFS` de las unidades. **NO activar banderas**. [Protocolo y pendientes](TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).

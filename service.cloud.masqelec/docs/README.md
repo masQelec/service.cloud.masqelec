@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **401/401 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **424/424 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 
@@ -83,3 +83,8 @@ Controles: valida inventario `crypt→OneDrive`, las cuatro unidades legacy comp
 
 Próximo paso: piloto de verificación read-only de prerrequisitos KodiELEC y, posteriormente, **dos FUSE + cuatro bind exclusivamente en rutas alternativas**, prueba de reproducción y rollback. El modo operativo legacy seguirá intacto hasta autorización explícita.
 
+
+
+## Transición reversible: readiness de FUSE y fusión OAuth local (18-11-2026)
+
+Implementado en `develop`: los cuatro servicios bind generados tienen **espera limitada de FUSE (30 × 1 s)** y se niegan a montarse encima de las cuatro rutas Kodi si ya son mountpoints. Compatibilidad `Type=simple` conservada; no se introduce `Type=notify`. Nuevo `lib/rclone_two_mount_token_rollback.py` **puro** para conservar dos tokens OneDrive aislados al volver a cuatro rclone, sin alterar Google Drive/crypt y bloqueando cambios concurrentes o identidad distinta. **424/424 tests OK** — [GitHub Actions 44356523812](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44356523812). No hay ejecutor de cutover, copias instaladas ni ensayo real de OneDrive; el staging sigue en ruta privada distinta de los `ACCOUNT_CONFS` de las unidades. **NO activar banderas**. [Protocolo y pendientes](TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).

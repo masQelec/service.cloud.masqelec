@@ -187,3 +187,10 @@ python3 /tmp/rclone_two_mount_fuse_bind_local_lab.py --preflight
 ```
 
 **No ejecutar** `--run-local-pilot --confirm-isolated-only` hasta obtener `RCLONE_MOUNT_FLAGS=YES` y `LAB_RESULT=READY_FOR_LOCAL_PILOT` en ese equipo. En ningún caso los 406 tests prueban mounts reales. El siguiente paso tras validar el preflight sería un ensayo temporal autorizado en `/tmp`, nunca un cambio de `system.d` o de las cuatro rutas Kodi.
+
+
+## Transición reversible: readiness de FUSE y fusión OAuth local (18-11-2026)
+
+Implementado en `develop`: los cuatro servicios bind generados tienen **espera limitada de FUSE (30 × 1 s)** y se niegan a montarse encima de las cuatro rutas Kodi si ya son mountpoints. Compatibilidad `Type=simple` conservada; no se introduce `Type=notify`. Nuevo `lib/rclone_two_mount_token_rollback.py` **puro** para conservar dos tokens OneDrive aislados al volver a cuatro rclone, sin alterar Google Drive/crypt y bloqueando cambios concurrentes o identidad distinta. **424/424 tests OK** — [GitHub Actions 44356523812](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44356523812). No hay ejecutor de cutover, copias instaladas ni ensayo real de OneDrive; el staging sigue en ruta privada distinta de los `ACCOUNT_CONFS` de las unidades. **NO activar banderas**. [Protocolo y pendientes](TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
+
+**Amenaza residual:** `reconcile_canonical_for_rollback` no verifica con Microsoft el refresh nuevo. El ejecutor futuro debe detener el escritor aislado antes de leer el snapshot; un token leído durante una escritura activa no constituye un punto de recuperación consistente. No imprimir ni subir la configuración resultante.
