@@ -182,7 +182,7 @@ def _unit_files(root, rclone, *, mount_cmd="/bin/mount",
         wait = (
             "for x in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 "
             "16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; "
-            "do {} -q {} && /bin/test -d {} && exit 0; "
+            "do {} -q {} && [ -d {} ] && exit 0; "
             "/bin/sleep 1; done; exit 1"
         ).format(mountpoint_cmd, fuse[index], source)
         units[unit_name] = (

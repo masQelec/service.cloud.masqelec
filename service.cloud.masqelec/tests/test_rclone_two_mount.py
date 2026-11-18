@@ -128,13 +128,24 @@ class TwoMountPlanTests(unittest.TestCase):
             self.assertIn("BindsTo=" + plan.ACCOUNT_UNITS[i], unit)
             self.assertIn("After=" + plan.ACCOUNT_UNITS[i], unit)
             self.assertIn("/bin/mountpoint -q " + plan.FUSE_ROOTS[i], unit)
-            self.assertIn("/bin/test -d " + plan.FUSE_ROOTS[i]
-                          + "/" + folder, unit)
+            self.assertIn("[ -d " + plan.FUSE_ROOTS[i]
+                          + "/" + folder + " ]", unit)
+            self.assertNotIn("/bin/test", unit)
             self.assertIn("/bin/sleep 1", unit)
             self.assertIn("done; exit 1", unit)
             self.assertIn("ExecStart=/bin/mount --bind", unit)
             self.assertNotIn("rclone lsf", unit)
             self.assertNotIn("Type=notify", unit)
+
+    def test_bind_checks_are_busybox_shell_builtin_not_bin_test(self):
+        bundle = plan.generate(self.conf, self.units)
+        for name, index, folder, _ in plan.BIND_MAP:
+            unit = bundle[name][0].decode("utf-8")
+            self.assertNotIn("/bin/test", unit)
+            self.assertIn(
+                "[ -d " + plan.FUSE_ROOTS[index] + "/" + folder + " ]",
+                unit)
+            self.assertIn("/bin/sh -c", unit)
 
     def test_bind_rejects_busy_kodi_target_before_waiting(self):
         bundle = plan.generate(self.conf, self.units)

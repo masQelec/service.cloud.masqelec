@@ -141,7 +141,7 @@ def _bind_unit(name, account_index, folder, target):
     attempts = " ".join(str(i) for i in range(1, 31))
     wait = (
         "for retry in {}; do /bin/mountpoint -q {} && "
-        "/bin/test -d {} && exit 0; /bin/sleep 1; "
+        "[ -d {} ] && exit 0; /bin/sleep 1; "
         "done; exit 1"
     ).format(attempts, FUSE_ROOTS[account_index], source)
     return (

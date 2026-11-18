@@ -103,11 +103,23 @@ class SystemdLocalLabTests(unittest.TestCase):
             self.assertIn("/bin/mount --bind ", text)
             self.assertIn("ExecStop=/bin/umount ", text)
             self.assertIn("done; exit 1", text)
+            self.assertIn("[ -d ", text)
+            self.assertIn(" ] && exit 0", text)
+            self.assertNotIn("/bin/test", text)
             self.assertNotIn("WantedBy=", text)
         for content in units.values():
             self.assertNotIn(b"/storage/.mnt", content)
             self.assertNotIn(b"rclone.conf", content)
             self.assertNotIn(b"users_library_", content)
+
+    def test_bind_wait_uses_busybox_shell_builtin(self):
+        units = lab._unit_files(ROOT, RCLONE)
+        for name in lab._unit_names(ROOT)["bind"]:
+            content = units[name].decode("utf-8")
+            self.assertIn("do ", content)
+            self.assertIn("[ -d ", content)
+            self.assertIn(" ] && exit 0", content)
+            self.assertNotIn("/bin/test", content)
 
     def test_unit_generation_rejects_unsafe_executable(self):
         for binary in ("rclone", "/tmp/rclone;touch-bad", "/tmp/r clone",
