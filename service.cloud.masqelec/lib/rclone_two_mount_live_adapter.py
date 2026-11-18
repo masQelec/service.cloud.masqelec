@@ -113,11 +113,15 @@ class LocalAdapter:
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             timeout=10, check=False,
         )
-        if result.returncode not in (0, 1):
-            return "unknown"
         try:
             state = result.stdout.decode("ascii", "strict").strip()
         except (UnicodeError, AttributeError):
+            return "unknown"
+        # El estado not-found suele salir con rc=4, no con rc=1.
+        # Solo aceptar este código si stdout acredita exactamente ausencia.
+        if result.returncode == 4 and state == "not-found":
+            return state
+        if result.returncode not in (0, 1):
             return "unknown"
         if state in ("disabled", "not-found", "enabled",
                      "static", "masked", "indirect"):

@@ -398,6 +398,20 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(self.adapter.legacy_unit_file_state(
                 rollout.LEGACY_SERVICES[0]), "unknown")
 
+    def test_systemctl_not_found_rc4_is_distinct_from_generic_rc4(self):
+        class Result:
+            returncode = 4
+            stdout = b"not-found\n"
+        with mock.patch.object(live.subprocess, "run",
+                               return_value=Result()):
+            self.assertEqual(self.adapter.legacy_unit_file_state(
+                rollout.LEGACY_SERVICES[0]), "not-found")
+        Result.stdout = b"failed to connect\n"
+        with mock.patch.object(live.subprocess, "run",
+                               return_value=Result()):
+            self.assertEqual(self.adapter.legacy_unit_file_state(
+                rollout.LEGACY_SERVICES[0]), "unknown")
+
     def test_systemctl_legacy_unit_state_denies_unknown_units(self):
         with mock.patch.object(live.subprocess, "run",
                                side_effect=AssertionError("must not run")):
