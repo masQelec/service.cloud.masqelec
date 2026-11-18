@@ -1,5 +1,5 @@
 # KodiELEC — laboratorio systemd REAL y aislado (2 FUSE + 4 bind)
-**18-11-2026 · Estado: PREPARADO, aún NO ejecutado físicamente.**
+**18-11-2026 · Estado: primer ensayo REAL FALLÓ en arranque; limpieza PASS. Diagnóstico de unidad pendiente.**
 
 ## Propósito
 
@@ -63,3 +63,60 @@ Suite GitHub Actions [44391899556](https://github.com/masQelec/service.cloud.mas
 Tras confirmar PASS real, aún faltarán cutover real crypt→OneDrive, prueba multimedia exacta por cuenta, Kodi STRM y recuperación física tras un reinicio. La ruta de migración/rollback en `lib/rclone_two_mount_live_adapter.py` sigue desactivada; los tres flags permanecen `False`. No incluir las seis unidades efímeras en ningún paquete desplegable.
 
 **Handoff:** registrar la salida exacta del operador y clasificar fallos sin instalar paquetes ni activar cambios de producción.
+
+## Resultado REAL KodiELEC systemd (18-11-2026) — fallo de arranque con limpieza OK
+
+El operador ejecutó **ambos pasos** del nuevo laboratorio. El preflight devolvió `LAB_RESULT=READY_FOR_ISOLATED_SYSTEMD` con todos los requisitos YES. El piloto real devolvió:
+
+```text
+LAB_MODE=RCLONE_2FUSE_4BIND_REAL_SYSTEMD_ISOLATED
+ONEDRIVE_ACCESSED=NO
+LIVE_RCLONE_CONFIG_READ=NO
+KODI_MOUNT_PATHS_CHANGED=NO
+LEGACY_SERVICE_START_STOP=NO
+LEGACY_UNIT_FILES_CHANGED=NO
+SYSTEMD_DAEMON_RELOAD=ISOLATED_RUN_ONLY
+SYSTEMD_RUNTIME_UNITS_ONLY=YES
+PERMANENT_UNITS_ENABLED=NO
+GITHUB_UPLOAD=NO
+CLEANUP=COMPLETE
+LAB_RESULT=FAIL_SERVICE_START
+```
+
+**Conclusión**: no hay PASS de systemd REAL, no se conocen todavía ni el servicio fallido ni su causa. La limpieza del piloto indica que los recursos temporales se retiraron correctamente. No modificar rclone, FUSE3 ni las unidades legacy basándose en esta salida.
+
+**Corregido en `develop`**: al fallar `systemctl start`, el script llama `systemctl show` de la única unidad temporal afectada **antes de limpiar**. Solo imprime campos predefinidos: `FAILED_STAGE`, `FAILED_UNIT`, `SYSTEMD_LOAD`, `SYSTEMD_ACTIVE`, `SYSTEMD_SUBSTATE`, `SYSTEMD_RESULT`, `SYSTEMD_MAIN_STATUS`, `SYSTEMD_PRE_STATUS`, `SYSTEMD_DIAG_CLASS`. Nunca imprime `ExecStart`, contenidos de journal, entorno ni secretos. Mantiene los guards y desmontaje del ensayo. Compatibilidad systemd antiguo: un campo desconocido se muestra como `UNKNOWN`, **no se inventa un motivo**.
+
+Revisión validada: `42b47dbace7b59d04b366586893f681951b55ec1`; CI [44394459139](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44394459139) **622/622 OK**. Estas pruebas no reproducen el fallo físico.
+
+### Diagnóstico recomendado, sin otra operación destructiva
+
+Primero intentar recuperar el error original leyendo el journal local (no cambia servicios):
+
+```sh
+journalctl -b --no-pager -o short-iso | grep -F 'masqelec-sd-lab-' | tail -n 40
+```
+
+Si no muestra el error de la unidad o la salida es insuficiente, descargar la **versión con diagnóstico fijada** y compilarla:
+
+```sh
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/42b47dbace7b59d04b366586893f681951b55ec1/service.cloud.masqelec/tools/rclone_two_mount_systemd_local_lab.py' -O /tmp/rclone_two_mount_systemd_local_lab.py
+python3 -m py_compile /tmp/rclone_two_mount_systemd_local_lab.py
+python3 /tmp/rclone_two_mount_systemd_local_lab.py --preflight
+```
+
+**Solo si** el preflight nuevo sigue en `READY_FOR_ISOLATED_SYSTEMD`, la salida anterior mostró `CLEANUP=COMPLETE`, no se observan residuos y el operador acepta un nuevo ensayo temporal con `daemon-reload`, ejecutar:
+
+```sh
+python3 /tmp/rclone_two_mount_systemd_local_lab.py --run-isolated-systemd --confirm-isolated-only
+```
+
+Copiar el bloque `FAILED_*`/`SYSTEMD_*` y `CLEANUP`/`LAB_RESULT`. Si la clase es `UNCLASSIFIED`, usar `FAILED_UNIT` de la nueva salida para consultar solo el registro de esa unidad temporal:
+
+```sh
+journalctl -b -u 'UNIDAD_FALLIDA_DEL_LAB.service' -n 35 --no-pager
+```
+
+Sustituir `UNIDAD_FALLIDA_DEL_LAB.service` por la unidad literal indicada por el script; **no** consultar logs de los servicios legacy ni pegar configuraciones/credenciales. Si `FAIL_SYSTEMD_CLEANUP`, no repetir: conservar la raíz temporal y diagnosticar antes de desmontar o borrar nada.
+
+**Pendientes reales**: causa de `FAIL_SERVICE_START`, primer PASS real de 2 FUSE+4 bind gestionados por systemd, reproducción `.strm` y prueba de recuperación ante reinicio real. Tres banderas `False`, ningún cutover de OneDrive autorizado.

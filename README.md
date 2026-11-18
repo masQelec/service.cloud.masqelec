@@ -193,3 +193,7 @@ Versión `develop` con **588/588 tests PASS**. El rollback puede volver a los cu
 ### KodiELEC: laboratorio systemd real, aislado (18-11-2026)
 
 Preparado script para comprobar **2 FUSE + 4 bind gestionados por systemd** sin OneDrive y sin cambiar los 4 montajes legacy. Preflight solo lectura y ejecución temporal bajo `/tmp` con unidades runtime aleatorias. **617/617 pruebas sintéticas OK**; ensayo real pendiente del usuario. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
+
+### Primer ensayo real de systemd: diagnóstico pendiente (18-11-2026)
+
+KodiELEC: preflight READY; piloto `FAIL_SERVICE_START` con `CLEANUP=COMPLETE`. Preparado diagnóstico de unidad fallida, 622/622 tests CI OK; aún **no** existe PASS systemd real. [Runbook y siguiente comando](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
