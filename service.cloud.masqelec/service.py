@@ -265,13 +265,9 @@ def _two_mounts_ready() -> bool:
         if not rclone_two_mount_health.check_two_fuse_four_bind(entries):
             log("_two_mounts_ready: árbol FUSE/bind incorrecto", "WARNING")
             return False
-        for _unit, _idx, _folder, target in rclone_two_mount_health.plan.BIND_MAP:
-            if not os.path.isdir(target):
-                return False
-            files = _safe_listdir(target, timeout=LIST_TIMEOUT)
-            if files is None or not files:
-                log("_two_mounts_ready: ruta bind no disponible", "WARNING")
-                return False
+        # MASTER/CLIENTES: no enumerar OneDrive para comprobar montaje.
+        # check_two_fuse_four_bind valida las seis entradas y fsroot exacto
+        # usando solo información del kernel, sin os.listdir/FUSE I/O.
         return True
     except Exception:
         log("_two_mounts_ready: fallo leyendo mountinfo", "WARNING")
@@ -280,11 +276,11 @@ def _two_mounts_ready() -> bool:
 
 def _mounts_ready() -> bool:
     """
-    Verifica que los montajes rclone están:
-      ✔ en /proc/mounts como fuse.rclone
-      ✔ accesibles
-      ✔ NO vacíos
-      ✔ sin bloquear por FUSE colgado
+    Verifica las rutas rclone usando la tabla de montajes del kernel.
+
+    No hace os.listdir/stat sobre OneDrive: en CLIENTES la biblioteca usa
+    los STRM locales y los remotos sólo se leen al reproducir. Mountinfo
+    acredita estructura montada, NO salud de red ni contenido disponible.
     """
     if rclone_two_mount_boot_guard.recovery_required(
             feature_allowed=getattr(
@@ -337,19 +333,9 @@ def _mounts_ready() -> bool:
             log(f"_mounts_ready: faltan targets montados: {sorted(missing)}", "WARNING")
             return False
 
-        for _, target in REQUIRED_RCLONE_MOUNTS:
-            if not os.path.isdir(target):
-                log(f"_mounts_ready: directorio no existe: {target}", "WARNING")
-                return False
-
-            items = _safe_listdir(target, timeout=LIST_TIMEOUT)
-            if items is None:
-                log(f"_mounts_ready: TIMEOUT listando {target} (posible rclone colgado)", "WARNING")
-                return False
-            if not items:
-                log(f"_mounts_ready: carpeta vacía (montaje incompleto): {target}", "WARNING")
-                return False
-
+        # Sin listados remotos (4 rutas por comprobación). El sistema
+        # declarará montado un FUSE aunque una lectura remota falle:
+        # pruebas de red/contenido son responsabilidad de sondas explícitas.
         return True
 
     except Exception as e:
