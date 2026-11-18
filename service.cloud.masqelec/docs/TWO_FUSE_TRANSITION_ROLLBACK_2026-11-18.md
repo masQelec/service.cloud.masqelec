@@ -131,3 +131,35 @@ LIVE_KODI_MOUNTS_CHANGED=NO
 ```
 
 **Siguiente trabajo SIN desviar el objetivo:** un único adaptador local a `systemctl` + journal + montaje y conciliación de dos tokens al volver a legacy, con pruebas de caída/reinicio; acto seguido, ventana de reproducción inactiva y piloto real en MASTER con permiso específico. No construir coordinador de flota, no cambiar catálogo STRM/función MASTER-CLIENTES, no activar nada automáticamente mientras siga faltando una de esas garantías.
+
+## Adaptador local systemd — prototipo SIN ACTUALIZADOR (18-11-2026)
+
+**Nuevo módulo:** `lib/rclone_two_mount_live_adapter.py`, con `LocalAdapter(live_enabled=False)` por defecto. **NO hay llamada desde `service.py`, ni `--apply` operativo**. Código únicamente en `addon/develop`, no copiado al equipo KodiELEC.
+
+La propuesta une `rclone_two_mount_cutover_engine` con el journal privado, las instalaciones exclusivas y el gate de reproducción Kodi. Revalida las cuatro unidades y montajes legacy **sin apilamientos**, origen crypt y tokens locales, y exige marcador ausente y nombres libres. Antes de detener legacy escribe respaldo duradero, un marcador `cutover_started` que `rollout.mode()` considera `unsafe`, y bloquea el actualizador legacy. Detiene las cuatro unidades, lee el canónico más reciente tras la parada, genera dos configuraciones individuales y seis servicios, arranca dos FUSE y cuatro bind; `Type=simple` se acompaña de esperas de disponibilidad. No crea listados `rclone lsf` ni modifica las bibliotecas.
+
+**Nuevo gate obligatorio para marcar ACTIVE:** `known_media_files=(ruta_1,ruta_2)` con **una ruta multimedia exacta por cuenta OneDrive**, extraída de un `.strm` ya conocido. Deben comenzar por `/storage/.mnt/videos/1/` o `/storage/.mnt/tvshows/1/` y `/storage/.mnt/videos/2/` o `/storage/.mnt/tvshows/2/` respectivamente. No se recorre el sistema remoto: se lee solo 1 byte por archivo con un subproceso Python y límite de 15 segundos por archivo, sin imprimir contenidos. Si no están disponibles, el estado ACTIVE se deniega. **El gate no acredita aún reproducción multimedia completa desde Kodi.**
+
+**Rollback previsto, NO validado en equipo:** detener los cuatro bind y los dos FUSE; comprobar que ambos procesos escritores realmente estén inactivos; recuperar los tokens actualizados de los dos `account*.conf` y conciliarlos con el canónico local sin reemplazar Google Drive/crypt; restaurar cuatro servicios legacy y verificar montaje. Persistencia de journal bajo bloqueo exclusivo. Si se detecta un conflicto de identidad, estado o tokens, se suspende la recuperación automática y requiere intervención.
+
+**Evidencia:** [GitHub Actions 44364099119](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44364099119): **530/530 tests OK** (incluye 18 tests nuevos del adaptador y 3 del sondeo multimedia con timeout, además de los 507 anteriores). Todas las pruebas del adaptador usan montajes/systemd simulados y rutas temporales. El MASTER real solo ha pasado preflight y piloto FUSE/bind **local ficticio**.
+
+### Gates de lanzamiento aún cerrados
+
+1. **Reinicio abrupto:** journal permite detectar estado interrumpido pero **no existe recuperador de boot validado**. No decir «rollback automático garantizado» ni usar el código durante apagones o reinicios probables.
+2. **Escritores del canónico OAuth:** la lectura-validación previa a `os.replace` no es un CAS coordinado con otros rclone que puedan modificar tokens de Google Drive. Se debe excluir escritor concurrente o implantar una recuperación que no reescriba el canónico compartido.
+3. **Reproducción inactiva y recuperación real:** el callback JSON-RPC de Kodi no está integrado en la versión desplegada; no se ha ejecutado `systemctl stop/start` real para v2, ni prueba `.strm` real.
+4. **Operación final:** confirmar rutas conocidas (una por cuenta), backup cerrado, orden y rollback de todos los servicios, y ensayar en ventana sin reproducción. La función `execute_with_local_lock` exige argumentos de autorización, y el constructor está deshabilitado por defecto: **no utilizarla todavía como un comando de operación**.
+
+```text
+MASTER_PREFLIGHT_READ_ONLY=PASS_REAL
+KODIELEC_TWO_FUSE_FOUR_BIND_LOCAL=PASS_REAL
+GITHUB_CI=530/530_PASS
+ADAPTER_CODE=IMPLEMENTED_DISABLED_PROTOTYPE
+ADAPTER_ATTACHED_TO_ADDON=NO
+REAL_ONEDRIVE_CUTOVER=NOT_EXECUTED
+REAL_BOOT_CRASH_RECOVERY=NOT_VERIFIED
+RCLONE_TWO_MOUNT_STAGING_ENABLED=False
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False
+RCLONE_TOKEN_SYNC_ENABLED=False
+```

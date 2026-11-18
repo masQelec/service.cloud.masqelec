@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **507/507 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **530/530 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 
@@ -122,3 +122,7 @@ PREFLIGHT_RESULT=PASS_READ_ONLY
 ### MASTER listo para preparación; ejecutor live aún bloqueado (18-11-2026)
 
 El operador confirmó `PREFLIGHT_RESULT=PASS_READ_ONLY` con `CONFIG`, `LEGACY_UNITS`, `LEGACY_MOUNTS`, `LEGACY_SERVICES`, `NEW_MOUNTS_ABSENT`, `NEW_UNITS_ABSENT`, `ROLLOUT_STATE_LEGACY` = PASS. Sin OAuth, cambios de sistema ni verificación de playback. Implementados motor puro, gate Kodi JSON-RPC, journal persistente y escritura exclusiva de artefactos, **sin adaptador systemd real**. **507/507 tests PASS** (GitHub Actions [44361419430](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44361419430)); no activación ni rollback operativo. Ver [protocolo](TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
+
+### Adapter local v2, 530/530 CI OK (18/11/2026)
+
+Se añadió `lib/rclone_two_mount_live_adapter.py` al código de `develop` con ejecución explícitamente deshabilitada por defecto y sin integración en `service.py`. Revalida montajes legacy sin apilamientos, usa journal y operaciones systemd limitadas, conserva tokens locales, y exige leer un fichero conocido de cada cuenta antes de marcar ACTIVE (límite 15 s por lectura; no explora OneDrive). CI **530/530 PASS**: [run 44364099119](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44364099119). **NO probado con systemd/OneDrive reales; no cutover, no boot recovery.** Riesgo de escritura OAuth concurrente sobre `rclone.conf` aún sin cerrar. [Detalles y próximos gates](TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).

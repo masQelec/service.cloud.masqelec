@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 18-11-2026.** GitHub Actions **507/507 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+> **Estado actualizado: 18-11-2026.** GitHub Actions **530/530 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## ¿Qué es?
 
@@ -177,3 +177,7 @@ Disponible verificación standalone de configuración, cuatro servicios legacy/m
 ### Transición transaccional v2 — 18/11/2026
 
 El MASTER ha pasado el preflight **real de solo lectura**. Preparados motor de transición/rollback con inyección de fallos, gate Kodi inactivo, journal privado y escritura exclusiva. **507/507 tests CI OK**. Aún falta el adaptador systemd y probar cutover/reinicio reales; flags apagados. [Procedimiento](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
+
+### Adaptador local desactivado, sin cambios de producción (18/11/2026)
+
+Prototipo para ejecutar transición y rollback con journal, Kodi idle, dos FUSE y cuatro bind; pruebas **530/530 OK**. El MASTER sigue con los cuatro montajes legacy. Pendiente recuperación tras reboot y coordinación de escritura OAuth. [Protocolo](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
