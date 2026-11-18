@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 18-11-2026.** GitHub Actions **424/424 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+> **Estado actualizado: 18-11-2026.** GitHub Actions **440/440 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## ¿Qué es?
 
@@ -169,3 +169,7 @@ El preflight real halló `RCLONE_MOUNT_FLAGS=NO` con FUSE y herramientas de mont
 ### Arranque seguro y rollback OAuth (18-11-2026)
 
 Generadas unidades bind que esperan de forma acotada al montaje FUSE de `Type=simple` y una función pura para reintroducir en el canónico los tokens OneDrive renovados por dos montajes aislados, sin tocar Google Drive. **424/424 tests CI PASS**. No hay migración automática ni instalación. [Pendientes y controles](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
+
+### Preflight real de transición 4→2 (18-11-2026)
+
+Disponible verificación standalone de configuración, cuatro servicios legacy/mountinfo y ausencia de unidades v2; **solo lectura**. Suite 440/440 OK. El diagnóstico del MASTER debe preceder a cualquier corte. [Comando y gates](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
