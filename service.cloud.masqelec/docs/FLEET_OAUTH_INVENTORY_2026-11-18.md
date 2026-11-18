@@ -123,3 +123,51 @@ SYSTEMD_LOCAL_LAB=PASS_REAL
 Ejecutar el **mismo** `rclone_two_mount_fleet_inventory.py --inventory` (referencia fija de la sección anterior) en cada CLIENTE **que utilice las mismas cuentas**, con root y sin cambios systemd. Rotular la salida manualmente como `CLIENTE 1`, `CLIENTE 2`, etc.; no introducir hostname, IP, remotos, configuraciones o tokens en los informes públicos. No exigir `4/4` en CLIENTES: ese patrón se ha comprobado en MASTER y el cliente puede tener una distribución distinta. Guardar la cantidad real de clientes inventariados y contrastarla con el inventario de equipos conocidos antes de declarar cobertura.
 
 Hasta que se identifiquen y coordinen **todos** los escritores potenciales entre dispositivos y ventanas programadas, no iniciar `lsf`, `rclone mount` extra, sondas OAuth ni transición. La existencia de cuatro rclone activos en MASTER impide interpretar un sondeo adicional como aislado.
+
+## Resultado físico CLIENTE 1 — 2026-11-18: PASS_READ_ONLY
+
+El operador identifica como **CLIENTE 1** el segundo dispositivo verificado (el script devuelve `DEVICE_ROLE=NOT_ATTESTED` porque no certifica el rol por sí solo). Salida recibida:
+
+```text
+LAB_MODE=FLEET_OAUTH_LOCAL_INVENTORY_READ_ONLY
+REMOTE_REQUESTS=NO
+CANONICAL_CONFIG_READ=NO
+TOKEN_VALUES_PRINTED=NO
+COMMAND_LINE_INSPECTED=YES_LOCAL_ONLY
+PROCESS_ARGUMENTS_PRINTED=NO
+MOUNT_OR_SYSTEMD_MUTATIONS=NO
+DEVICE_ROLE=NOT_ATTESTED
+ROOT=YES
+PROC_INSPECTION=COMPLETE
+MOUNTINFO_INSPECTION=COMPLETE
+RCLONE_PROCESSES=4
+RCLONE_MOUNT_PROCESSES=4
+RCLONE_OTHER_PROCESSES=0
+RCLONE_UNCLASSIFIED=0
+RCLONE_FUSE_MOUNTS=4
+LEGACY_MOUNT_TARGETS=4/4
+V2_FUSE_ROOTS=0/2
+STACKED_KODI_OR_V2_TARGETS=0
+OTHER_RCLONE_FUSE_MOUNTS=0
+SINGLE_SNAPSHOT_STABILITY=NOT_VERIFIED
+OTHER_DEVICES_INSPECTED=NO
+FLEET_OAUTH_COORDINATION=NOT_VERIFIED
+REAL_OAUTH_PROBE_ALLOWED=NO
+CUTOVER_AUTHORIZED=NO
+INVENTORY_RESULT=PASS_READ_ONLY
+```
+
+**Resumen conjunto MASTER + CLIENTE 1:** cada equipo presenta cuatro procesos rclone clasificados como mount y cuatro montajes FUSE legacy, sin roots v2 ni apilamiento observado. Suman **8 procesos rclone mount y 8 montajes FUSE** en estos dos equipos, en dos snapshots tomados en momentos distintos; no se ha medido simultaneidad ni estabilidad temporal. Sin datos sobre otros clientes. Estos resultados NO verifican si los equipos comparten idénticos refresh tokens: el inventario no lee ni calcula huellas de credenciales. No permiten deducir ni autorizar una ventana de exclusión OAuth.
+
+```text
+MASTER_LOCAL_RCLONE_INVENTORY=PASS_READ_ONLY
+CLIENT_1_LOCAL_RCLONE_INVENTORY=PASS_READ_ONLY
+DEVICES_INVENTORIED=2
+TOTAL_CLIENTS=NOT_CONFIRMED
+FLEET_COVERAGE=NOT_VERIFIED
+FLEET_OAUTH_COORDINATION=NOT_VERIFIED
+REAL_OAUTH_PROBE_ALLOWED=NO
+CUTOVER_AUTHORIZED=NO
+```
+
+**Siguiente paso:** confirmar el **número total de CLIENTES** que usan estas cuentas y continuar el inventario exclusivamente de lectura en los restantes. Si CLIENTE 1 es el único, aclarar que aun con cobertura local de ambos dispositivos hacen falta identificación y exclusión de otros escritores OAuth (servicios, timers, scripts, equipos externos) y un protocolo probado de pausa/reinicio antes de autorizar OneDrive real.

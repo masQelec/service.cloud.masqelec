@@ -240,3 +240,7 @@ Nuevo script `tools/rclone_two_mount_fleet_inventory.py` en `addon/develop`, sol
 ### 18/11/2026 — inventario físico MASTER: PASS_READ_ONLY
 
 KodiELEC MASTER reporta `ROOT=YES`, `PROC_INSPECTION=COMPLETE`, `MOUNTINFO_INSPECTION=COMPLETE`; **4 procesos rclone**, los cuatro clasificados como `mount`, otros **0**, montajes FUSE **4**, rutas legacy **4/4**, raíces v2 **0/2**, apilados **0**, FUSE extra **0**, `INVENTORY_RESULT=PASS_READ_ONLY`. No se inspeccionaron otros dispositivos ni estabilidad entre lecturas: `FLEET_OAUTH_COORDINATION=NOT_VERIFIED`, `REAL_OAUTH_PROBE_ALLOWED=NO`, `CUTOVER_AUTHORIZED=NO`. Próximo paso: inventario del conjunto completo de CLIENTES que compartan credenciales, sin ejecutar OAuth adicional. [Registro íntegro](FLEET_OAUTH_INVENTORY_2026-11-18.md).
+
+### 18/11/2026 — CLIENTE 1: inventario local PASS_READ_ONLY
+
+El usuario identifica como **CLIENTE 1** el equipo con `ROOT=YES`, `PROC_INSPECTION=COMPLETE`, `MOUNTINFO_INSPECTION=COMPLETE`, `RCLONE_PROCESSES=4`, `RCLONE_MOUNT_PROCESSES=4`, `RCLONE_OTHER_PROCESSES=0`, `RCLONE_FUSE_MOUNTS=4`, `LEGACY_MOUNT_TARGETS=4/4`, `V2_FUSE_ROOTS=0/2`, `STACKED_KODI_OR_V2_TARGETS=0`, `OTHER_RCLONE_FUSE_MOUNTS=0`. Ya hay **MASTER + CLIENTE 1** inventariados; ocho montajes y ocho rclone mount reportados entre ambos. **TOTAL_CLIENTS=NOT_CONFIRMED**, no se verificó igualdad/validez OAuth ni totalidad de dispositivos. `FLEET_OAUTH_COORDINATION=NOT_VERIFIED`; `REAL_OAUTH_PROBE_ALLOWED=NO`. [Evidencia](FLEET_OAUTH_INVENTORY_2026-11-18.md).
