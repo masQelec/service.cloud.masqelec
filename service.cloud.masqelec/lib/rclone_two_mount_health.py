@@ -81,7 +81,10 @@ def check_layout_at(mountinfo, fuse_roots, bind_map):
 
 
 def check_two_fuse_four_bind(mountinfo):
-    """Valida las cuatro rutas Kodi originales con 2 FUSE + 4 bind."""
+    """Valida rutas Kodi; preserva ValueError del parser legacy estricto."""
+    # Los consumidores existentes distinguen un mountinfo truncado
+    # (excepción) de un layout incompleto pero bien formado (False).
+    mount_entries(mountinfo)
     bind_map = [(index, folder, target)
                 for _, index, folder, target in plan.BIND_MAP]
     return check_layout_at(mountinfo, plan.FUSE_ROOTS, bind_map)
