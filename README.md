@@ -209,3 +209,7 @@ El MASTER KodiELEC confirmó **`PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL` + `CLEANUP=
 ### 18/11/2026 — inventario de escritores rclone sin tocar OAuth
 
 Disponible en `develop` un script standalone de solo lectura para contar procesos rclone y montajes en MASTER y CLIENTES (incluye `cmdline` local, nunca se imprime). **No habilita sondeos OneDrive ni migraciones**: la coordinación entre dispositivos sigue pendiente. [Procedimiento](service.cloud.masqelec/docs/FLEET_OAUTH_INVENTORY_2026-11-18.md).
+
+### 18/11/2026 — inventario rclone MASTER observado
+
+El MASTER KodiELEC tiene **4 rclone mount activos / 4 FUSE legacy**, sin raíces v2 ni apilamientos; inventario local root `PASS_READ_ONLY`. Aún sin coordinación de CLIENTES ni autorización OAuth. [Registro y siguientes gates](service.cloud.masqelec/docs/FLEET_OAUTH_INVENTORY_2026-11-18.md).

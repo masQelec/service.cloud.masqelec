@@ -89,3 +89,7 @@ El operador confirma `CLEANUP=COMPLETE`, `LAB_RESULT=PASS_REAL_SYSTEMD_2FUSE_4BI
 ### 18/11/2026 — inventario OAuth local de flota, sin tokens ni tráfico
 
 Nuevo script `tools/rclone_two_mount_fleet_inventory.py` en `addon/develop`, solo `--inventory`, requiere root. Lee `/proc/PID/comm` y **cmdline local sin imprimirla**, cuenta rclone mount/otros y examina `mountinfo` para cuatro rutas legacy y dos raíces v2; no abre configuraciones, no hace llamadas remotas ni cambia systemd. Cualquier lectura incompleta bloquea. **La captura local NO confirma coordinación de otros dispositivos y NUNCA permite sondeo OAuth**, aunque reporte cero procesos. Ejecutar primero en MASTER y después en cada CLIENTE conocido. [Procedimiento](FLEET_OAUTH_INVENTORY_2026-11-18.md). No desactivar el bloqueo de `--real-probe` ni reiniciar servicios por estos números.
+
+### 18/11/2026 — inventario físico MASTER: PASS_READ_ONLY
+
+KodiELEC MASTER reporta `ROOT=YES`, `PROC_INSPECTION=COMPLETE`, `MOUNTINFO_INSPECTION=COMPLETE`; **4 procesos rclone**, los cuatro clasificados como `mount`, otros **0**, montajes FUSE **4**, rutas legacy **4/4**, raíces v2 **0/2**, apilados **0**, FUSE extra **0**, `INVENTORY_RESULT=PASS_READ_ONLY`. No se inspeccionaron otros dispositivos ni estabilidad entre lecturas: `FLEET_OAUTH_COORDINATION=NOT_VERIFIED`, `REAL_OAUTH_PROBE_ALLOWED=NO`, `CUTOVER_AUTHORIZED=NO`. Próximo paso: inventario del conjunto completo de CLIENTES que compartan credenciales, sin ejecutar OAuth adicional. [Registro íntegro](FLEET_OAUTH_INVENTORY_2026-11-18.md).

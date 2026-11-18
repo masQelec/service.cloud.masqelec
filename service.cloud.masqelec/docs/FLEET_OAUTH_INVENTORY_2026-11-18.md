@@ -70,3 +70,56 @@ INVENTORY_RESULT=PASS_READ_ONLY
 Código `662bc955342fd9f4d1eaed3f3dab8eed753db5db`, CI: 647 pruebas previstas (624 previas + 23 pruebas de inventario y root). Verificar resultado en Actions antes de usar. Los tests usan `/proc` y mountinfo ficticios en directorios temporales, **no** leen las cuentas del MASTER ni CLIENTES.
 
 **Handoff:** paso práctico siguiente: recibir el resumen de inventario LOCAL del MASTER, analizar recuentos y discrepancias, y continuar con CLIENTES sin arrancar OAuth v2. No repetir el laboratorio systemd local, que ya pasó físicamente.
+
+## Resultado físico MASTER — 2026-11-18: PASS_READ_ONLY
+
+Inventario REAL devuelto por el operador desde KodiELEC MASTER (sin credenciales ni argumentos expuestos):
+
+```text
+LAB_MODE=FLEET_OAUTH_LOCAL_INVENTORY_READ_ONLY
+REMOTE_REQUESTS=NO
+CANONICAL_CONFIG_READ=NO
+TOKEN_VALUES_PRINTED=NO
+COMMAND_LINE_INSPECTED=YES_LOCAL_ONLY
+PROCESS_ARGUMENTS_PRINTED=NO
+MOUNT_OR_SYSTEMD_MUTATIONS=NO
+DEVICE_ROLE=NOT_ATTESTED
+ROOT=YES
+PROC_INSPECTION=COMPLETE
+MOUNTINFO_INSPECTION=COMPLETE
+RCLONE_PROCESSES=4
+RCLONE_MOUNT_PROCESSES=4
+RCLONE_OTHER_PROCESSES=0
+RCLONE_UNCLASSIFIED=0
+RCLONE_FUSE_MOUNTS=4
+LEGACY_MOUNT_TARGETS=4/4
+V2_FUSE_ROOTS=0/2
+STACKED_KODI_OR_V2_TARGETS=0
+OTHER_RCLONE_FUSE_MOUNTS=0
+SINGLE_SNAPSHOT_STABILITY=NOT_VERIFIED
+OTHER_DEVICES_INSPECTED=NO
+FLEET_OAUTH_COORDINATION=NOT_VERIFIED
+REAL_OAUTH_PROBE_ALLOWED=NO
+CUTOVER_AUTHORIZED=NO
+INVENTORY_RESULT=PASS_READ_ONLY
+```
+
+**Interpretación exacta:** el MASTER, durante esa lectura, tenía 4 procesos rclone de montaje y 4 entradas FUSE en las rutas legacy; ninguna raíz nueva activa, ningún FUSE extra ni apilamiento detectado. La inspección de /proc y mountinfo fue completa con privilegios root. **No acredita** validación de OAuth, asignación individual de procesos a cuentas, estabilidad temporal, inactividad futura de timers, ausencia de programas rclone renombrados, ni situación en CLIENTES. **No probar OAuth aún**: los escritores de montaje siguen activos.
+
+**Gates:**
+```text
+MASTER_LOCAL_RCLONE_INVENTORY=PASS_READ_ONLY
+MASTER_LEGACY_PATHS=4_OF_4
+LOCAL_EXTRA_RCLONE_PROCESS=NOT_OBSERVED_IN_SNAPSHOT
+CLIENT_FLEET_INVENTORY=NOT_RUN
+FLEET_OAUTH_COORDINATION=NOT_VERIFIED
+REAL_OAUTH_PROBE_ALLOWED=NO
+CUTOVER_AUTHORIZED=NO
+SYSTEMD_LOCAL_LAB=PASS_REAL
+```
+
+### Siguiente obtención de evidencia — clientes reales
+
+Ejecutar el **mismo** `rclone_two_mount_fleet_inventory.py --inventory` (referencia fija de la sección anterior) en cada CLIENTE **que utilice las mismas cuentas**, con root y sin cambios systemd. Rotular la salida manualmente como `CLIENTE 1`, `CLIENTE 2`, etc.; no introducir hostname, IP, remotos, configuraciones o tokens en los informes públicos. No exigir `4/4` en CLIENTES: ese patrón se ha comprobado en MASTER y el cliente puede tener una distribución distinta. Guardar la cantidad real de clientes inventariados y contrastarla con el inventario de equipos conocidos antes de declarar cobertura.
+
+Hasta que se identifiquen y coordinen **todos** los escritores potenciales entre dispositivos y ventanas programadas, no iniciar `lsf`, `rclone mount` extra, sondas OAuth ni transición. La existencia de cuatro rclone activos en MASTER impide interpretar un sondeo adicional como aislado.
