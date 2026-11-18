@@ -82,3 +82,52 @@ PREFLIGHT_RESULT=PASS_READ_ONLY
 
 **PENDIENTES:** prueba real de inactividad Kodi, ubicación segura y durable de los dos snapshots 0600 y su instalación transaccional, secuencia ejecutora con rollback comprobado tras caídas, ensayo de credenciales/crypt/OneDrive real y reproducción. `CUTOVER_EXECUTOR=NOT_IMPLEMENTED`, `CUTOVER_AUTHORIZED=NO`, los tres flags quedan `False`. Mientras esto no exista, no ejecutar `systemctl stop` ni tocar `/storage/.mnt/`. Los montajes de producción siguen intactos.
 
+
+## MASTER: preflight real PASS y motor transaccional aún sin adaptador (18-11-2026)
+
+**Evidencia textual del operador en KodiELEC MASTER** (solo lectura, no activación):
+
+```text
+LAB_MODE=TWO_FUSE_TRANSITION_READ_ONLY
+ONEDRIVE_ACCESSED=NO
+LIVE_CONFIG_WRITE=NO
+RCLONE_TOKEN_VALUES_PRINTED=NO
+MOUNT_OR_SYSTEMD_MUTATIONS=NO
+PLAYBACK_IDLE=NOT_VERIFIED
+CUTOVER_AUTHORIZED=NO
+CONFIG=PASS
+LEGACY_UNITS=PASS
+LEGACY_MOUNTS=PASS
+LEGACY_SERVICES=PASS
+NEW_MOUNTS_ABSENT=PASS
+NEW_UNITS_ABSENT=PASS
+ROLLOUT_STATE_LEGACY=PASS
+PREFLIGHT_RESULT=PASS_READ_ONLY
+```
+
+**Interpretación estricta:** el MASTER tiene la configuración local y las cuatro unidades/montajes legacy correctos, sin restos visibles de v2; junto con el piloto local ficticio `PASS_LOCAL_FUSE_BIND_LAB` confirma prerrequisitos. **No prueba reproducción inactiva, crypt/OneDrive v2 ni posibilidad de rollback de montajes reales.** Ningún servicio real se ha detenido, instalado, habilitado ni reiniciado.
+
+### Código preparado en `addon/develop`
+
+- `lib/rclone_two_mount_cutover_engine.py`: motor de transición con **adaptador inyectado**, sin I/O ni servicios. Bloqueado por defecto salvo gates booleanos estrictos de autorización, Kodi inactivo y rollback preparado. Pasos de parada legacy, instalación, arranque 2 FUSE/4 bind, verificación, marcador ACTIVE; ante fallo, secuencia de rollback. Si no se pueden desmontar los bind/FUSE nuevos, o recuperar tokens, devuelve `MANUAL_RECOVERY_REQUIRED` sin arrancar legacy encima de los nuevos. La excepción/terminación del proceso requiere journal y recuperación operativa real, todavía NO integrados.
+- `lib/rclone_two_mount_kodi_idle.py`: función pura que consulta `Player.GetActivePlayers` mediante callback JSON-RPC de Kodi. Solo `result=[]` explícito = inactivo; errores, música/vídeo activo y respuestas ambiguas bloquean. **No se ha conectado todavía a Kodi real**.
+- `lib/rclone_two_mount_journal.py`: archivos privados 0600 en directorio 0700, lock exclusivo y fases `prepared → cutover_started → active` o `rollback_required → legacy_restored`. Guarda respaldo canónico y cuatro unidades legacy y sincroniza a disco. Detecta interrupciones como recuperación manual requerida. **No está conectado todavía con el marcador de arranque ni con los servicios**; por tanto NO garantiza recuperación automática tras reboot.
+- `lib/rclone_two_mount_atomic_install.py`: instalación de ficheros candidatos 0600/0644 con enlace duro sin sobrescribir, sincronización a disco y retirada conservadora por contenido esperado. No llama `systemctl`, no modifica la configuración activa por sí solo. **No usar para reemplazar a ciegas rclone.conf**: la sustitución de un canónico con otros escritores de OAuth requiere una estrategia adicional de concurrencia.
+
+**Pruebas:** CI final **507/507 PASS**, [run 44361419430](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44361419430). Hay 21 tests del motor con fallos inyectados, 9 del gate Kodi, 22 del journal y 15 del instalador; todas sintéticas. La compatibilidad real de bloqueo `flock`, instalación y nueva reproducción en KodiELEC sigue pendiente.
+
+### GATE que impide activar hoy
+
+```text
+REAL_KODI_IDLE_VERIFIED=NO
+REAL_SYSTEMD_ADAPTER_CONNECTED=NO
+CRASH_RECOVERY_ON_BOOT_VERIFIED=NO
+REAL_ONEDRIVE_CRYPT_TWO_FUSE_TEST=NO
+CUTOVER_EXECUTOR_LIVE=NO
+RCLONE_TWO_MOUNT_STAGING_ENABLED=False
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False
+RCLONE_TOKEN_SYNC_ENABLED=False
+LIVE_KODI_MOUNTS_CHANGED=NO
+```
+
+**Siguiente trabajo SIN desviar el objetivo:** un único adaptador local a `systemctl` + journal + montaje y conciliación de dos tokens al volver a legacy, con pruebas de caída/reinicio; acto seguido, ventana de reproducción inactiva y piloto real en MASTER con permiso específico. No construir coordinador de flota, no cambiar catálogo STRM/función MASTER-CLIENTES, no activar nada automáticamente mientras siga faltando una de esas garantías.

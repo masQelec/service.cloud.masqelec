@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **440/440 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **507/507 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 
@@ -118,3 +118,7 @@ PREFLIGHT_RESULT=PASS_READ_ONLY
 
 **PENDIENTES:** prueba real de inactividad Kodi, ubicación segura y durable de los dos snapshots 0600 y su instalación transaccional, secuencia ejecutora con rollback comprobado tras caídas, ensayo de credenciales/crypt/OneDrive real y reproducción. `CUTOVER_EXECUTOR=NOT_IMPLEMENTED`, `CUTOVER_AUTHORIZED=NO`, los tres flags quedan `False`. Mientras esto no exista, no ejecutar `systemctl stop` ni tocar `/storage/.mnt/`. Los montajes de producción siguen intactos.
 
+
+### MASTER listo para preparación; ejecutor live aún bloqueado (18-11-2026)
+
+El operador confirmó `PREFLIGHT_RESULT=PASS_READ_ONLY` con `CONFIG`, `LEGACY_UNITS`, `LEGACY_MOUNTS`, `LEGACY_SERVICES`, `NEW_MOUNTS_ABSENT`, `NEW_UNITS_ABSENT`, `ROLLOUT_STATE_LEGACY` = PASS. Sin OAuth, cambios de sistema ni verificación de playback. Implementados motor puro, gate Kodi JSON-RPC, journal persistente y escritura exclusiva de artefactos, **sin adaptador systemd real**. **507/507 tests PASS** (GitHub Actions [44361419430](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44361419430)); no activación ni rollback operativo. Ver [protocolo](TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
