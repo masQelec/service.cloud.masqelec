@@ -24,6 +24,8 @@ from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_startup_stage as stage
 from lib import rclone_two_mount_token_rollback as oauth
 from lib import rclone_conf_merge as conf
+from lib import rclone_two_mount_recovery_units as recovery_units
+from lib import rclone_token_policy as token_policy
 from lib import constants
 
 
@@ -110,6 +112,8 @@ class LocalAdapter:
         if (os.path.lexists(self.state_path)
                 or any(os.path.lexists(os.path.join(self.unit_dir, x))
                        for x in rollout.NEW_SERVICES + rollout.BIND_SERVICES)
+                or any(os.path.lexists(os.path.join(self.unit_dir, x + ".d"))
+                       for x in rollout.LEGACY_SERVICES)
                 or any(os.path.lexists(path) for path in self.account_confs)):
             return False
         raw, _ = stage._read_file(self.canonical, confidential=True)
@@ -367,12 +371,10 @@ class LocalAdapter:
         return True
 
     def _rewrite_canonical_if_stable(self, baseline, new):
-        """Nunca reemplazar rclone.conf mientras haya escritores externos.
+        """Guarda tokens rotados SIN reescribir el canónico compartido.
 
-        rclone NO respeta flock del addon: ni comparar mtime/inode antes de
-        os.replace puede impedir una renovación simultánea de Google Drive.
-        El candidato reconciliado queda en journal PRIVADO para una fase
-        posterior con todos los escritores efectivamente detenidos.
+        Devuelve ruta privada si el rollback requiere override; None si
+        no hubo renovación. rclone no coopera con locks del addon.
         """
         self._require_enabled()
         current, _generation = stage._read_file(self.canonical,
@@ -380,17 +382,48 @@ class LocalAdapter:
         if current != baseline:
             raise ValueError("Canonical changed during rollback")
         if current == new:
-            return
+            return None
         if self.txn is None or journal.phase(self.txn) not in (
                 "cutover_started", "active", "rollback_required"):
             raise ValueError("Missing rollback journal")
-        # No reemplaza ni reescribe la configuración compartida. Evita
-        # perder tokens Google Drive por un cambio concurrente sin CAS.
-        journal._write_new(
-            os.path.join(self.txn, "canonical-recovery-candidate.conf"), new)
+        file = os.path.join(
+            self.txn, "canonical-recovery-candidate.conf")
+        journal._write_new(file, new)
         journal._sync(self.txn)
-        raise RuntimeError(
-            "Shared canonical not safely quiesced; manual recovery required")
+        return file
+
+    def _install_legacy_recovery_overrides(self, recovery_file):
+        """Una sola config de rollback privado; NO modifica rclone.conf.
+
+        Drop-ins systemd ExecStart apuntan a esta config. El servicio legacy
+        original sigue intacto. Si hay fallo parcial, no reiniciar legacy:
+        marker/journal fuerzan recuperación manual.
+        """
+        self._require_enabled()
+        if self.units is None or self.txn is None:
+            raise ValueError("Missing durable unit inventory")
+        expected = os.path.join(
+            self.txn, "canonical-recovery-candidate.conf")
+        if recovery_file != expected:
+            raise ValueError("Unexpected recovery config path")
+        raw, _ = stage._read_file(recovery_file, confidential=True)
+        token_policy.validate_master_layout(raw)
+        dropins = recovery_units.overrides(self.units, recovery_file)
+        for unit in rollout.LEGACY_SERVICES:
+            parent = os.path.join(self.unit_dir, unit + ".d")
+            # No sobreescribir otros drop-ins ni heredar configuraciones de
+            # ejecución externas que pudieran alterar el rollback.
+            if os.path.lexists(parent):
+                raise FileExistsError("Existing legacy drop-in directory")
+        for unit in rollout.LEGACY_SERVICES:
+            parent = os.path.join(self.unit_dir, unit + ".d")
+            os.mkdir(parent, 0o700)
+            journal._private_dir(parent)
+            atomic.install_exclusive(
+                os.path.join(parent, recovery_units.DROPIN),
+                dropins[unit], 0o644)
+        journal._sync(self.unit_dir)
+        self._systemctl("daemon-reload")
 
     def reconcile_and_restore_legacy(self):
         self._require_enabled()
@@ -412,7 +445,9 @@ class LocalAdapter:
                 snapshots.append(raw)
             new = oauth.reconcile_canonical_for_rollback(
                 self.at_stop, current, snapshots[0], snapshots[1])
-            self._rewrite_canonical_if_stable(current, new)
+            private_config = self._rewrite_canonical_if_stable(current, new)
+            if private_config is not None:
+                self._install_legacy_recovery_overrides(private_config)
         elif self.baseline is not None:
             # Falla antes de instalar v2: no se sobrescriben tokens canónicos.
             if not conf.same_non_token_settings(self.baseline, current):

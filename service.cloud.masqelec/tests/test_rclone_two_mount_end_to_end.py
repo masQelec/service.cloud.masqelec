@@ -227,7 +227,7 @@ class IntegratedCutoverTests(unittest.TestCase):
         self.assertTrue(boot.recovery_required(
             parent=str(self.txn_parent), state_path=str(self.marker)))
 
-    def test_refreshed_one_drive_requires_manual_recovery_and_no_clobber(self):
+    def test_refreshed_onedrive_uses_private_legacy_override_no_clobber(self):
         def rotate(unit):
             if unit == rollout.NEW_SERVICES[0]:
                 config = self.accounts / "account1.conf"
@@ -240,23 +240,25 @@ class IntegratedCutoverTests(unittest.TestCase):
                 config.write_bytes(updated)
         self.system.on_start = rotate
         self.system.fail_start.add(rollout.BIND_SERVICES[1])
-        self.assertEqual(self.run_cutover(), "MANUAL_RECOVERY_REQUIRED")
+        self.assertEqual(self.run_cutover(), "ROLLED_BACK")
         self.assertEqual(self.original, self.conf.read_bytes())
-        self.assertFalse(self.system.active.intersection(
-            set(rollout.NEW_SERVICES + rollout.BIND_SERVICES)))
-        self.assertTrue(self.marker.exists())
-        self.assertTrue(boot.recovery_required(
+        self.assertEqual(self.system.active, set(rollout.LEGACY_SERVICES))
+        self.assertFalse(self.marker.exists())
+        self.assertFalse(boot.recovery_required(
             parent=str(self.txn_parent), state_path=str(self.marker)))
         self.assertEqual(journal.phase(self.adapter.txn),
-                         "rollback_required")
+                         "legacy_restored")
         recovery = Path(self.adapter.txn, "canonical-recovery-candidate.conf")
         self.assertTrue(recovery.exists())
         self.assertEqual(recovery.stat().st_mode & 0o777, 0o600)
         self.assertIn(b"ROTATED_REFRESH_ONEDRIVE_1",
                       recovery.read_bytes())
-        self.assertFalse(any(x[1] == "start"
-                             and x[2] in rollout.LEGACY_SERVICES
-                             for x in self.system.actions))
+        for unit in rollout.LEGACY_SERVICES:
+            dropin = self.units / (unit + ".d") / (
+                "90-masqelec-oauth-recovery.conf")
+            self.assertTrue(dropin.is_file())
+            self.assertIn(str(recovery), dropin.read_text())
+            self.assertIn(b"--config", dropin.read_bytes())
 
     def test_crash_after_marker_requires_recovery_without_legacy_restart(self):
         with journal.locked(str(self.txn_parent)):

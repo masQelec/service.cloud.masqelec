@@ -138,6 +138,10 @@ class AdapterTests(unittest.TestCase):
                              x[2] in rollout.LEGACY_SERVICES
                              for x in actions))
 
+    def test_preflight_refuses_existing_legacy_dropin(self):
+        (self.units / (rollout.LEGACY_SERVICES[0] + ".d")).mkdir()
+        self.assertFalse(self.adapter.legacy_preflight())
+
     def test_preflight_refuses_existing_v2_unit(self):
         (self.units / rollout.NEW_SERVICES[0]).write_bytes(b"[Unit]\n")
         self.assertFalse(self.adapter.legacy_preflight())
@@ -284,11 +288,12 @@ class AdapterTests(unittest.TestCase):
             updated = original.replace(
                 b"refresh-users_library_1", b"offline-rotated-refresh")
             self.assertNotEqual(original, updated)
-            with self.assertRaisesRegex(RuntimeError, "manual recovery"):
-                self.adapter._rewrite_canonical_if_stable(original, updated)
+            output = self.adapter._rewrite_canonical_if_stable(
+                original, updated)
             self.assertEqual(self.config.read_bytes(), original)
             staged = Path(self.adapter.txn,
                           "canonical-recovery-candidate.conf")
+            self.assertEqual(output, str(staged))
             self.assertEqual(staged.read_bytes(), updated)
             self.assertEqual(staged.stat().st_mode & 0o777, 0o600)
 
@@ -343,8 +348,7 @@ class AdapterTests(unittest.TestCase):
     def test_integrated_rollback_stages_refreshed_oauth_but_does_not_write_shared(self):
         original = self._prepare_reconcile_context(rotated=True)
         with journal.locked(str(self.txn)):
-            with self.assertRaisesRegex(RuntimeError, "manual recovery"):
-                self.adapter.reconcile_and_restore_legacy()
+            self.adapter.reconcile_and_restore_legacy()
         self.assertEqual(self.config.read_bytes(), original)
         self.assertEqual(journal.phase(self.adapter.txn), "rollback_required")
         candidate = Path(self.adapter.txn,
@@ -359,6 +363,12 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(
             policy.oauth_tokens(content)["logs"],
             policy.oauth_tokens(original)["logs"])
+        for unit in rollout.LEGACY_SERVICES:
+            dropin = self.units / (unit + ".d") / (
+                "90-masqelec-oauth-recovery.conf")
+            self.assertTrue(dropin.is_file())
+            self.assertIn(str(candidate), dropin.read_text())
+            self.assertNotIn("refresh_token", dropin.read_text())
 
     def test_integrated_rollback_without_token_rotation_leaves_canonical_intact(self):
         original = self._prepare_reconcile_context(rotated=False)
