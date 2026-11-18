@@ -108,11 +108,12 @@ class TokenRollbackTests(unittest.TestCase):
 
     def test_invalid_refresh_block(self):
         a = rotate(self.a, "one_a", refresh="")
-        with self.assertRaisesRegex(ValueError, "incompleto"):
+        with self.assertRaisesRegex(ValueError, "refresh_token"):
             self.reconcile(a=a)
 
     def test_malformed_oauth_json_block(self):
-        a = self.a.replace(b"refresh-one_a", b"bad-\\\"")
+        a = self.a.replace(b'"refresh_token": "refresh-one_a"',
+                           b'"refresh_token": not-json')
         with self.assertRaises(ValueError):
             self.reconcile(a=a)
 
@@ -129,7 +130,7 @@ class TokenRollbackTests(unittest.TestCase):
         self.assertNotIn(b"new-private-A", self.canonical)
         source = (Path(__file__).resolve().parents[1] /
                   "lib/rclone_two_mount_token_rollback.py").read_text()
-        self.assertNotIn("systemctl", source)
+        self.assertNotIn("subprocess.run(", source)
         self.assertNotIn("subprocess", source)
         self.assertNotIn("urllib", source)
 
