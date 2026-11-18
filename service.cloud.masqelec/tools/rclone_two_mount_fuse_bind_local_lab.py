@@ -57,15 +57,48 @@ _TEMP_ROOT = "/tmp"
 _SAMPLE = b"masQelec-local-pilot-placeholder\n"
 
 
+def rclone_binary():
+    """El binario KodiELEC suele vivir fuera de PATH; no ejecuta nada."""
+    for path in (
+            "/storage/.config/rclone/rclone", "/usr/bin/rclone",
+            "/usr/local/bin/rclone"):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return shutil.which("rclone")
+
+
+def _rclone_mount_flags_supported(executable):
+    """Consulta ayuda local del binario, sin llamar a ningún backend."""
+    if not executable:
+        return False
+    try:
+        help_text = subprocess.run(
+            [executable, "mount", "--help"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            check=False, timeout=12,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if help_text.returncode:
+        return False
+    return all(flag in help_text.stdout for flag in (
+        b"--read-only", b"--vfs-cache-mode", b"--config"))
+
+
 def prerequisites():
-    """Solo estructura, sin dar por probado un montaje."""
+    """Solo estructura, sin dar por probado Type=notify ni un montaje."""
+    binary = rclone_binary()
+    try:
+        fuse = (os.path.exists("/dev/fuse") and
+                stat.S_ISCHR(os.stat("/dev/fuse").st_mode))
+    except OSError:
+        fuse = False
     return {
-        "rclone": shutil.which("rclone") is not None,
+        "rclone": binary is not None,
+        "rclone_mount_flags": _rclone_mount_flags_supported(binary),
         "mount": shutil.which("mount") is not None,
         "umount": shutil.which("umount") is not None,
-        "fuse_device": (
-            os.path.exists("/dev/fuse") and
-            stat.S_ISCHR(os.stat("/dev/fuse").st_mode)),
+        "fuse_device": fuse,
         "mountinfo": os.path.isfile("/proc/self/mountinfo"),
         "privileged": os.geteuid() == 0,
     }
@@ -189,7 +222,7 @@ def run_local_pilot():
 
         for src, point in zip(sources, fuse):
             proc = subprocess.Popen(
-                ["rclone", "mount", str(src), point,
+                [rclone_binary(), "mount", str(src), point,
                  "--config", "/dev/null", "--read-only",
                  "--vfs-cache-mode", "off"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
