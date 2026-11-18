@@ -198,7 +198,8 @@ class LocalFuseBindPilotTests(unittest.TestCase):
                  mock.patch.object(lab.subprocess, "Popen",
                                    return_value=DummyProcess()), \
                  mock.patch("builtins.open",
-                            return_value=io.BytesIO(lab._SAMPLE)), \
+                            side_effect=lambda *args, **kwargs:
+                                io.BytesIO(lab._SAMPLE)), \
                  contextlib.redirect_stdout(io.StringIO()) as output:
                 result = lab.run_local_pilot()
         return result, output.getvalue()
