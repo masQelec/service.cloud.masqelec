@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Overrides de rollback: config aislado; sin cambio de unidades originales."""
 import sys
+import shlex
 from pathlib import Path
 import unittest
 
@@ -27,7 +28,14 @@ class RecoveryOverridesTests(unittest.TestCase):
             self.assertTrue(text.startswith(
                 "[Service]\nExecStart=\nExecStart="))
             old_args = isolation._start_args(original[unit])
-            new_args = isolation._start_args(results[unit])
+            # Drop-in systemd: primer ExecStart= vacío resetea el servicio;
+            # la segunda directiva contiene el comando efectivo.
+            commands = [line[len("ExecStart="):]
+                        for line in text.splitlines()
+                        if line.startswith("ExecStart=")]
+            self.assertEqual(len(commands), 2)
+            self.assertEqual(commands[0], "")
+            new_args = shlex.split(commands[1])
             self.assertEqual(old_args[:4], new_args[:4])
             self.assertEqual(
                 isolation._config_arg(new_args), RECOVERY)
