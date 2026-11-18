@@ -10,15 +10,12 @@ import stat
 import tempfile
 import urllib.parse
 
-from lib import catalog_utils
 from lib import constants
-from lib import device_utils
 from lib import rclone_two_mount_config_routes as routes
 from lib import rclone_two_mount_master_sync as master
 from lib import rclone_two_mount_plan as plan
 from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_startup_stage as stage
-from lib import rclone_token_sync as tokens
 
 API = "https://api.github.com/repos/masQelec/cloud.masqelec"
 BRANCH = "develop"
@@ -31,7 +28,10 @@ class GitHubV2Transport:
         if not isinstance(token, str) or not token:
             raise ValueError("GitHub token required")
         self._token = token
-        self._request = request if request is not None else catalog_utils._req
+        if request is None:
+            from lib import catalog_utils
+            request = catalog_utils._req
+        self._request = request
         if not callable(self._request):
             raise ValueError("GitHub request callback required")
 
@@ -104,7 +104,24 @@ def _probe_candidate(candidate, names):
             stream.write(candidate)
             stream.flush()
             os.fsync(stream.fileno())
+        from lib import rclone_token_sync as tokens
         return {name: tokens._probe(name, path) for name in names}
+
+
+
+def _get_role():
+    from lib import device_utils
+    return device_utils.get_device_role()
+
+
+def _get_device_key():
+    from lib import device_utils
+    return device_utils.get_key_from_authorized_keys()
+
+
+def _get_gh_token():
+    from lib import catalog_utils
+    return catalog_utils._gh_get_plain_token()
 
 
 def run_once(*, release_authorized=False, request=None,
@@ -121,14 +138,14 @@ def run_once(*, release_authorized=False, request=None,
             getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED", False)
             is not True or
             constants.CLOUD_BRANCH != BRANCH or
-            device_utils.get_device_role() != "MASTER" or
+            _get_role() != "MASTER" or
             rollout.mode(True) != "active"):
         return "blocked_master_not_ready"
     try:
         secret_key = key if key is not None else (
-            device_utils.get_key_from_authorized_keys())
+            _get_device_key())
         gh_token = token if token is not None else (
-            catalog_utils._gh_get_plain_token())
+            _get_gh_token())
         if not secret_key or not gh_token:
             return "blocked_missing_credentials"
         gh = GitHubV2Transport(gh_token, request=request)

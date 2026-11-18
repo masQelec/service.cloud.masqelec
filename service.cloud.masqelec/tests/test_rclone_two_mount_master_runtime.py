@@ -104,7 +104,7 @@ class MasterV2RuntimeTests(unittest.TestCase):
                                True), \
              mock.patch.object(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
                                True, create=True), \
-             mock.patch.object(runtime.device_utils, "get_device_role",
+             mock.patch.object(runtime, "_get_role",
                                return_value="CLIENT"), \
              mock.patch.object(runtime, "GitHubV2Transport",
                                side_effect=AssertionError("network")):
@@ -116,7 +116,7 @@ class MasterV2RuntimeTests(unittest.TestCase):
                                True), \
              mock.patch.object(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
                                True, create=True), \
-             mock.patch.object(runtime.device_utils, "get_device_role",
+             mock.patch.object(runtime, "_get_role",
                                return_value="MASTER"), \
              mock.patch.object(runtime.rollout, "mode",
                                return_value="legacy"), \
@@ -131,7 +131,7 @@ class MasterV2RuntimeTests(unittest.TestCase):
                                True), \
              mock.patch.object(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
                                True, create=True), \
-             mock.patch.object(runtime.device_utils, "get_device_role",
+             mock.patch.object(runtime, "_get_role",
                                return_value="MASTER"), \
              mock.patch.object(runtime.rollout, "mode",
                                return_value="active"), \
