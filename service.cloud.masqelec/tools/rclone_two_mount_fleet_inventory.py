@@ -2,7 +2,7 @@
 """Inventario LOCAL de escritores rclone/OAuth para MASTER y CLIENTES.
 
 Solo lee /proc/PID/comm, /proc/PID/cmdline y /proc/self/mountinfo.
-No lee rclone.conf, NO ejecuta rclone, no llama red, no imprime argv
+No lee configuraciones ni credenciales, NO ejecuta rclone, no llama red
 ni PIDs ni nombres de cuenta. No modifica montajes ni systemd.
 
 Un resultado PASS_READ_ONLY significa inventario local legible, NUNCA
