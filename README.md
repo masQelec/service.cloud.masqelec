@@ -189,3 +189,7 @@ La migración v2 continúa sin desplegar. El addon bloquea actualizaciones legac
 ### 18/11/2026 — motor de recuperación y tokens aislados
 
 Versión `develop` con **588/588 tests PASS**. El rollback puede volver a los cuatro montajes con refresh OneDrive renovado usando configuración privada y drop-ins systemd, sin sobrescribir el canónico de Google Drive. Disponible recuperación explícita desde journal tras interrupción. Sin deploy, sin prueba de crypt real y con flags apagados. [Handoff actualizado](service.cloud.masqelec/docs/HANDOFF_2026-11-18_CRASH_RECOVERY.md).
+
+### KodiELEC: laboratorio systemd real, aislado (18-11-2026)
+
+Preparado script para comprobar **2 FUSE + 4 bind gestionados por systemd** sin OneDrive y sin cambiar los 4 montajes legacy. Preflight solo lectura y ejecución temporal bajo `/tmp` con unidades runtime aleatorias. **617/617 pruebas sintéticas OK**; ensayo real pendiente del usuario. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).

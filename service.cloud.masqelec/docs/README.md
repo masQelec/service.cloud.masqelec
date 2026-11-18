@@ -128,3 +128,5 @@ El operador confirmó `PREFLIGHT_RESULT=PASS_READ_ONLY` con `CONFIG`, `LEGACY_UN
 Se añadió `lib/rclone_two_mount_live_adapter.py` al código de `develop` con ejecución explícitamente deshabilitada por defecto y sin integración en `service.py`. Revalida montajes legacy sin apilamientos, usa journal y operaciones systemd limitadas, conserva tokens locales, y exige leer un fichero conocido de cada cuenta antes de marcar ACTIVE (límite 15 s por lectura; no explora OneDrive). CI **530/530 PASS**: [run 44364099119](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44364099119). **NO probado con systemd/OneDrive reales; no cutover, no boot recovery.** Riesgo de escritura OAuth concurrente sobre `rclone.conf` aún sin cerrar. [Detalles y próximos gates](TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
 
 | [Handoff 18-11: recuperación y OAuth sin clobber](HANDOFF_2026-11-18_CRASH_RECOVERY.md) | Estado actual de cutover, tests 588/588, rollback con drop-ins, condiciones pendientes |
+
+| [Piloto real systemd aislado 2 FUSE + 4 bind](TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md) | Comandos KodiELEC, seguridad, limpieza y límites; 617 tests sintéticos |

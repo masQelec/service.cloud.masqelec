@@ -276,3 +276,7 @@ PREFLIGHT_RESULT=PASS_READ_ONLY
 
 **PENDIENTES:** prueba real de inactividad Kodi, ubicación segura y durable de los dos snapshots 0600 y su instalación transaccional, secuencia ejecutora con rollback comprobado tras caídas, ensayo de credenciales/crypt/OneDrive real y reproducción. `CUTOVER_EXECUTOR=NOT_IMPLEMENTED`, `CUTOVER_AUTHORIZED=NO`, los tres flags quedan `False`. Mientras esto no exista, no ejecutar `systemctl stop` ni tocar `/storage/.mnt/`. Los montajes de producción siguen intactos.
 
+
+## Laboratorio systemd aislado preparado (18-11-2026; NO ejecutado en KodiELEC)
+
+Nuevo script **autocontenido** `tools/rclone_two_mount_systemd_local_lab.py`: preflight exclusivamente lectura; tras confirmación explícita, seis unidades con nombres aleatorios solo en `/run/systemd/system` y dos FUSE + cuatro bind usando fixtures locales solo en `/tmp/masqelec-sd-lab-<16hex>`. Verifica Type=simple, BindsTo/After y bind oneshot con montajes reales, lectura, parada inversa y limpieza obligatoria. No enable, no acceso OAuth, no cambio de rutas Kodi ni servicios legacy; sí realiza `systemctl daemon-reload` global, sin reiniciar servicios. Bloquea un nuevo ensayo si quedan residuos del anterior. **617/617 tests CI PASS** [44391899556](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44391899556), pero NO demuestran systemd/FUSE real en KodiELEC. [Runbook y comandos](TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md). Esperar resultado `READY_FOR_ISOLATED_SYSTEMD` del preflight antes de ejecutar el piloto. Flags de migración siguen `False`.
