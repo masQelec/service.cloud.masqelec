@@ -115,6 +115,18 @@ class LocalAdapter:
             for name in rollout.LEGACY_SERVICES
         }
         plan.generate(raw, units)
+        # Los targets legacy no deben tener capas superpuestas. El último
+        # match de mountinfo no basta si hay dos FUSE sobre la misma ruta.
+        raw_mounts = self.mount_reader()
+        expected = {dst: 0 for _, _, _, dst in plan.BIND_MAP}
+        for line in raw_mounts.splitlines():
+            fields = line.partition(" - ")[0].split()
+            if len(fields) < 5:
+                return False
+            if fields[4] in expected:
+                expected[fields[4]] += 1
+        if set(expected.values()) != {1}:
+            return False
         if not self._old_mounted():
             return False
         entries = self._mounts()
@@ -312,6 +324,10 @@ class LocalAdapter:
 
     def new_fully_unmounted(self):
         self._require_enabled()
+        # FUSE desmontado no implica que el proceso escritor haya muerto.
+        # No leer account*.conf para rollback mientras rclone siga activo.
+        if any(self._active(unit) for unit in rollout.NEW_SERVICES):
+            return False
         entries = self._mounts()
         if any(root in entries for root in plan.FUSE_ROOTS):
             return False

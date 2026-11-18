@@ -91,6 +91,16 @@ class AdapterTests(unittest.TestCase):
         (self.accounts / "account1.conf").write_bytes(b"old")
         self.assertFalse(self.adapter.legacy_preflight())
 
+    def test_preflight_refuses_stacked_legacy_fuse(self):
+        self.mountinfo += "\n" + self.legacy_mountinfo().splitlines()[0]
+        self.assertFalse(self.adapter.legacy_preflight())
+
+    def test_recovery_refuses_active_new_writer_without_mount(self):
+        def active(args):
+            return ("rclone_library_1.service" in args)
+        self.adapter.runner = active
+        self.assertFalse(self.adapter.new_fully_unmounted())
+
     def test_preflight_refuses_existing_marker(self):
         self.marker.write_text("{}")
         self.assertFalse(self.adapter.legacy_preflight())
@@ -110,12 +120,14 @@ class AdapterTests(unittest.TestCase):
 
     def test_mount_guard_identifies_old_and_new(self):
         self.assertTrue(self.adapter._old_mounted())
+        self.adapter.runner = lambda args: False
         self.assertTrue(self.adapter.new_fully_unmounted())
         self.mountinfo += (
             "\n20 1 0:9 / /storage/.mnt/cloud/1 rw - fuse.rclone new rw")
         self.assertFalse(self.adapter.new_fully_unmounted())
 
     def test_mount_guard_detects_v2_bind_in_old_target(self):
+        self.adapter.runner = lambda args: False
         self.mountinfo = (
             "20 1 0:8 /movies /storage/.mnt/videos/1 rw "
             "- fuse.rclone new rw")
