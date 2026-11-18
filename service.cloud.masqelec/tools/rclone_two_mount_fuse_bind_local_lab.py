@@ -18,11 +18,39 @@ import sys
 import tempfile
 import time
 
-ROOT = str(Path(__file__).resolve().parents[1])
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+# Autocontenido: puede descargarse a /tmp y ejecutarse por SSH sin
+# instalar una nueva versión del addon en KodiELEC.
+def _mount_entries(data):
+    """Parseo mínimo de /proc/self/mountinfo; solo datos de montajes."""
+    entries = {}
+    for line in data.splitlines():
+        left, sep, right = line.partition(" - ")
+        a, b = left.split(), right.split()
+        if not sep or len(a) < 6 or len(b) < 3:
+            raise ValueError("mountinfo inválido")
+        entries[a[4]] = {
+            "device": a[2], "fsroot": a[3],
+            "fstype": b[0], "source": b[1],
+        }
+    return entries
 
-from lib import rclone_two_mount_health as health
+
+def _check_alternate_layout(data, fuse, binds):
+    try:
+        entries = _mount_entries(data)
+    except (ValueError, TypeError):
+        return False
+    for index, folder, target in binds:
+        root, child = entries.get(fuse[index]), entries.get(target)
+        if root is None or child is None or root["fstype"] != "fuse.rclone":
+            return False
+        expected = root["fsroot"].rstrip("/") + "/" + folder
+        if child["fsroot"] != expected:
+            return False
+        if any(child[key] != root[key] for key in (
+                "device", "fstype", "source")):
+            return False
+    return True
 
 # Ninguna ruta real /storage es válida como destino en este laboratorio.
 _TEMP_ROOT = "/tmp"
@@ -65,7 +93,7 @@ def _mountinfo():
 
 
 def _is_mounted(path):
-    return path in health.mount_entries(_mountinfo())
+    return path in _mount_entries(_mountinfo())
 
 
 def _wait_for_fuse(proc, target, seconds=12):
@@ -129,7 +157,10 @@ def _cleanup(root, binds, fuse, processes):
         except (OSError, ValueError):
             all_unmounted = False
     if all_unmounted:
-        shutil.rmtree(root)
+        try:
+            shutil.rmtree(root)
+        except OSError:
+            all_unmounted = False
     return all_unmounted
 
 
@@ -173,7 +204,7 @@ def run_local_pilot():
             source_path = str(Path(fuse[index]) / folder)
             _run(["mount", "--bind", source_path, target])
 
-        if not health.check_layout_at(_mountinfo(), fuse, binds):
+        if not _check_alternate_layout(_mountinfo(), fuse, binds):
             return "FAIL_LOCAL_MOUNTINFO_LAYOUT"
 
         for _, _, target in binds:
