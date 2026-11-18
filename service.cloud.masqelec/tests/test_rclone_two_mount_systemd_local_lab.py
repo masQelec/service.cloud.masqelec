@@ -234,6 +234,55 @@ class SystemdLocalLabTests(unittest.TestCase):
         self.assertEqual(starts, names["fuse"] + names["bind"])
         self.assertIn("CLEANUP=COMPLETE", out.getvalue())
 
+    def test_diagnostic_classifies_bind_failure_from_systemd(self):
+        unit = lab._unit_names(ROOT)["bind"][0]
+        raw = (b"LoadState=loaded\nActiveState=failed\n"
+               b"SubState=failed\nResult=exit-code\n"
+               b"ExecMainStatus=0\n"
+               b"ExecStartPre={ path=/bin/sh ; code=exited ; status=1 }\n")
+        with mock.patch.object(lab, "_run",
+                               return_value=(True, raw)):
+            data = lab._service_diagnostic(unit, ROOT)
+        self.assertEqual(data["FAILED_STAGE"], "BIND_VIDEOS_1")
+        self.assertEqual(data["SYSTEMD_PRE_STATUS"], "1")
+        self.assertEqual(data["SYSTEMD_DIAG_CLASS"], "EXECSTARTPRE_FAILURE")
+
+    def test_diagnostic_classifies_missing_binary_in_fuse(self):
+        unit = lab._unit_names(ROOT)["fuse"][1]
+        raw = (b"LoadState=loaded\nActiveState=failed\n"
+               b"Result=exit-code\nExecMainStatus=203\n")
+        with mock.patch.object(lab, "_run",
+                               return_value=(True, raw)):
+            data = lab._service_diagnostic(unit, ROOT)
+        self.assertEqual(data["FAILED_STAGE"], "FUSE_2")
+        self.assertEqual(data["SYSTEMD_DIAG_CLASS"], "EXEC_NOT_FOUND")
+
+    def test_diagnostic_systemctl_unsupported_fails_closed(self):
+        unit = lab._unit_names(ROOT)["bind"][3]
+        with mock.patch.object(lab, "_run", return_value=(False, b"")):
+            data = lab._service_diagnostic(unit, ROOT)
+        self.assertEqual(data["FAILED_STAGE"], "BIND_TVSHOWS_2")
+        self.assertEqual(data["SYSTEMD_RESULT"], "UNKNOWN")
+        self.assertEqual(data["SYSTEMD_DIAG_CLASS"], "UNCLASSIFIED")
+
+    def test_diagnostic_ignores_untrusted_property_values_and_tokens(self):
+        unit = lab._unit_names(ROOT)["fuse"][0]
+        bad = (b"LoadState=loaded; TOKEN=hidden\n"
+               b"Result=exit-code\nExecMainStatus=1\n"
+               b"ExecStart=/private/secret-token\n")
+        with mock.patch.object(lab, "_run", return_value=(True, bad)), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            lab._emit_service_diagnostic(unit, ROOT)
+        self.assertNotIn("secret-token", output.getvalue())
+        self.assertNotIn("TOKEN=hidden", output.getvalue())
+        self.assertIn("FAILED_STAGE=FUSE_1", output.getvalue())
+
+    def test_diagnostic_invalid_unit_never_queries_systemd(self):
+        with mock.patch.object(lab, "_run",
+                               side_effect=AssertionError("no call")):
+            diag = lab._service_diagnostic("rclone_videos_1.service", ROOT)
+        self.assertEqual(diag["FAILED_STAGE"], "INVALID_LAB_UNIT")
+
     def test_service_start_failure_cleans_and_never_passes(self):
         def control(op, unit=None, **kw):
             return not (op == "start" and
@@ -245,8 +294,11 @@ class SystemdLocalLabTests(unittest.TestCase):
              mock.patch.object(lab, "_any_lab_mounted", return_value=False), \
              mock.patch.object(lab, "_write_units"), \
              mock.patch.object(lab, "_control", side_effect=control), \
+             mock.patch.object(lab, "_emit_service_diagnostic") as diagnostic, \
              mock.patch.object(lab, "_cleanup", return_value=True):
             self.assertEqual(lab.run_isolated(), "FAIL_SERVICE_START")
+        diagnostic.assert_called_once_with(
+            lab._unit_names(ROOT)["bind"][1], ROOT)
 
     def test_cleanup_failure_overrides_success_without_false_pass(self):
         with mock.patch.object(lab, "prerequisites",

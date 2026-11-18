@@ -289,6 +289,84 @@ def _control(op, unit=None, *, timeout=40):
     return ok
 
 
+def _service_diagnostic(unit, root):
+    """Metadatos de systemd ANTES de desmontar; nunca journal ni argumentos.
+
+    Propiedades seleccionadas, sin ExecStart ni entorno. Compatible con
+    systemd antiguo: campos no admitidos o ausentes => UNKNOWN.
+    """
+    names = _unit_names(root)
+    order = names["fuse"] + names["bind"]
+    stages = ("FUSE_1", "FUSE_2", "BIND_VIDEOS_1", "BIND_VIDEOS_2",
+              "BIND_TVSHOWS_1", "BIND_TVSHOWS_2")
+    if unit not in order:
+        return {"FAILED_STAGE": "INVALID_LAB_UNIT",
+                "FAILED_UNIT": "UNKNOWN"}
+    values = {
+        "FAILED_STAGE": stages[order.index(unit)],
+        "FAILED_UNIT": unit,
+        "SYSTEMD_LOAD": "UNKNOWN",
+        "SYSTEMD_ACTIVE": "UNKNOWN",
+        "SYSTEMD_SUBSTATE": "UNKNOWN",
+        "SYSTEMD_RESULT": "UNKNOWN",
+        "SYSTEMD_MAIN_STATUS": "UNKNOWN",
+        "SYSTEMD_PRE_STATUS": "UNKNOWN",
+        "SYSTEMD_DIAG_CLASS": "UNCLASSIFIED",
+    }
+    keys = {
+        "LoadState": "SYSTEMD_LOAD",
+        "ActiveState": "SYSTEMD_ACTIVE",
+        "SubState": "SYSTEMD_SUBSTATE",
+        "Result": "SYSTEMD_RESULT",
+        "ExecMainStatus": "SYSTEMD_MAIN_STATUS",
+    }
+    try:
+        argv = ["systemctl", "show", unit, "--no-pager"] + [
+            "--property=" + key for key in (
+                "LoadState", "ActiveState", "SubState", "Result",
+                "ExecMainStatus", "ExecStartPre")]
+        ok, raw = _run(argv, timeout=9, output=True)
+        if ok and isinstance(raw, bytes) and len(raw) < 65536:
+            metadata = raw.decode("utf-8", "replace")
+            for line in metadata.splitlines():
+                key, separator, value = line.partition("=")
+                if not separator:
+                    continue
+                if key in keys and re.fullmatch(
+                        r"[A-Za-z0-9_.:/-]{1,80}", value):
+                    values[keys[key]] = value
+                if key == "ExecStartPre":
+                    matches = re.findall(r"\bstatus=([0-9]{1,4})\b",
+                                         value)
+                    if matches:
+                        values["SYSTEMD_PRE_STATUS"] = matches[-1]
+            if values["SYSTEMD_LOAD"] not in ("loaded", "UNKNOWN"):
+                values["SYSTEMD_DIAG_CLASS"] = "UNIT_LOAD_FAILURE"
+            elif values["SYSTEMD_RESULT"] in (
+                    "dependency", "timeout", "start-limit-hit"):
+                values["SYSTEMD_DIAG_CLASS"] = {
+                    "dependency": "DEPENDENCY_FAILURE",
+                    "timeout": "START_TIMEOUT",
+                    "start-limit-hit": "START_LIMIT",
+                }[values["SYSTEMD_RESULT"]]
+            elif values["SYSTEMD_PRE_STATUS"] not in ("0", "UNKNOWN"):
+                values["SYSTEMD_DIAG_CLASS"] = "EXECSTARTPRE_FAILURE"
+            elif values["SYSTEMD_MAIN_STATUS"] == "203":
+                values["SYSTEMD_DIAG_CLASS"] = "EXEC_NOT_FOUND"
+            elif values["SYSTEMD_MAIN_STATUS"] not in ("0", "UNKNOWN"):
+                values["SYSTEMD_DIAG_CLASS"] = "MAIN_PROCESS_FAILURE"
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return values
+
+
+def _emit_service_diagnostic(unit, root):
+    data = _service_diagnostic(unit, root)
+    # Evitar que un fallo de inspección impida limpiar recursos temporales.
+    for name, value in data.items():
+        print(name + "=" + value)
+
+
 def _read_sample(path):
     try:
         p = subprocess.run(
@@ -435,6 +513,7 @@ def run_isolated():
             else:
                 for name in names["fuse"] + names["bind"]:
                     if not _control("start", name):
+                        _emit_service_diagnostic(name, root)
                         status = "FAIL_SERVICE_START"
                         break
                 else:
