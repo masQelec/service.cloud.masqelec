@@ -83,5 +83,15 @@ class DynamicHealthTests(unittest.TestCase):
             data, (roots[0], "/tmp/absent"), binds))
 
 
+
+    def test_duplicate_folder_per_account_denied(self):
+        data, roots, binds = synthetic_mountinfo()
+        broken = ((0, "movies", binds[0][2]),
+                  (1, "movies", binds[1][2]),
+                  (0, "movies", binds[2][2]),
+                  (1, "tvshows", binds[3][2]))
+        self.assertFalse(health.check_layout_at(data, roots, broken))
+
+
 if __name__ == "__main__":
     unittest.main()

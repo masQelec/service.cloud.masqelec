@@ -55,6 +55,7 @@ def check_layout_at(mountinfo, fuse_roots, bind_map):
         return False
     used = set()
     counts = [0, 0]
+    folders = [set(), set()]
     for item in bind_map:
         if not isinstance(item, (tuple, list)) or len(item) != 3:
             return False
@@ -64,7 +65,10 @@ def check_layout_at(mountinfo, fuse_roots, bind_map):
                 or not isinstance(target, str) or target in used
                 or target in fuse_roots):
             return False
+        if folder in folders[i]:
+            return False
         used.add(target)
+        folders[i].add(folder)
         counts[i] += 1
         root = entries.get(fuse_roots[i])
         child = entries.get(target)
@@ -77,7 +81,8 @@ def check_layout_at(mountinfo, fuse_roots, bind_map):
         if any(child[field] != root[field] for field in (
                 "device", "fstype", "source")):
             return False
-    return counts == [2, 2]
+    return counts == [2, 2] and folders == [
+        {"movies", "tvshows"}, {"movies", "tvshows"}]
 
 
 def check_two_fuse_four_bind(mountinfo):

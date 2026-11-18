@@ -137,5 +137,40 @@ class LocalFuseBindPilotTests(unittest.TestCase):
         self.assertNotIn('"systemctl"', text)
 
 
+
+    def test_kodielec_binary_preferred_to_path(self):
+        def is_file(path):
+            return path == "/storage/.config/rclone/rclone"
+        with mock.patch.object(lab.os.path, "isfile",
+                               side_effect=is_file), \
+             mock.patch.object(lab.os, "access", return_value=True), \
+             mock.patch.object(lab.shutil, "which",
+                               side_effect=AssertionError("PATH not needed")):
+            self.assertEqual(lab.rclone_binary(),
+                             "/storage/.config/rclone/rclone")
+
+    def test_help_checks_flags_without_oauth(self):
+        fake = types.SimpleNamespace(
+            returncode=0,
+            stdout=b"--config --read-only --vfs-cache-mode")
+        with mock.patch.object(lab.subprocess, "run",
+                               return_value=fake) as run:
+            self.assertTrue(lab._rclone_mount_flags_supported("/tmp/rclone"))
+            self.assertEqual(run.call_args.args[0],
+                             ["/tmp/rclone", "mount", "--help"])
+
+    def test_help_missing_flag_blocks_pilot(self):
+        fake = types.SimpleNamespace(
+            returncode=0, stdout=b"--config --read-only")
+        with mock.patch.object(lab.subprocess, "run", return_value=fake):
+            self.assertFalse(lab._rclone_mount_flags_supported("/tmp/rclone"))
+
+    def test_help_timeout_blocks(self):
+        with mock.patch.object(lab.subprocess, "run",
+                               side_effect=lab.subprocess.TimeoutExpired(
+                                   cmd="rclone", timeout=12)):
+            self.assertFalse(lab._rclone_mount_flags_supported("/tmp/rclone"))
+
+
 if __name__ == "__main__":
     unittest.main()
