@@ -214,6 +214,73 @@ class RcloneTokenSyncTests(unittest.TestCase):
         self.assertEqual(status, ["ran"])
 
 
+    def test_v2_master_tick_disabled_by_default_does_not_import_transport(self):
+        self.sync.constants.RCLONE_TOKEN_SYNC_ENABLED = True
+        self.addCleanup(setattr, self.sync.constants, "RCLONE_TOKEN_SYNC_ENABLED", False)
+        with mock.patch.object(
+                self.sync.rclone_two_mount_rollout, "mode",
+                return_value="active"), \
+             mock.patch.object(self.sync.constants,
+                               "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                               True), \
+             mock.patch.object(self.sync.constants,
+                               "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
+                               False), \
+             mock.patch.object(self.sync, "_v2_master_tick") as helper:
+            self.sync.tick()
+        helper.assert_called_once_with()
+
+    def test_v2_master_worker_only_runs_for_master_when_all_gates_true(self):
+        self.sync.constants.RCLONE_TOKEN_SYNC_ENABLED = True
+        self.addCleanup(setattr, self.sync.constants, "RCLONE_TOKEN_SYNC_ENABLED", False)
+        from lib import rclone_two_mount_master_runtime as runtime
+        role = ["CLIENT"]
+        self.sync.device_utils.get_device_role = lambda: role[0]
+        self.sync._last_tick = None
+        with mock.patch.object(
+                self.sync.rclone_two_mount_rollout, "mode",
+                return_value="active"), \
+             mock.patch.object(self.sync.constants,
+                               "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                               True), \
+             mock.patch.object(self.sync.constants,
+                               "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
+                               True), \
+             mock.patch.object(runtime, "run_once",
+                               return_value="created_verified") as sync, \
+             mock.patch.object(self.sync.log_utils, "write_log") as log:
+            self.sync.tick()
+            sync.assert_not_called()
+            role[0] = "MASTER"
+            self.sync.tick()
+            sync.assert_called_once_with(release_authorized=True)
+            self.sync.tick()
+            sync.assert_called_once_with(release_authorized=True)
+        self.assertTrue(log.called)
+
+    def test_v2_master_unknown_status_cannot_leak_into_log(self):
+        self.sync.constants.RCLONE_TOKEN_SYNC_ENABLED = True
+        self.addCleanup(setattr, self.sync.constants, "RCLONE_TOKEN_SYNC_ENABLED", False)
+        from lib import rclone_two_mount_master_runtime as runtime
+        self.sync.device_utils.get_device_role = lambda: "MASTER"
+        self.sync._last_tick = None
+        with mock.patch.object(
+                self.sync.rclone_two_mount_rollout, "mode",
+                return_value="active"), \
+             mock.patch.object(self.sync.constants,
+                               "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                               True), \
+             mock.patch.object(self.sync.constants,
+                               "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
+                               True), \
+             mock.patch.object(runtime, "run_once",
+                               return_value="refresh_token=DO_NOT_LOG"), \
+             mock.patch.object(self.sync.log_utils, "write_log") as log:
+            self.sync.tick()
+        args = str(log.call_args_list)
+        self.assertIn("blocked_unknown_status", args)
+        self.assertNotIn("DO_NOT_LOG", args)
+
     def test_master_does_not_publish_during_live_rclone_write(self):
         self.sync.device_utils.is_master_device = lambda: True
         now = time.time()

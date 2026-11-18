@@ -590,11 +590,69 @@ def _master_cycle(now):
     return status
 
 
+_SAFE_V2_MASTER_RESULTS = {
+    "created_verified", "updated_verified", "unchanged",
+    "blocked_not_authorized", "blocked_master_not_ready",
+    "blocked_missing_credentials", "blocked_missing_dependency",
+    "blocked_repository_unverified", "blocked_remote_unavailable",
+    "blocked_remote_invalid", "blocked_remote_static_change",
+    "blocked_remote_identity", "blocked_local_health",
+    "blocked_local_changed", "blocked_repository_changed",
+    "conflict_no_retry", "put_failed", "put_unconfirmed",
+    "blocked_readback_branch_drift", "blocked_readback_remote_invalid",
+    "blocked_readback_mismatch", "published_local_changed_requires_recheck",
+    "blocked_sync_failure", "blocked_master_runtime",
+}
+
+
+def _v2_master_tick():
+    """Ruta MASTER v2, aislada del recuperador legacy y cerrada por flags.
+
+    Se ejecutará solo en una futura release después de gates OAuth/Kodi.
+    Nunca actúa como uploader de catalog ni reescribe la ruta legacy.
+    """
+    global _last_tick
+    if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is not True or
+            getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED", False)
+            is not True or
+            device_utils.get_device_role() != "MASTER" or
+            constants.CLOUD_BRANCH != "develop"):
+        return
+    now = time.monotonic()
+    if _last_tick is not None and now - _last_tick < MASTER_INTERVAL:
+        return
+    if not _lock.acquire(blocking=False):
+        return
+    try:
+        _last_tick = now
+        try:
+            from lib import rclone_two_mount_master_runtime as v2_runtime
+            status = v2_runtime.run_once(release_authorized=True)
+        except Exception as exc:
+            log_utils.write_log(
+                "[rclone_sync_v2] Excepción (" + type(exc).__name__ + ")",
+                "WARNING")
+            return
+        safe = status if status in _SAFE_V2_MASTER_RESULTS else "blocked_unknown_status"
+        if safe in ("created_verified", "updated_verified"):
+            log_utils.write_log("[rclone_sync_v2] " + safe, "INFO")
+        elif safe != "unchanged":
+            log_utils.write_log("[rclone_sync_v2] " + safe, "WARNING")
+    finally:
+        _lock.release()
+
+
 def tick():
-    """Cada 60s: MASTER autorrecupera o publica; CLIENTE recupera si falla."""
+    """Cada 60s: legacy intacto; MASTER v2 con ruta independiente y flags."""
+
     global _last_tick, _last_master_confirmed_fp, _last_master_remote_checked_at
     global _last_master_onedrive_health_at, _last_master_drive_health_at
     if not getattr(constants, "RCLONE_TOKEN_SYNC_ENABLED", False):
+        return
+    if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is True and rclone_two_mount_rollout.mode(True) == "active"):
+        _v2_master_tick()
         return
     if not _legacy_sync_permitted():
         return
