@@ -149,8 +149,8 @@ class AdapterTests(unittest.TestCase):
         self.adapter.known_media_files = (
             "/storage/.mnt/videos/1/one.mkv",
             "/storage/.mnt/tvshows/2/two.mkv")
-        with mock.patch.object(live.os, "open", return_value=91) as opening, \\
-             mock.patch.object(live.os, "read", return_value=b"x") as reading, \\
+        with mock.patch.object(live.os, "open", return_value=91) as opening, \
+             mock.patch.object(live.os, "read", return_value=b"x") as reading, \
              mock.patch.object(live.os, "close"):
             self.assertTrue(self.adapter._known_media_verified())
         self.assertEqual(opening.call_count, 2)
