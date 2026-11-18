@@ -48,3 +48,36 @@ Microsoft explica que al intercambiar refresh tokens no se revocan automáticame
 **Estado operativo:** `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`, `RCLONE_TWO_MOUNT_STAGING_ENABLED=False`, `RCLONE_TOKEN_SYNC_ENABLED=False`; `AUTO_UPDATE_CUTOVER_IMPLEMENTED=NO`; `V2_MASTER_PUBLISH_IMPLEMENTED=NO`; `V2_CLIENT_AUTH_RECOVERY_IMPLEMENTED=NO`; `RELEASE_AUTHORIZED=NO`. El PASS real systemd LOCAL queda confirmado y **no se necesita repetirlo**.
 
 Este documento fija la **intención** y los requisitos; no afirma que el código ya los implemente.
+
+## 19/11/2026 — Decisión final: archivo MQC2 separado para addon v2 y limpieza legacy tras el primer arranque
+
+**Responsabilidades:** el operador publica el ZIP del addon y garantiza la distribución mediante su repositorio Kodi. No asumir tarea de publicación del ZIP por parte del desarrollador. El **addon actualizado**, en el primer arranque de cada KodiELEC, debe llevar a cabo la transición local de 4 FUSE a 2 FUSE + 4 bind (mismas rutas Kodi). No es una migración manual equipo por equipo.
+
+### Dos rutas remotas independientes
+
+| Destinatario | Archivo en `masQelec/cloud.masqelec` rama `develop` | Estado |
+| --- | --- | --- |
+| Addon legacy | `rclone/rclone.conf.crypt` | EXISTE, no modificar/borrar en esta fase |
+| Addon nuevo v2 | `rclone/rclone-v2.conf.crypt` | RUTA RESERVADA, NO PUBLICADO todavía |
+
+`lib/rclone_two_mount_config_routes.py` es el **selector puro** de rutas implementado y probado: `legacy` y `prepared` eligen el nombre original, `active` elige el v2. Un estado `unsafe` o transitorio no cae silenciosamente al archivo antiguo. La separación es de **distribución de credenciales**, no implica tener simultáneamente dos arquitecturas de FUSE montadas en un dispositivo.
+
+El formato v2 inicialmente puede mantener el **cifrado/autenticación MQC2** y la estructura canónica necesaria para validar identidades y componer un candidato por cuenta; el MASTER debe ensamblar la configuración a partir de los **dos account*.conf actualizados por rclone** y preservar los ajustes/identidades de crypt y las dos cuentas Google Drive, sin publicar snapshots mezclados. El CLIENTE consulta `rclone-v2.conf.crypt` solo cuando detecta un error OAuth inequívoco, lo descifra y valida, y recupera únicamente su cuenta afectada; no sobrescribe una cuenta sana, ni la configuración compartida de Google Drive. La simple discrepancia de refresh no equivale a fallo.
+
+**Puntos críticos:** la nueva ruta **no existe aún en el repo cloud**; tampoco hay escritor MASTER v2 ni lector/recuperador CLIENTE v2 conectado a `service.py`. Se requiere publicación autenticada, CAS por ruta y readback; las dos publicaciones **NO** son una transacción GitHub atómica. No afirmar que el archivo antiguo se mantendrá actualizado automáticamente: para soportar CLIENTES todavía sin actualizar, el MASTER necesita conservar la publicación compatible del MQC2 legacy hasta que dejen de depender de él, o asumir explícitamente el riesgo de que su fallback envejezca.
+
+### Primera actualización del addon: retirar las cuatro unidades antiguas
+
+El `addon.xml` en `develop` sigue en `2.3.1`, y los flags de activación permanecen `False`. El motor actual puede detener/deshabilitar legacy e instalar v2 **en laboratorios**, pero no borra sus archivos unit en el camino de éxito y no restaura unidades antiguas desde journal después del borrado. Falta integrar un flujo seguro e idempotente:
+
+1. **Nada de reconstruir biblioteca:** los `.strm` viven en almacenamiento interno y la transición afecta solo los montajes de contenido remoto.
+2. No cortar montajes cuando Kodi está reproduciendo, aunque exista caché: esta no garantiza continuidad; esperar reproducción inactiva. Guardar antes un snapshot durable privado de las cuatro unidades antiguas y credenciales.
+3. Deshabilitar cuatro legacy; detener y comprobar desmontaje real; instalar 2 FUSE + 4 bind; verificar mountinfo, seis unidades y lectura mínima de archivo conocido.
+4. Marcar `ACTIVE` duradero y **solo después**, si existe recuperación de unidades desde snapshot, eliminar **exclusivamente** estos cuatro ficheros de `/storage/.config/system.d/`: `rclone_tvshows_1.service`, `rclone_tvshows_2.service`, `rclone_videos_1.service`, `rclone_videos_2.service`. La eliminación exige correspondencia exacta de bytes/propietario y unidades deshabilitadas/inactivas; `daemon-reload`; si falla una retirada, dejar `CLEANUP_PENDING` sin desmontar v2.
+5. En siguientes inicios no recrear legacy ni repetir el corte. Tras una interrupción a mitad de camino, restaurar los servicios viejos desde el journal o recuperar v2 con un estado inequívoco, nunca ambos activos sobre la misma ruta. La pérdida de corriente puede dejar el **cambio de servicios** inconcluso; no implica borrar `.strm` ya persistidos.
+
+La existencia de dispositivos todavía sin actualizar es inevitable porque las actualizaciones de Kodi no son atómicas entre equipos; el requisito no es coexistencia activa de legacy y v2 **en un mismo equipo**. Por diseño los archivos MQC2 separados permiten clientes antiguos en otros dispositivos, aunque la política de mantenimiento de ambos endpoints sigue pendiente.
+
+**Estado verificable:** `REAL_SYSTEMD_LOCAL_2FUSE_4BIND=PASS`, `CONFIG_ROUTE_SPLIT_PURE_TESTS=PASS`, `V2_REMOTE_FILE_PUBLISHED=NO`, `V2_MASTER_WRITER_WIRED=NO`, `V2_CLIENT_RECOVERY_WIRED=NO`, `AUTO_CUTOVER_WIRED=NO`, `LEGACY_UNIT_CLEANUP_WIRED=NO`, `RELEASE_AUTHORIZED=NO`. Las tres banderas siguen en `False`.
+
+**GitHub CI** para el selector de ruta: 657/657 Python OK, [run 44419097420](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44419097420). No valida el acceso al endpoint v2 todavía inexistente.

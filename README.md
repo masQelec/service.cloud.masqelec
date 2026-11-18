@@ -217,3 +217,7 @@ El MASTER KodiELEC tiene **4 rclone mount activos / 4 FUSE legacy**, sin raíces
 ### Diseño definitivo de distribución (18/11/2026)
 
 **Sin migración gradual manual:** una versión futura del addon se distribuirá desde el repositorio de Kodi y cada equipo migrará autónomamente 4 FUSE→2 FUSE+4 bind cuando se actualice y esté inactivo; MASTER publica MQC2, CLIENTE mantiene sus OAuth salvo fallo confirmado. **La publicación y recuperación OAuth v2 y la transición automática aún faltan**. [Decisión técnica](service.cloud.masqelec/docs/AUTO_UPDATE_TWO_MOUNT_ARCHITECTURE_2026-11-18.md).
+
+### 19/11/2026 — ruta independiente de configuración cifrada v2
+
+Nuevo contrato puro `rclone_two_mount_config_routes.py`: la versión antigua permanece en `rclone/rclone.conf.crypt`; la futura versión v2 utilizará **`rclone/rclone-v2.conf.crypt`**. 657/657 tests CI OK; **no existe todavía el archivo v2 en cloud ni se ha conectado el lector/escritor de producción**. En la primera ejecución del addon se retirarán los cuatro unit files antiguos después de validar 2 FUSE+4 bind y asegurar recuperación. La biblioteca `.strm` sigue local. [Diseño y gates](service.cloud.masqelec/docs/AUTO_UPDATE_TWO_MOUNT_ARCHITECTURE_2026-11-18.md).
