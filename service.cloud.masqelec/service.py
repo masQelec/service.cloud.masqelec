@@ -40,6 +40,7 @@ from lib import rclone_two_mount_rollout
 from lib import rclone_two_mount_health
 from lib import rclone_two_mount_startup_stage
 from lib import rclone_two_mount_boot_guard
+from lib import rclone_two_mount_autostart
 
 # ---- Config constante ----
 SLEEP_INTERVAL_SECS = 10
@@ -486,6 +487,30 @@ def _upload_log(n: str, nwid: str, id_device: str, eth0: str, wlan0: str):
     except Exception:
         log(f"upload_log fallido:\n{traceback.format_exc()}", "ERROR")
 
+# Primera ejecución y reintento diferido cuando Kodi está reproduciendo.
+# Hasta activar los gates de release, tick devuelve DISABLED sin IO.
+_rclone_v2_autostart_last = None
+
+
+def _rclone_v2_autostart_worker():
+    global _rclone_v2_autostart_last
+    try:
+        status = rclone_two_mount_autostart.tick(xbmc.executeJSONRPC)
+        # Lista cerrada para no volcar tokens/errores de procesos externos.
+        if status not in rclone_two_mount_autostart._STATUSES:
+            status = "BLOCKED_LOCAL_ERROR"
+        if status != _rclone_v2_autostart_last:
+            _rclone_v2_autostart_last = status
+            if status not in ("DISABLED", "ACTIVE_CLEAN_ALREADY"):
+                log("rclone v2 autostart: " + status,
+                    "INFO" if status == "ACTIVE_VERIFIED_LEGACY_RETIRED"
+                    else "WARNING")
+    except Exception:
+        if _rclone_v2_autostart_last != "BLOCKED_LOCAL_ERROR":
+            _rclone_v2_autostart_last = "BLOCKED_LOCAL_ERROR"
+            log("rclone v2 autostart: BLOCKED_LOCAL_ERROR", "WARNING")
+
+
 # ------------- FASES -------------
 def _phase1_cloud_storage_blocking(monitor: xbmc.Monitor):
     log("Fase 1: cloud_storage (start_cloud_storage) -> inicio")
@@ -917,6 +942,8 @@ def run_service():
         log(f"Direcciones MAC: Eth: {eth0}  Wlan: {wlan0}")
 
     _phase1_cloud_storage_blocking(monitor)
+    if not monitor.abortRequested():
+        _rclone_v2_autostart_worker()
 
     oneshot_sequence = [
         ("fix_settings_once",   _fix_settings_wrapper),
@@ -1003,6 +1030,7 @@ def run_service():
         StoppableWorker("periodic_pvr_tick", _periodic_pvr_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_clean_tick", _periodic_clean_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_update_tick", _periodic_update_worker, monitor, interval=CHECK_TICK_SECS),
+        StoppableWorker("periodic_rclone_v2_cutover", _rclone_v2_autostart_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_rclone_token_tick", rclone_token_sync.tick, monitor, interval=CHECK_TICK_SECS),
     ]
     for w in workers_periodic:

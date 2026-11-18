@@ -32,3 +32,12 @@ RCLONE_TWO_MOUNT_STAGING_ENABLED = False
 
 # Publicación automática MASTER del MQC2 v2 (requiere gates físicos de release).
 RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED = False
+
+# Activación automática en el primer arranque tras actualizar el addon.
+# Desactivado hasta validación física de corte/reboot y rollback en KodiELEC.
+RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED = False
+RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED = False
+RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED = False
+RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED = False
+# Dos rutas públicas de medios conocidas: una por cuenta, solo para prueba.
+RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES = ()

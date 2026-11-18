@@ -1,0 +1,125 @@
+# -*- coding: utf-8 -*-
+"""Arranque/reintento local automático de 4 FUSE -> 2 FUSE + 4 bind.
+
+NO opera por defecto. Solo el addon de una release aprobada activará los
+flags independientes. No publica credenciales ni modifica archivos STRM.
+"""
+import os
+
+from lib import constants
+from lib import rclone_two_mount_kodi_idle as kodi_idle
+from lib import rclone_two_mount_rollout as rollout
+from lib import rclone_two_mount_live_adapter as live
+from lib import rclone_two_mount_legacy_cleanup as cleanup
+from lib import rclone_two_mount_plan as plan
+
+_STATUSES = frozenset({
+    "DISABLED", "BLOCKED_RELEASE_GATES", "BLOCKED_NOT_ROOT",
+    "BLOCKED_KODI_RPC", "BLOCKED_MEDIA_FIXTURES",
+    "BLOCKED_UNSAFE_STATE", "BLOCKED_PREPARED_STATE",
+    "DEFERRED_PLAYBACK_ACTIVE", "BLOCKED_UNEXPECTED_MODE",
+    "BLOCKED_LOCAL_ERROR", "ACTIVE_PENDING_CLEANUP",
+    "ACTIVE_VERIFIED_LEGACY_RETIRED", "ACTIVE_CLEAN_ALREADY",
+    "ROLLED_BACK", "BLOCKED_MANUAL_RECOVERY_REQUIRED",
+    "BLOCKED_RECOVERY_NOT_ENABLED",
+    "BLOCKED_LEGACY_PREFLIGHT", "BLOCKED_ROLLBACK_PREPARATION",
+    "BLOCKED_PLAYBACK_CHANGED", "BLOCKED_PLAYBACK_NOT_VERIFIED",
+    "BLOCKED_FEATURE_DISABLED", "MANUAL_RECOVERY_REQUIRED",
+    "CLEANED", "ALREADY_CLEAN", "BLOCKED_NOT_AUTHORIZED",
+    "BLOCKED_NOT_ACTIVE", "BLOCKED_JOURNAL_NOT_ACTIVE",
+    "BLOCKED_DONE_MARKER_CONFLICT", "BLOCKED_LEGACY_DROPINS",
+    "BLOCKED_V2_UNHEALTHY", "BLOCKED_LEGACY_RUNNING",
+    "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN",
+    "BLOCKED_CLEANUP_INCOMPLETE", "BLOCKED_NOT_INTERRUPTED",
+    "BLOCKED_ROLLBACK_NOT_READY", "BLOCKED_NOT_AUTHORIZED",
+})
+
+
+def _valid_media_paths(paths):
+    if not isinstance(paths, (tuple, list)) or len(paths) != 2:
+        return False
+    for number, path in enumerate(paths, 1):
+        if (not isinstance(path, str) or
+                not os.path.isabs(path) or os.path.normpath(path) != path):
+            return False
+        allowed = (
+            "/storage/.mnt/videos/{}/".format(number),
+            "/storage/.mnt/tvshows/{}/".format(number),
+        )
+        if not path.startswith(allowed) or path.endswith("/"):
+            return False
+    return True
+
+
+def tick(rpc_call, *, adapter_factory=None):
+    """Una evaluación del primer arranque o de una migración diferida.
+
+    La migración del mismo equipo es transaccional; otras instalaciones
+    pueden actualizarse en otro momento sin ninguna acción sobre ellas.
+    No se crean archivos ni locks si los flags están desactivados.
+    """
+    if getattr(constants, "RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED", False) is not True:
+        return "DISABLED"
+    if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is not True or
+            getattr(constants, "RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED", False)
+            is not True):
+        return "BLOCKED_RELEASE_GATES"
+    if os.geteuid() != 0:
+        return "BLOCKED_NOT_ROOT"
+    if not callable(rpc_call):
+        return "BLOCKED_KODI_RPC"
+    known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
+    if not _valid_media_paths(known):
+        return "BLOCKED_MEDIA_FIXTURES"
+    try:
+        mode = rollout.mode(True)
+        maker = (adapter_factory if adapter_factory is not None
+                 else live.LocalAdapter)
+        if mode not in ("legacy", "prepared", "active", "unsafe"):
+            return "BLOCKED_UNEXPECTED_MODE"
+        if mode == "prepared":
+            # Un journal prepared anterior no debe eliminarse ciegamente.
+            return "BLOCKED_PREPARED_STATE"
+        # Construir adaptador puede cargar metadatos, pero nunca invoca
+        # systemctl ni OAuth por sí mismo.
+        adapter = maker(rpc_call=rpc_call, live_enabled=True,
+                        known_media_files=known)
+        if mode == "active":
+            if (getattr(constants, "RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED",
+                        False) is not True):
+                return "ACTIVE_PENDING_CLEANUP"
+            result = cleanup.retire_after_active(
+                adapter, authorized=True)
+            return {
+                "CLEANED": "ACTIVE_VERIFIED_LEGACY_RETIRED",
+                "ALREADY_CLEAN": "ACTIVE_CLEAN_ALREADY",
+            }.get(result, result if result in _STATUSES
+                  else "BLOCKED_LOCAL_ERROR")
+        if not kodi_idle.is_playback_idle(rpc_call):
+            return "DEFERRED_PLAYBACK_ACTIVE"
+        if mode == "unsafe":
+            if (getattr(constants, "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
+                        False) is not True):
+                return "BLOCKED_RECOVERY_NOT_ENABLED"
+            recovered = live.recover_with_local_lock(
+                adapter, authorized=True, verified_rollback=True)
+            return recovered if recovered in _STATUSES else (
+                "BLOCKED_MANUAL_RECOVERY_REQUIRED")
+        outcome = live.execute_with_local_lock(
+            adapter, authorized=True, verified_rollback=True)
+        if outcome == "ACTIVE":
+            if (getattr(constants, "RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED",
+                        False) is not True):
+                return "ACTIVE_PENDING_CLEANUP"
+            cleaned = cleanup.retire_after_active(adapter, authorized=True)
+            return {
+                "CLEANED": "ACTIVE_VERIFIED_LEGACY_RETIRED",
+                "ALREADY_CLEAN": "ACTIVE_CLEAN_ALREADY",
+            }.get(cleaned, cleaned if cleaned in _STATUSES
+                  else "BLOCKED_LOCAL_ERROR")
+        return outcome if outcome in _STATUSES else (
+            "BLOCKED_MANUAL_RECOVERY_REQUIRED")
+    except (OSError, ValueError, RuntimeError, TypeError,
+            BlockingIOError):
+        return "BLOCKED_LOCAL_ERROR"
