@@ -51,7 +51,23 @@ def check_layout_at(mountinfo, fuse_roots, bind_map):
         return False
     try:
         entries = mount_entries(mountinfo)
-    except (ValueError, TypeError, UnicodeError):
+        text = (mountinfo.decode("utf-8", "strict")
+                if isinstance(mountinfo, bytes) else mountinfo)
+        required = set(fuse_roots)
+        required.update(item[2] for item in bind_map)
+        present = {path: 0 for path in required}
+        for line in text.splitlines():
+            columns = line.partition(" - ")[0].split()
+            if len(columns) < 6:
+                return False
+            path = _decode(columns[4])
+            if path in present:
+                present[path] += 1
+        # mount_entries() conserva la última capa. No aceptar montajes
+        # apilados ni una ruta que aparezca cero veces.
+        if any(count != 1 for count in present.values()):
+            return False
+    except (ValueError, TypeError, UnicodeError, IndexError):
         return False
     used = set()
     counts = [0, 0]

@@ -61,7 +61,16 @@ class FakeSystemd:
                 return False
             self.active.add(unit)
             if unit in rollout.LEGACY_SERVICES:
-                self._mount_legacy()
+                mapping = {
+                    "rclone_tvshows_1.service": "/storage/.mnt/tvshows/1",
+                    "rclone_tvshows_2.service": "/storage/.mnt/tvshows/2",
+                    "rclone_videos_1.service": "/storage/.mnt/videos/1",
+                    "rclone_videos_2.service": "/storage/.mnt/videos/2",
+                }
+                index = list(mapping).index(unit)
+                self.mounts[mapping[unit]] = (
+                    "0:" + str(50 + index), "/", "fuse.rclone",
+                    "old" + str(index))
             elif unit in rollout.NEW_SERVICES:
                 index = rollout.NEW_SERVICES.index(unit)
                 self.mounts[plan.FUSE_ROOTS[index]] = (
@@ -80,9 +89,6 @@ class FakeSystemd:
             self.active.discard(unit)
             if unit in rollout.LEGACY_SERVICES:
                 # Each legacy FUSE has its own target.
-                for _, _, _, target in plan.BIND_MAP:
-                    if target.endswith("_unexpected"):
-                        continue
                 reverse = {
                     "rclone_tvshows_1.service": "/storage/.mnt/tvshows/1",
                     "rclone_tvshows_2.service": "/storage/.mnt/tvshows/2",
@@ -197,6 +203,29 @@ class IntegratedCutoverTests(unittest.TestCase):
         self.assertEqual(self.run_cutover(), "ROLLED_BACK")
         self.assertFalse(self.marker.exists())
         self.assertEqual(self.system.active, set(rollout.LEGACY_SERVICES))
+
+    def test_failure_in_v2_mount_layout_cannot_be_marked_active(self):
+        self.system.fail_start.add(rollout.BIND_SERVICES[2])
+        self.assertEqual(self.run_cutover(), "ROLLED_BACK")
+        self.assertNotEqual(rollout.mode(True, str(self.marker)), "active")
+
+    def test_legacy_mount_not_restored_even_if_service_reports_active(self):
+        self.system.fail_start.add(rollout.BIND_SERVICES[0])
+        original = self.system.__call__
+        def mounts_missing(argv):
+            ok = original(argv)
+            if (argv[1] == "start" and
+                    argv[2] == rollout.LEGACY_SERVICES[-1]):
+                self.system.mounts.pop(
+                    "/storage/.mnt/videos/2", None)
+            return ok
+        self.adapter.runner = mounts_missing
+        self.assertEqual(self.run_cutover(), "MANUAL_RECOVERY_REQUIRED")
+        self.assertTrue(self.marker.exists())
+        self.assertEqual(journal.phase(self.adapter.txn),
+                         "rollback_required")
+        self.assertTrue(boot.recovery_required(
+            parent=str(self.txn_parent), state_path=str(self.marker)))
 
     def test_refreshed_one_drive_requires_manual_recovery_and_no_clobber(self):
         def rotate(unit):

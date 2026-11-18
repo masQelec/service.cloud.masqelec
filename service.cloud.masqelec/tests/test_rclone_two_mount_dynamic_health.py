@@ -77,6 +77,32 @@ class DynamicHealthTests(unittest.TestCase):
         broken = ((True, "movies", binds[0][2]),) + binds[1:]
         self.assertFalse(health.check_layout_at(data, roots, broken))
 
+    def test_stacked_fuse_root_denied_even_if_last_matches(self):
+        data, roots, binds = synthetic_mountinfo()
+        duplicated = next(x for x in data.splitlines()
+                          if roots[0] in x)
+        self.assertFalse(health.check_layout_at(
+            data + "\n" + duplicated, roots, binds))
+
+    def test_stacked_bind_denied_even_if_last_matches(self):
+        data, roots, binds = synthetic_mountinfo()
+        duplicated = next(x for x in data.splitlines()
+                          if binds[0][2] in x)
+        self.assertFalse(health.check_layout_at(
+            data + "\n" + duplicated, roots, binds))
+
+    def test_bytes_mountinfo_stacked_denied(self):
+        data, roots, binds = synthetic_mountinfo()
+        duplicated = next(x for x in data.splitlines()
+                          if binds[1][2] in x)
+        self.assertFalse(health.check_layout_at(
+            (data + "\n" + duplicated).encode(), roots, binds))
+
+    def test_bytes_mountinfo_clean_allowed(self):
+        data, roots, binds = synthetic_mountinfo()
+        self.assertTrue(health.check_layout_at(
+            data.encode(), roots, binds))
+
     def test_missing_fuse_root_fails(self):
         data, roots, binds = synthetic_mountinfo()
         self.assertFalse(health.check_layout_at(
