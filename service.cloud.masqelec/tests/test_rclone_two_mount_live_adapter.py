@@ -84,6 +84,60 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(Path(self.adapter.txn, "canonical.conf").exists())
         self.assertEqual(journal.phase(self.adapter.txn), "prepared")
 
+    def test_global_feature_flag_blocks_live_mutations(self):
+        with mock.patch.object(live.constants,
+                               "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False):
+            self.assertEqual(live.execute_with_local_lock(
+                self.adapter, authorized=True, verified_rollback=True),
+                "BLOCKED_FEATURE_DISABLED")
+        self.assertFalse(self.txn.exists())
+        self.assertEqual(self.actions, [])
+
+    def test_mark_active_disables_legacy_before_enabling_new(self):
+        self.assertTrue(self.adapter.legacy_preflight())
+        with journal.locked(str(self.txn)):
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+            with mock.patch.object(self.adapter, "complete_health",
+                                   return_value=True):
+                self.adapter.mark_active()
+        changes = [x for x in self.actions
+                   if x[1] in ("disable", "enable")]
+        self.assertEqual(
+            changes[:4],
+            [("systemctl", "disable", n)
+             for n in rollout.LEGACY_SERVICES])
+        self.assertEqual(
+            changes[4:],
+            [("systemctl", "enable", n)
+             for n in rollout.NEW_SERVICES + rollout.BIND_SERVICES])
+        self.assertEqual(journal.phase(self.adapter.txn), "active")
+
+    def test_first_enable_failure_no_old_unit_reenabled(self):
+        self.assertTrue(self.adapter.legacy_preflight())
+        with journal.locked(str(self.txn)):
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+            def run(args):
+                self.actions.append(tuple(args))
+                return args[1] != "enable"
+            self.adapter.runner = run
+            with mock.patch.object(self.adapter, "complete_health",
+                                   return_value=True):
+                with self.assertRaises(RuntimeError):
+                    self.adapter.mark_active()
+        actions = [x for x in self.actions
+                   if x[1] in ("disable", "enable")]
+        self.assertEqual(
+            actions[:4],
+            [("systemctl", "disable", n)
+             for n in rollout.LEGACY_SERVICES])
+        self.assertEqual(
+            actions[4], ("systemctl", "enable", rollout.NEW_SERVICES[0]))
+        self.assertFalse(any(x[1] == "enable" and
+                             x[2] in rollout.LEGACY_SERVICES
+                             for x in actions))
+
     def test_preflight_refuses_existing_v2_unit(self):
         (self.units / rollout.NEW_SERVICES[0]).write_bytes(b"[Unit]\n")
         self.assertFalse(self.adapter.legacy_preflight())

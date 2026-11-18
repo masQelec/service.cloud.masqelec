@@ -24,6 +24,7 @@ from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_startup_stage as stage
 from lib import rclone_two_mount_token_rollback as oauth
 from lib import rclone_conf_merge as conf
+from lib import constants
 
 
 TXN_PARENT = "/storage/.config/masqelec/rclone-v2-transaction"
@@ -297,10 +298,13 @@ class LocalAdapter:
             raise ValueError("Durable phase not ready")
         if not self.complete_health():
             raise ValueError("2 FUSE, 4 bind or known-media read failed")
-        for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
-            self._systemctl("enable", unit)
+        # No dejar simultáneamente habilitados legacy y v2 en un reboot.
+        # Si se interrumpe entre fases, puede quedar todo apagado, pero
+        # NUNCA ambos grupos habilitados y compitiendo por las rutas Kodi.
         for unit in rollout.LEGACY_SERVICES:
             self._systemctl("disable", unit)
+        for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
+            self._systemctl("enable", unit)
         self._replace_marker(self._unsafe_marker(), self._active_marker())
         journal.transition(self.txn, "cutover_started", "active")
 
@@ -457,6 +461,8 @@ def execute_with_local_lock(adapter, *, authorized=False,
         return "BLOCKED_NOT_AUTHORIZED"
     if verified_rollback is not True:
         return "BLOCKED_ROLLBACK_NOT_READY"
+    if getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False) is not True:
+        return "BLOCKED_FEATURE_DISABLED"
     try:
         with journal.locked(adapter.txn_parent):
             return engine.run(
