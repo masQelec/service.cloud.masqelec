@@ -38,27 +38,50 @@ def mount_entries(data):
     return entries
 
 
-def check_two_fuse_four_bind(mountinfo):
-    """Verifica relación real entre montajes (no basta que existan rutas).
+def check_layout_at(mountinfo, fuse_roots, bind_map):
+    """Verificador configurable para laboratorio aislado; no monta nada.
 
-    Los cuatro targets legacy deben apuntar, por dispositivo, al mismo
-    superblock del FUSE raíz y a la subcarpeta exacta.
+    fuse_roots=(raíz1, raíz2); bind_map=(índice, carpeta, destino) por
+    cada una de las cuatro carpetas. No se acepta resultado basado solo
+    en directorios existentes: se exige superblock y fsroot de mountinfo.
     """
-    entries = mount_entries(mountinfo)
-    for i, fuse_root in enumerate(plan.FUSE_ROOTS):
-        root = entries.get(fuse_root)
-        if root is None or root["fstype"] != "fuse.rclone":
+    if (not isinstance(fuse_roots, (tuple, list)) or len(fuse_roots) != 2
+            or len(set(fuse_roots)) != 2 or
+            not isinstance(bind_map, (tuple, list)) or len(bind_map) != 4):
+        return False
+    try:
+        entries = mount_entries(mountinfo)
+    except (ValueError, TypeError, UnicodeError):
+        return False
+    used = set()
+    counts = [0, 0]
+    for item in bind_map:
+        if not isinstance(item, (tuple, list)) or len(item) != 3:
             return False
-        for _, source_index, folder, target in plan.BIND_MAP:
-            if source_index != i:
-                continue
-            child = entries.get(target)
-            if child is None:
-                return False
-            expected_root = root["fsroot"].rstrip("/") + "/" + folder
-            if child["fsroot"] != expected_root:
-                return False
-            if any(child[field] != root[field] for field in (
-                    "device", "fstype", "source")):
-                return False
-    return True
+        i, folder, target = item
+        if (type(i) is not int or i not in (0, 1)
+                or folder not in ("movies", "tvshows")
+                or not isinstance(target, str) or target in used
+                or target in fuse_roots):
+            return False
+        used.add(target)
+        counts[i] += 1
+        root = entries.get(fuse_roots[i])
+        child = entries.get(target)
+        if (root is None or child is None
+                or root["fstype"] != "fuse.rclone"):
+            return False
+        expected = root["fsroot"].rstrip("/") + "/" + folder
+        if child["fsroot"] != expected:
+            return False
+        if any(child[field] != root[field] for field in (
+                "device", "fstype", "source")):
+            return False
+    return counts == [2, 2]
+
+
+def check_two_fuse_four_bind(mountinfo):
+    """Valida las cuatro rutas Kodi originales con 2 FUSE + 4 bind."""
+    bind_map = [(index, folder, target)
+                for _, index, folder, target in plan.BIND_MAP]
+    return check_layout_at(mountinfo, plan.FUSE_ROOTS, bind_map)
