@@ -209,7 +209,7 @@ class LocalFuseBindPilotTests(unittest.TestCase):
         sample = (
             "51 1 0:44 / /tmp/masqelec-fuse-local-A/fuse/1 rw "
             "- fuse.rclone test: rw")
-        with mock.patch.object(lab, "_mountinfo", return_value=sample), \\
+        with mock.patch.object(lab, "_mountinfo", return_value=sample), \
              mock.patch.object(lab.time, "sleep",
                                side_effect=AssertionError("not expected")):
             self.assertTrue(lab._wait_for_fuse(
