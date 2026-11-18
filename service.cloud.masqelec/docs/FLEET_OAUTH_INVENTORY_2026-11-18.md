@@ -171,3 +171,9 @@ CUTOVER_AUTHORIZED=NO
 ```
 
 **Siguiente paso:** confirmar el **número total de CLIENTES** que usan estas cuentas y continuar el inventario exclusivamente de lectura en los restantes. Si CLIENTE 1 es el único, aclarar que aun con cobertura local de ambos dispositivos hacen falta identificación y exclusión de otros escritores OAuth (servicios, timers, scripts, equipos externos) y un protocolo probado de pausa/reinicio antes de autorizar OneDrive real.
+
+### 18/11/2026 — decisión de producto: actualización automática global vía addon, NO corte gradual por operador
+
+El usuario aclara que **hay más CLIENTES que los dos equipos inventariados y todos comparten arquitectura**: NO desea parada ni migración manual uno por uno. El repositorio de addons de Kodi distribuirá una versión futura de `service.cloud.masqelec`; cada nodo adoptará localmente 2 FUSE + 4 bind cuando reciba la actualización, preservando los cuatro destinos de STRM. Kodi no actualiza todos simultáneamente (equipos apagados/con distintas configuraciones). MASTER publicará MQC2 desde `cloud.masqelec`; cada CLIENTE conservará sus tokens locales y recuperará **solo en error OAuth confirmado** la credencial del MASTER correspondiente, con validación/rollback. **No forzar inventario exhaustivo o parada de toda la flota como requisito del despliegue de addon.**
+
+GAPS confirmados por lectura de código: `rclone_two_mount_live_adapter.py` no está conectado a `service.py`; flags de release False; `rclone_token_sync.tick` se corta en v2 activo, así que publicación MASTER v2 y recuperación CLIENT v2 **no están implementadas**; el addon aún tiene `version=2.3.1` en `develop/main`, y es necesario empaquetado/metadatos del repo para actualizar; `cloud_storage` descarga MQC2 al arrancar y actualmente conserva tokens locales, pero la recuperación v2 por cuenta aislada no está conectada. **No autorizar release todavía**. [Decisión y gates](AUTO_UPDATE_TWO_MOUNT_ARCHITECTURE_2026-11-18.md).
