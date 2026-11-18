@@ -39,6 +39,7 @@ from lib import constants
 from lib import rclone_two_mount_rollout
 from lib import rclone_two_mount_health
 from lib import rclone_two_mount_startup_stage
+from lib import rclone_two_mount_boot_guard
 
 # ---- Config constante ----
 SLEEP_INTERVAL_SECS = 10
@@ -278,6 +279,12 @@ def _two_mounts_ready() -> bool:
 
 
 def _mounts_ready() -> bool:
+    if rclone_two_mount_boot_guard.recovery_required(
+            feature_allowed=getattr(
+                constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)):
+        log("_mounts_ready: transición interrumpida; escaneo remoto/local bloqueado",
+            "ERROR")
+        return False
     """
     Verifica que los montajes rclone están:
       ✔ en /proc/mounts como fuse.rclone

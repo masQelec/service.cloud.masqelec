@@ -23,6 +23,7 @@ from lib import utils
 from lib import constants
 from lib import rclone_conf_merge
 from lib import rclone_two_mount_rollout
+from lib import rclone_two_mount_boot_guard
 
 # ==============================
 # Config red
@@ -264,6 +265,16 @@ def _ensure_services_active(services):
 # CLOUD STORAGE
 # ==============================
 def start_cloud_storage():
+    # Un corte iniciado pero interrumpido NO puede volver a activar legacy
+    # aunque el marcador de modo esté ausente o dañado tras el reinicio.
+    if rclone_two_mount_boot_guard.recovery_required(
+            feature_allowed=getattr(
+                constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)):
+        log_utils.write_log(
+            "rclone: transición interrumpida/inconsistente; "
+            "bloqueado actualizador legacy hasta recuperación operativa",
+            "ERROR")
+        return
     # El actualizador legacy puede reiniciar rclone al cambiar unidades.
     # Nunca aplicarlo sobre un CLIENTE marcado como two-fuse activo; la
     # migración necesita su propio protocolo de versión y rollback.
