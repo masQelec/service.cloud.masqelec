@@ -340,7 +340,7 @@ class SystemdLocalLabTests(unittest.TestCase):
             self.assertEqual(lab.main(
                 ["--run-isolated-systemd", "--confirm-isolated-only"]), 0)
         self.assertIn("PERMANENT_UNITS_ENABLED=NO", out.getvalue())
-        self.assertIn("LEGACY_SERVICES_TOUCHED=NO", out.getvalue())
+        self.assertIn("LEGACY_SERVICE_START_STOP=NO", out.getvalue())
 
     def test_source_has_no_production_mounts_or_oauth(self):
         source = PATH.read_text(encoding="utf-8")
