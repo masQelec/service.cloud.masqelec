@@ -25,6 +25,7 @@ class DummyAdapter:
         self.good = True
         self.active = set()
         self.enabled_units = set()
+        self.unit_states = {}
         self.fail_reload = False
 
     def complete_health(self):
@@ -34,6 +35,16 @@ class DummyAdapter:
     def _active(self, unit):
         self.actions.append("active:" + unit)
         return unit in self.active
+
+    def legacy_unit_file_state(self, unit):
+        self.actions.append("unitfile:" + unit)
+        if unit in self.unit_states:
+            return self.unit_states[unit]
+        if unit in self.enabled_units:
+            return "enabled"
+        if not Path(self.unit_dir, unit).exists():
+            return "not-found"
+        return "disabled"
 
     def runner(self, args):
         self.actions.append(tuple(args))
@@ -152,8 +163,24 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(len(list(Path(self.a.unit_dir).iterdir())), 4)
 
     def test_unknown_enabled_state_blocks(self):
-        self.a.runner = lambda _: None
+        self.a.unit_states[rollout.LEGACY_SERVICES[0]] = "unknown"
         self.assertEqual(self.run_cleanup(), "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN")
+
+    def test_is_enabled_not_found_while_unit_file_exists_blocks(self):
+        self.a.unit_states[rollout.LEGACY_SERVICES[0]] = "not-found"
+        self.assertEqual(self.run_cleanup(), "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN")
+        self.assertTrue(Path(self.a.unit_dir,
+                             rollout.LEGACY_SERVICES[0]).exists())
+
+    def test_systemctl_query_error_blocks_even_if_exit_nonzero(self):
+        self.a.unit_states[rollout.LEGACY_SERVICES[0]] = "systemctl-error"
+        self.assertEqual(self.run_cleanup(), "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN")
+
+    def test_removed_unit_allows_exact_not_found(self):
+        name = rollout.LEGACY_SERVICES[0]
+        Path(self.a.unit_dir, name).unlink()
+        self.a.unit_states[name] = "not-found"
+        self.assertEqual(self.run_cleanup(), "CLEANED")
 
     def test_partial_cleanup_resumes_with_same_durable_backup(self):
         name = rollout.LEGACY_SERVICES[0]

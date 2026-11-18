@@ -89,10 +89,13 @@ def retire_after_active(adapter, *, authorized=False):
             for unit in rollout.LEGACY_SERVICES:
                 if adapter._active(unit):
                     return "BLOCKED_LEGACY_RUNNING"
-                # False == no está enabled. True o None bloquean.
-                if adapter.runner(
-                        ["systemctl", "is-enabled", "--quiet", unit]
-                ) is not False:
+                # 'is-enabled --quiet' no diferencia disabled de fallo
+                # de systemd. Solo estados explícitos y conocidos.
+                state = adapter.legacy_unit_file_state(unit)
+                allowed = ("disabled",) if os.path.lexists(
+                    os.path.join(adapter.unit_dir, unit)) else (
+                        "disabled", "not-found")
+                if state not in allowed:
                     return "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN"
             for path, original in present:
                 atomic.remove_if_identical(path, original)

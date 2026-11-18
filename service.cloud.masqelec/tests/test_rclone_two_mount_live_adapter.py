@@ -379,6 +379,31 @@ class AdapterTests(unittest.TestCase):
             self.adapter.txn, "canonical-recovery-candidate.conf").exists())
         self.assertEqual(journal.phase(self.adapter.txn), "rollback_required")
 
+    def test_systemctl_legacy_unit_state_requires_exact_status(self):
+        class Result:
+            returncode = 1
+            stdout = b"disabled\n"
+        with mock.patch.object(live.subprocess, "run",
+                               return_value=Result()) as proc:
+            self.assertEqual(self.adapter.legacy_unit_file_state(
+                rollout.LEGACY_SERVICES[0]), "disabled")
+        self.assertIn("is-enabled", proc.call_args.args[0])
+
+    def test_systemctl_legacy_unit_state_fails_closed_on_error(self):
+        class Result:
+            returncode = 1
+            stdout = b"systemctl unexpected failure\n"
+        with mock.patch.object(live.subprocess, "run",
+                               return_value=Result()):
+            self.assertEqual(self.adapter.legacy_unit_file_state(
+                rollout.LEGACY_SERVICES[0]), "unknown")
+
+    def test_systemctl_legacy_unit_state_denies_unknown_units(self):
+        with mock.patch.object(live.subprocess, "run",
+                               side_effect=AssertionError("must not run")):
+            with self.assertRaises(ValueError):
+                self.adapter.legacy_unit_file_state("wrong.service")
+
     def test_known_systemctl_commands_only(self):
         with self.assertRaises(ValueError):
             self.adapter._systemctl("restart","rclone_videos_1.service")

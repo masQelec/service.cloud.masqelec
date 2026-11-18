@@ -99,6 +99,31 @@ class LocalAdapter:
         self._require_enabled()
         return self.runner(["systemctl", "is-active", "--quiet", unit]) is True
 
+    def legacy_unit_file_state(self, unit):
+        """Distingue 'disabled' real de errores del comando systemctl.
+
+        is-enabled --quiet devuelve no-cero tanto para un unit disabled
+        como cuando systemd falla. Nunca usar ese booleano para borrar.
+        """
+        self._require_enabled()
+        if unit not in rollout.LEGACY_SERVICES:
+            raise ValueError("Unknown legacy unit")
+        result = subprocess.run(
+            ["systemctl", "is-enabled", unit],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=10, check=False,
+        )
+        if result.returncode not in (0, 1):
+            return "unknown"
+        try:
+            state = result.stdout.decode("ascii", "strict").strip()
+        except (UnicodeError, AttributeError):
+            return "unknown"
+        if state in ("disabled", "not-found", "enabled",
+                     "static", "masked", "indirect"):
+            return state
+        return "unknown"
+
     def _mounts(self):
         return health.mount_entries(self.mount_reader())
 
