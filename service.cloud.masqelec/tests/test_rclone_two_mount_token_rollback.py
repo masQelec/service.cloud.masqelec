@@ -112,8 +112,9 @@ class TokenRollbackTests(unittest.TestCase):
             self.reconcile(a=a)
 
     def test_malformed_oauth_json_block(self):
-        a = self.a.replace(b'"refresh_token": "refresh-one_a"',
-                           b'"refresh_token": not-json')
+        original_token = policy.sections(self.a)["one_a"]["token"].encode()
+        a = self.a.replace(original_token, b"INVALID_JSON_FOR_TEST", 1)
+        self.assertNotEqual(a, self.a)
         with self.assertRaises(ValueError):
             self.reconcile(a=a)
 
