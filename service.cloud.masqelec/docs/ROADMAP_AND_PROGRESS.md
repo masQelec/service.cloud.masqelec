@@ -208,3 +208,22 @@ Próximo paso: piloto de verificación read-only de prerrequisitos KodiELEC y, p
 ## Piloto 2 FUSE + 4 bind en rutas aisladas (18-11-2026)
 
 Nuevo script standalone `tools/rclone_two_mount_fuse_bind_local_lab.py` para KodiELEC: `--preflight` **solo lectura**, y `--run-local-pilot --confirm-isolated-only` (monta dos fuentes **locales ficticias** y cuatro bind en una ruta aleatoria de `/tmp`, valida lecturas y desmonta). No usa `rclone.conf`, tokens OneDrive, `crypt`, rutas `.strm`, `systemd` ni cambios en catálogo. `rclone_two_mount_health.check_layout_at` permite validar rutas temporales sin modificar la comprobación original de Kodi; se preservó el error `ValueError` en `mountinfo` truncado. **401/401 tests CI PASS**, [run 44339477354](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44339477354). **Ningún piloto FUSE/bind real se ha ejecutado todavía en KodiELEC**. El paso siguiente es obtener salida del preflight y, si procede, ejecutar el piloto local controlado antes de probar OneDrive real y `Type=notify`. Ver [procedimiento](TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md).
+
+
+## Resultado real KodiELEC del primer preflight y corrección (18-11-2026)
+
+**Salida facilitada por el operador:** FUSE_DEVICE, MOUNT, MOUNTINFO, PRIVILEGED, RCLONE y UMOUNT `YES`; `RCLONE_MOUNT_FLAGS=NO` y `LAB_RESULT=BLOCKED_MISSING_LOCAL_PREREQUISITE`. **No hubo petición OAuth, montaje ni escritura operativa.** La causa exacta en ese binario aún requiere repetir el preflight.
+
+**Error detectado en el laboratorio:** se exigía `--config` en la ayuda de `rclone mount`, cuando es una opción **global** y puede no listarse allí. Se ha separado la consulta: `rclone mount --help` comprueba `--read-only`/`--vfs-cache-mode`; `rclone help flags` (o `rclone --help` como alternativa) comprueba `--config`. Además se ha eliminado una referencia a `health.mount_entries` que no existía en el script standalone durante la espera de FUSE. **No se relaja ninguna condición de seguridad**: una opción realmente ausente sigue bloqueando.
+
+**Código corregido, referencia inmutable**: `17963e287152afe1cb845f73d460cdfd53b81091`. CI del código [44351743573](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44351743573): `Ran 406 tests ... OK` (5 pruebas nuevas). La corrección de sintaxis de un test intermedio está incluida.
+
+Repetir **solo el preflight**, descargando la versión nueva:
+
+```sh
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/17963e287152afe1cb845f73d460cdfd53b81091/service.cloud.masqelec/tools/rclone_two_mount_fuse_bind_local_lab.py' -O /tmp/rclone_two_mount_fuse_bind_local_lab.py
+python3 -m py_compile /tmp/rclone_two_mount_fuse_bind_local_lab.py
+python3 /tmp/rclone_two_mount_fuse_bind_local_lab.py --preflight
+```
+
+**No ejecutar** `--run-local-pilot --confirm-isolated-only` hasta obtener `RCLONE_MOUNT_FLAGS=YES` y `LAB_RESULT=READY_FOR_LOCAL_PILOT` en ese equipo. En ningún caso los 406 tests prueban mounts reales. El siguiente paso tras validar el preflight sería un ensayo temporal autorizado en `/tmp`, nunca un cambio de `system.d` o de las cuatro rutas Kodi.

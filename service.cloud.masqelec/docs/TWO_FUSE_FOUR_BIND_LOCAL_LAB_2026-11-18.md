@@ -1,6 +1,6 @@
 # Piloto aislado de 2 FUSE + 4 bind — masQelec/KodiELEC
 
-**Fecha:** 18-11-2026 · **Rama:** addon `develop` · **Versión inmóvil del script:** `c6c776c47a79ed892fd9be70e107d46d4c49cec9` · **Sin deploy**.
+**Fecha:** 18-11-2026 · **Rama:** addon `develop` · **Versión inmóvil del script:** `17963e287152afe1cb845f73d460cdfd53b81091` · **Sin deploy**.
 
 ## Objetivo y límite
 
@@ -15,7 +15,7 @@ El piloto es `tools/rclone_two_mount_fuse_bind_local_lab.py`: script **autoconte
 Consola SSH del dispositivo de laboratorio (no altera montajes, ni OneDrive ni la biblioteca):
 
 ```bash
-wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/c6c776c47a79ed892fd9be70e107d46d4c49cec9/service.cloud.masqelec/tools/rclone_two_mount_fuse_bind_local_lab.py' -O /tmp/rclone_two_mount_fuse_bind_local_lab.py
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/17963e287152afe1cb845f73d460cdfd53b81091/service.cloud.masqelec/tools/rclone_two_mount_fuse_bind_local_lab.py' -O /tmp/rclone_two_mount_fuse_bind_local_lab.py
 python3 -m py_compile /tmp/rclone_two_mount_fuse_bind_local_lab.py
 python3 /tmp/rclone_two_mount_fuse_bind_local_lab.py --preflight
 ```
@@ -70,7 +70,7 @@ Este comando **sí realiza cambios temporales locales**: crea con `mkdtemp` una 
 | Compatibilidad con semántica legacy de `ValueError` para mountinfo truncado | Regresión corregida | PASS |
 | Rechazo de bind repetidos, cuenta equivocada, directorio incorrecto | Pruebas negativas | PASS |
 | Preflight offline, selección del binario KodiELEC, argumentos seguros y limpieza | Tests de piloto aislado | PASS sintético |
-| Suite completa Python 3.11 | GitHub Actions [44340361783](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44340361783): **401/401 OK** | **PASS CI** |
+| Suite completa Python 3.11 | GitHub Actions [44351743573](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44351743573): **406/406 OK** | **PASS CI** |
 | Preflight en KodiELEC real | No se ha recibido salida del operador | **NOT RUN** |
 | Dos FUSE y cuatro bind temporales reales | No se ha ejecutado en KodiELEC | **NOT RUN** |
 | `Type=notify` para el binario exacto del dispositivo | No probado bajo systemd | **NOT RUN** |
@@ -95,4 +95,22 @@ GITHUB_OAUTH_PUT=NO
 
 ### Corrección de cierre (18-11-2026)
 
-Al auditar el flujo de salida se encontró que una versión inicial podía devolver PASS aunque la limpieza del laboratorio fallase. Corregido en commits `e4140dc8`, `bae1e203` y `c6c776c` con 2 pruebas adicionales, incluyendo fallo de limpieza después de una simulación completamente satisfactoria. **El script que debe descargarse es el referenciado por el SHA `c6c776c47a79ed892fd9be70e107d46d4c49cec9` de esta página**, no el original; GitHub Actions [44340361783](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44340361783): `Ran 401 tests ... OK`. Esto sigue sin equivaler a un FUSE real probado en KodiELEC.
+Al auditar el flujo de salida se encontró que una versión inicial podía devolver PASS aunque la limpieza del laboratorio fallase. Corregido en commits `e4140dc8`, `bae1e203` y `c6c776c` con 2 pruebas adicionales, incluyendo fallo de limpieza después de una simulación completamente satisfactoria. **El script que debe descargarse es el referenciado por el SHA `17963e287152afe1cb845f73d460cdfd53b81091` de esta página**, no el original; GitHub Actions [44351743573](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44351743573): `Ran 401 tests ... OK`. Esto sigue sin equivaler a un FUSE real probado en KodiELEC.
+
+## Resultado real KodiELEC del primer preflight y corrección (18-11-2026)
+
+**Salida facilitada por el operador:** FUSE_DEVICE, MOUNT, MOUNTINFO, PRIVILEGED, RCLONE y UMOUNT `YES`; `RCLONE_MOUNT_FLAGS=NO` y `LAB_RESULT=BLOCKED_MISSING_LOCAL_PREREQUISITE`. **No hubo petición OAuth, montaje ni escritura operativa.** La causa exacta en ese binario aún requiere repetir el preflight.
+
+**Error detectado en el laboratorio:** se exigía `--config` en la ayuda de `rclone mount`, cuando es una opción **global** y puede no listarse allí. Se ha separado la consulta: `rclone mount --help` comprueba `--read-only`/`--vfs-cache-mode`; `rclone help flags` (o `rclone --help` como alternativa) comprueba `--config`. Además se ha eliminado una referencia a `health.mount_entries` que no existía en el script standalone durante la espera de FUSE. **No se relaja ninguna condición de seguridad**: una opción realmente ausente sigue bloqueando.
+
+**Código corregido, referencia inmutable**: `17963e287152afe1cb845f73d460cdfd53b81091`. CI del código [44351743573](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44351743573): `Ran 406 tests ... OK` (5 pruebas nuevas). La corrección de sintaxis de un test intermedio está incluida.
+
+Repetir **solo el preflight**, descargando la versión nueva:
+
+```sh
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/17963e287152afe1cb845f73d460cdfd53b81091/service.cloud.masqelec/tools/rclone_two_mount_fuse_bind_local_lab.py' -O /tmp/rclone_two_mount_fuse_bind_local_lab.py
+python3 -m py_compile /tmp/rclone_two_mount_fuse_bind_local_lab.py
+python3 /tmp/rclone_two_mount_fuse_bind_local_lab.py --preflight
+```
+
+**No ejecutar** `--run-local-pilot --confirm-isolated-only` hasta obtener `RCLONE_MOUNT_FLAGS=YES` y `LAB_RESULT=READY_FOR_LOCAL_PILOT` en ese equipo. En ningún caso los 406 tests prueban mounts reales. El siguiente paso tras validar el preflight sería un ensayo temporal autorizado en `/tmp`, nunca un cambio de `system.d` o de las cuatro rutas Kodi.
