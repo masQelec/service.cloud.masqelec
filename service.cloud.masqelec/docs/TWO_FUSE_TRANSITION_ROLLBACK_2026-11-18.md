@@ -163,3 +163,31 @@ RCLONE_TWO_MOUNT_STAGING_ENABLED=False
 RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False
 RCLONE_TOKEN_SYNC_ENABLED=False
 ```
+
+## 18-11-2026 — cierre de riesgos críticos: arranque y OAuth compartido
+
+**Verificado en addon/develop:** [GitHub Actions 44378128654](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44378128654), **552/552 tests PASS** (Python 3.11). La prueba real MASTER legacy `PREFLIGHT_RESULT=PASS_READ_ONLY` y el laboratorio ficticio 2 FUSE+4 bind `PASS_LOCAL_FUSE_BIND_LAB` siguen siendo la única evidencia física: **no** se ha ejecutado el cutover con OneDrive.
+
+### 1) Arranque tras interrupción: fail-closed real en código del addon
+
+Nuevo módulo `lib/rclone_two_mount_boot_guard.py` integrado en **`lib/cloud_storage.py`** y **`service.py::_mounts_ready()`**. Lee exclusivamente el journal persistente y el marcador de arquitectura. Si falta el journal pero hay un marcador v2, si el journal está corrupto, si la fase quedó `cutover_started`/`rollback_required`, o si `active` no tiene flag autorizado y marcador compatible: **bloquea el actualizador de servicios legacy y el escaneo Kodi**. Si no hay journal ni marcador, no cambia el funcionamiento legacy. Un journal `prepared` o `legacy_restored` sin marcador permite legacy; una fase `active` con bandera habilitada y marcador correcto permite continuar a la validación independiente de mountinfo. Se evita el reinicio ciego de cuatro servicios encima de montajes v2.
+
+**Importante**: no detiene systemd automáticamente, no decide el montaje sano por sí solo, y **NO restaura los servicios tras un reinicio brusco**. Si hubo corte, devuelve bloqueo conservador para revisión de las rutas y credenciales. Las unidades habilitadas en systemd pueden arrancar antes del addon; queda por ensayar físicamente un reinicio interrumpido.
+
+### 2) OAuth: no reemplazar jamás el canónico compartido sin excluir otros escritores
+
+La función de rollback del adaptador ya **no utiliza `os.replace` sobre `/storage/.config/rclone/rclone.conf`**. Si al parar rclone v2 los dos tokens OneDrive han cambiado, construye una copia conciliada (OneDrive actualizado, Google Drive/crypt existentes intactos) dentro del journal privado en `canonical-recovery-candidate.conf`, con permisos 0600, y devuelve `MANUAL_RECOVERY_REQUIRED`. Si no hubo cambio, no escribe el canónico y puede continuar la reversión. La copia privada permite recuperar tokens recientes sin enviarlos a GitHub ni sustituir los de Google Drive. Se incluyen pruebas integradas que verifican archivo canónico intacto aun con rotación.
+
+**Esta decisión prioriza no perder credenciales**: un rollback completamente automático con refresh OneDrive renovado NO está resuelto; necesita un procedimiento exclusivo para parar cualquier escritor del canónico (incluidos posibles procesos Google Drive) y una prueba real de reanudación. Una comprobación inode/mtime antes del reemplazo no es suficiente; rclone no respeta el `flock` del addon. No reintroducir esa carrera.
+
+### 3) Cambio seguro de unidades en reinicio
+
+El adaptador impide `execute_with_local_lock` si `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`, incluso si un llamador pasa `authorized=True`. En `mark_active`, después de verificar 2 FUSE+4 bind y lecturas conocidas, primero deshabilita las **cuatro unidades legacy** y **después** habilita las nuevas; no deja en ningún punto las dos familias habilitadas a la vez. Un apagón en medio podría dejar montajes sin autoarranque, pero nunca hace que el propio adaptador mantenga ambas familias habilitadas. El journal/marker siguen siendo la fuente de advertencia. No hay autorización de producción.
+
+### Evidencias y siguientes gates
+
+- Tests sintéticos y de integración (sin systemd real): **552/552 PASS**, CI `44378128654`.
+- Bandera `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; `RCLONE_TWO_MOUNT_STAGING_ENABLED=False`; `RCLONE_TOKEN_SYNC_ENABLED=False`. Ningún comando operativo publicado ni instalación en KodiELEC.
+- **Pendiente antes de activar**: ensayo controlado del adaptador con systemd real/archivo conocido de cada cuenta, un recuperador tras reinicio real (o procedimiento manual probado), manejo del conflicto OAuth de forma que no bloquee rollback con renovación real, reproducción .strm y verificación del comportamiento tras el próximo arranque.
+- MASTER/CLIENTES y ZIP/STRM intactos. Los clientes siguen importando catálogo sin escanear OneDrive.
+
