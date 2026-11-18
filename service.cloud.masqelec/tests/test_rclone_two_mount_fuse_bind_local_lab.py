@@ -172,5 +172,47 @@ class LocalFuseBindPilotTests(unittest.TestCase):
             self.assertFalse(lab._rclone_mount_flags_supported("/tmp/rclone"))
 
 
+
+    def _exercise_full_pilot_mock(self, cleanup_result):
+        class DummyProcess:
+            pass
+        info = {key: True for key in (
+            "rclone", "rclone_mount_flags", "mount", "umount",
+            "fuse_device", "mountinfo", "privileged")}
+        with tempfile.TemporaryDirectory(
+                prefix="masqelec-fuse-local-", dir="/tmp") as root:
+            with mock.patch.object(lab, "prerequisites", return_value=info), \
+                 mock.patch.object(lab.tempfile, "mkdtemp",
+                                   return_value=root), \
+                 mock.patch.object(lab, "rclone_binary",
+                                   return_value="/usr/bin/rclone"), \
+                 mock.patch.object(lab, "_wait_for_fuse",
+                                   return_value=True), \
+                 mock.patch.object(lab, "_run"), \
+                 mock.patch.object(lab, "_mountinfo",
+                                   return_value="synthetic-mountinfo"), \
+                 mock.patch.object(lab, "_check_alternate_layout",
+                                   return_value=True), \
+                 mock.patch.object(lab, "_cleanup",
+                                   return_value=cleanup_result), \
+                 mock.patch.object(lab.subprocess, "Popen",
+                                   return_value=DummyProcess()), \
+                 mock.patch("builtins.open",
+                            return_value=io.BytesIO(lab._SAMPLE)), \
+                 contextlib.redirect_stdout(io.StringIO()) as output:
+                result = lab.run_local_pilot()
+        return result, output.getvalue()
+
+    def test_clean_lab_success_requires_cleanup(self):
+        result, output = self._exercise_full_pilot_mock(True)
+        self.assertEqual(result, "PASS_LOCAL_FUSE_BIND_LAB")
+        self.assertNotIn("CLEANUP=INCOMPLETE", output)
+
+    def test_cleanup_failure_overrides_success(self):
+        result, output = self._exercise_full_pilot_mock(False)
+        self.assertEqual(result, "FAIL_LOCAL_CLEANUP")
+        self.assertIn("CLEANUP=INCOMPLETE", output)
+
+
 if __name__ == "__main__":
     unittest.main()

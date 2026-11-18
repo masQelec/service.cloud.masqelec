@@ -256,7 +256,10 @@ def run_local_pilot():
         result = "FAIL_LOCAL_RUNTIME"
     finally:
         # No borrar directorios donde aún puede existir un FUSE o bind.
-        cleaned = _cleanup(root, binds, fuse, processes)
+        try:
+            cleaned = _cleanup(root, binds, fuse, processes)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            cleaned = False
     if not cleaned:
         print("CLEANUP=INCOMPLETE_TEMP_PATH_REQUIRES_MANUAL_REVIEW")
         return "FAIL_LOCAL_CLEANUP"
