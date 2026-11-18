@@ -135,20 +135,29 @@ def _bind_unit(name, account_index, folder, target):
     """Bind de Linux; sin proceso rclone adicional."""
     account_unit = ACCOUNT_UNITS[account_index]
     source = FUSE_ROOTS[account_index] + "/" + folder
+    # Type=simple solo garantiza proceso lanzado, NO FUSE montado. Espera
+    # acotada (30 s) antes de realizar bind. Sin variables $ que systemd
+    # pudiera expandir, sin lsf ni exploración de directorios de clientes.
+    attempts = " ".join(str(i) for i in range(1, 31))
+    wait = (
+        "for retry in {}; do /bin/mountpoint -q {} && "
+        "/bin/test -d {} && exit 0; /bin/sleep 1; "
+        "done; exit 1"
+    ).format(attempts, FUSE_ROOTS[account_index], source)
     return (
         "[Unit]\n"
         "Description=masQelec bind {} (STAGED PILOT)\n"
         "BindsTo={}\nAfter={}\n\n"
         "[Service]\nType=oneshot\nRemainAfterExit=yes\n"
+        "TimeoutStartSec=45\n"
         "ExecStartPre=/bin/mkdir -p {}\n"
-        "ExecStartPre=/bin/mountpoint -q {}\n"
-        "ExecStartPre=/bin/test -d {}\n"
         "ExecStartPre=/bin/sh -c '! /bin/mountpoint -q {}'\n"
+        "ExecStartPre=/bin/sh -c '{}'\n"
         "ExecStart=/bin/mount --bind {} {}\n"
         "ExecStop=/bin/umount {}\n\n"
         "[Install]\nWantedBy=multi-user.target\n"
     ).format(name, account_unit, account_unit,
-             target, FUSE_ROOTS[account_index], source, target,
+             target, target, wait,
              source, target, target).encode("utf-8")
 
 

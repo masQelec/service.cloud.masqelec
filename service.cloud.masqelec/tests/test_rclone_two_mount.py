@@ -118,6 +118,32 @@ class TwoMountPlanTests(unittest.TestCase):
             self.assertIn("mountpoint -q " + target, unit)
             self.assertNotIn("ExecStartPre=/bin/umount", unit)
 
+
+    def test_binds_wait_bounded_for_real_fuse_ready_with_type_simple(self):
+        bundle = plan.generate(self.conf, self.units)
+        for name, i, folder, target in plan.BIND_MAP:
+            unit = bundle[name][0].decode("utf-8")
+            self.assertIn("TimeoutStartSec=45", unit)
+            self.assertIn("Type=oneshot", unit)
+            self.assertIn("BindsTo=" + plan.ACCOUNT_UNITS[i], unit)
+            self.assertIn("After=" + plan.ACCOUNT_UNITS[i], unit)
+            self.assertIn("/bin/mountpoint -q " + plan.FUSE_ROOTS[i], unit)
+            self.assertIn("/bin/test -d " + plan.FUSE_ROOTS[i]
+                          + "/" + folder, unit)
+            self.assertIn("/bin/sleep 1", unit)
+            self.assertIn("done; exit 1", unit)
+            self.assertIn("ExecStart=/bin/mount --bind", unit)
+            self.assertNotIn("rclone lsf", unit)
+            self.assertNotIn("Type=notify", unit)
+
+    def test_bind_rejects_busy_kodi_target_before_waiting(self):
+        bundle = plan.generate(self.conf, self.units)
+        for name, _, _, target in plan.BIND_MAP:
+            unit = bundle[name][0].decode("utf-8")
+            busy = "ExecStartPre=/bin/sh -c '! /bin/mountpoint -q " + target + "'"
+            self.assertIn(busy, unit)
+            self.assertLess(unit.index(busy), unit.index("for retry in"))
+
     def test_manifest_public_does_not_embed_oauth_or_crypt(self):
         bundle = plan.generate(self.conf, self.units)
         manifest = plan.public_manifest(bundle)
