@@ -358,30 +358,30 @@ class LocalAdapter:
         return True
 
     def _rewrite_canonical_if_stable(self, baseline, new):
-        current, generation = stage._read_file(self.canonical, confidential=True)
+        """Nunca reemplazar rclone.conf mientras haya escritores externos.
+
+        rclone NO respeta flock del addon: ni comparar mtime/inode antes de
+        os.replace puede impedir una renovación simultánea de Google Drive.
+        El candidato reconciliado queda en journal PRIVADO para una fase
+        posterior con todos los escritores efectivamente detenidos.
+        """
+        self._require_enabled()
+        current, _generation = stage._read_file(self.canonical,
+                                                confidential=True)
         if current != baseline:
-            raise ValueError("Concurrent canonical update")
+            raise ValueError("Canonical changed during rollback")
         if current == new:
             return
-        fd, path = tempfile.mkstemp(prefix=".two-mount-recovery-",
-                                    dir=os.path.dirname(self.canonical))
-        try:
-            os.fchmod(fd, 0o600)
-            with os.fdopen(fd, "wb", closefd=False) as out:
-                out.write(new)
-                out.flush()
-            os.fsync(fd)
-            check, newer = stage._read_file(self.canonical, confidential=True)
-            if check != baseline or newer != generation:
-                raise ValueError("Concurrent OAuth change")
-            # No existe CAS filesystem interoperable con rclone en marcha:
-            # el futuro operador debe excluir escritores sobre este fichero.
-            os.replace(path, self.canonical)
-            journal._sync(os.path.dirname(self.canonical))
-        finally:
-            os.close(fd)
-            if os.path.exists(path):
-                os.unlink(path)
+        if self.txn is None or journal.phase(self.txn) not in (
+                "cutover_started", "active", "rollback_required"):
+            raise ValueError("Missing rollback journal")
+        # No reemplaza ni reescribe la configuración compartida. Evita
+        # perder tokens Google Drive por un cambio concurrente sin CAS.
+        journal._write_new(
+            os.path.join(self.txn, "canonical-recovery-candidate.conf"), new)
+        journal._sync(self.txn)
+        raise RuntimeError(
+            "Shared canonical not safely quiesced; manual recovery required")
 
     def reconcile_and_restore_legacy(self):
         self._require_enabled()

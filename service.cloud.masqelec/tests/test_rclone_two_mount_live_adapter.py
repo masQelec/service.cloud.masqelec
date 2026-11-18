@@ -204,6 +204,52 @@ class AdapterTests(unittest.TestCase):
             self.assertFalse(self.adapter._probe_known_media(
                 "/storage/.mnt/videos/1/film.mkv"))
 
+    def test_canonical_unmodified_and_candidate_staged_on_token_change(self):
+        self.assertTrue(self.adapter.legacy_preflight())
+        with journal.locked(str(self.txn)):
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            journal.transition(self.adapter.txn, "prepared", "cutover_started")
+            original = self.config.read_bytes()
+            updated = original.replace(
+                b"refresh-users_library_1", b"offline-rotated-refresh")
+            self.assertNotEqual(original, updated)
+            with self.assertRaisesRegex(RuntimeError, "manual recovery"):
+                self.adapter._rewrite_canonical_if_stable(original, updated)
+            self.assertEqual(self.config.read_bytes(), original)
+            staged = Path(self.adapter.txn,
+                          "canonical-recovery-candidate.conf")
+            self.assertEqual(staged.read_bytes(), updated)
+            self.assertEqual(staged.stat().st_mode & 0o777, 0o600)
+
+    def test_canonical_same_bytes_is_noop_without_candidate(self):
+        original = self.config.read_bytes()
+        self.adapter._rewrite_canonical_if_stable(original, original)
+        self.assertEqual(self.config.read_bytes(), original)
+        self.assertFalse(self.txn.exists())
+
+    def test_canonical_concurrent_change_blocks_staging(self):
+        self.assertTrue(self.adapter.legacy_preflight())
+        with journal.locked(str(self.txn)):
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            journal.transition(self.adapter.txn, "prepared", "cutover_started")
+            old = self.config.read_bytes()
+            self.config.write_bytes(old + b"\n# concurrent\n")
+            with self.assertRaisesRegex(ValueError, "Canonical changed"):
+                self.adapter._rewrite_canonical_if_stable(old, old)
+            self.assertFalse(Path(
+                self.adapter.txn,
+                "canonical-recovery-candidate.conf").exists())
+
+    def test_no_canonical_replace_in_adapter_source(self):
+        code = (Path(__file__).resolve().parents[1] /
+                "lib/rclone_two_mount_live_adapter.py").read_text()
+        start = code.index("def _rewrite_canonical_if_stable")
+        end = code.index("def reconcile_and_restore_legacy", start)
+        text = code[start:end]
+        self.assertNotIn("os.replace(", text)
+        self.assertNotIn("os.rename(", text)
+        self.assertIn("canonical-recovery-candidate.conf", text)
+
     def test_known_systemctl_commands_only(self):
         with self.assertRaises(ValueError):
             self.adapter._systemctl("restart","rclone_videos_1.service")
