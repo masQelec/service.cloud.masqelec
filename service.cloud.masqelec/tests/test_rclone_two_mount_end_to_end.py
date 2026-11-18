@@ -310,6 +310,21 @@ class IntegratedCutoverTests(unittest.TestCase):
                             for p in self.adapter.account_confs))
         self.assertFalse(self.marker.exists())
 
+    def test_crash_after_stop_snapshot_but_before_any_install_recovers(self):
+        with journal.locked(str(self.txn_parent)):
+            self.assertTrue(self.adapter.legacy_preflight())
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+            self.adapter.stop_legacy()
+            journal._write_new(
+                os.path.join(self.adapter.txn, "canonical-at-stop.conf"),
+                self.original)
+            journal._sync(self.adapter.txn)
+        self.assertFalse(self.accounts.exists())
+        self.assertEqual(self.resume_after_crash(), "ROLLED_BACK")
+        self.assertEqual(self.system.active, set(rollout.LEGACY_SERVICES))
+        self.assertFalse(self.marker.exists())
+
     def test_crash_with_rotated_onedrive_restores_private_config(self):
         with journal.locked(str(self.txn_parent)):
             self.assertTrue(self.adapter.legacy_preflight())

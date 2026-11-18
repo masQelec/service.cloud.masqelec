@@ -489,11 +489,27 @@ class LocalAdapter:
                         self.baseline, self.at_stop):
                     raise ValueError("Historical identity changed")
                 self.candidate = plan.generate(self.at_stop, self.units)
-                # Si se instaló un snapshot, ambos han de existir. No
-                # reconstruir token antiguo después de un posible refresh.
-                if any(not os.path.lexists(path)
-                       for path in self.account_confs):
-                    raise ValueError("Missing isolated account recovery state")
+                present = [os.path.lexists(path)
+                           for path in self.account_confs]
+                if not all(present):
+                    # Crash exactamente tras guardar canonical-at-stop, sin
+                    # instalar NINGÚN fichero v2: no hubo escritor nuevo.
+                    # La rama con instalación parcial se bloquea: no hay
+                    # forma fiable de recuperar tokens si faltan snapshots.
+                    new_units_exist = any(os.path.lexists(
+                        os.path.join(self.unit_dir, unit))
+                        for unit in rollout.NEW_SERVICES +
+                                    rollout.BIND_SERVICES)
+                    new_mounted = any(root in self._mounts()
+                                      for root in plan.FUSE_ROOTS)
+                    new_running = any(self._active(unit)
+                                      for unit in rollout.NEW_SERVICES)
+                    if (any(present) or new_units_exist or
+                            new_mounted or new_running):
+                        raise ValueError(
+                            "Missing isolated account recovery state")
+                    self.at_stop = None
+                    self.candidate = None
             else:
                 self.at_stop = None
                 self.candidate = None
