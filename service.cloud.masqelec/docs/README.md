@@ -138,3 +138,5 @@ Se añadió `lib/rclone_two_mount_live_adapter.py` al código de `develop` con e
 | [Distribución MQC2 legacy/v2 y primera limpieza systemd](AUTO_UPDATE_TWO_MOUNT_ARCHITECTURE_2026-11-18.md) | Nombres de archivo por versión, escritor/lector OAuth pendientes y eliminación segura de unidades antiguas |
 
 | [Sincronización MASTER v2 con GitHub](MASTER_V2_GITHUB_SYNC_2026-11-19.md) | 404 crea, cambios comprobados actualizan, CAS/readback, banderas desactivadas, riesgos legacy pendientes |
+
+| [Primer arranque automático y limpieza de legacy](AUTO_FIRST_RUN_CUTOVER_2026-11-19.md) | Orden transaccional, bloqueo por reproducción, limpieza idempotente, interruptores de release y gates reales |

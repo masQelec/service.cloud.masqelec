@@ -225,3 +225,7 @@ Nuevo contrato puro `rclone_two_mount_config_routes.py`: la versión antigua per
 ### 19/11/2026 — MASTER: creación y actualización de MQC2 v2 en GitHub (desactivado)
 
 MASTER v2 está preparado para **crear `rclone/rclone-v2.conf.crypt` si el GET autenticado es 404**, o **actualizarlo mediante CAS cuando cambien refresh tokens verificados**, cifrando y comprobando readback. La versión actual mantiene las banderas False y no ha publicado nada; el endpoint cloud v2 aún no existe. CI 704/704 OK. [Diseño y pruebas](service.cloud.masqelec/docs/MASTER_V2_GITHUB_SYNC_2026-11-19.md).
+
+### 19/11/2026 — primer arranque y limpieza legacy preparados, desactivados
+
+El addon ya contiene el trabajador de primer arranque y reintento al quedar Kodi inactivo, con cutover local y borrado verificado de las cuatro unidades systemd antiguas **solo tras ACTIVE**. Las bibliotecas `.strm` siguen locales. **754/754 pruebas CI OK**, banderas False y pruebas reales pendientes; aún falta descubrir un archivo multimedia conocido por cuenta sin configuración manual por dispositivo. [Procedimiento y pendientes](service.cloud.masqelec/docs/AUTO_FIRST_RUN_CUTOVER_2026-11-19.md).
