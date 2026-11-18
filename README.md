@@ -201,3 +201,7 @@ KodiELEC: preflight READY; piloto `FAIL_SERVICE_START` con `CLEANUP=COMPLETE`. P
 ### Fix KodiELEC systemd: `/bin/test` ausente (18/11/2026)
 
 Causa real del fallo de `BIND_VIDEOS_1`: KodiELEC no tiene `/bin/test`. Ambas generaciones de bind (laboratorio y unidades candidatas) usan ahora el builtin `[ -d ... ]`. **624/624 CI OK**; reensayo real pendiente. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
+
+### 18/11/2026 — systemd real 2 FUSE + 4 bind: PASS
+
+El MASTER KodiELEC confirmó **`PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL` + `CLEANUP=COMPLETE`** en laboratorio local sin acceso a OneDrive ni cambios de producción. La corrección de `/bin/test` funcionó en dispositivo. Generador candidato con `ExecStop=/bin/umount`. **624/624 CI OK**. Próximo gate: coordinación OAuth MASTER/CLIENTES antes de OneDrive real. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).

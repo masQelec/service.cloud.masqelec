@@ -1,5 +1,5 @@
 # KodiELEC — laboratorio systemd REAL y aislado (2 FUSE + 4 bind)
-**18-11-2026 · Estado: primer ensayo REAL FALLÓ en arranque; limpieza PASS. Diagnóstico de unidad pendiente.**
+**18-11-2026 · Estado: laboratorio REAL superado tras fix; `CLEANUP=COMPLETE`, `PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL`. OAuth aún no probado.**
 
 ## Propósito
 
@@ -148,3 +148,37 @@ python3 /tmp/rclone_two_mount_systemd_local_lab.py --run-isolated-systemd --conf
 Resultado objetivo: `CLEANUP=COMPLETE` y `LAB_RESULT=PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL`. Si vuelve a fallar, conservar `FAILED_STAGE`, `SYSTEMD_DIAG_CLASS`, `SYSTEMD_PRE_STATUS`, `CLEANUP` y `LAB_RESULT`, **sin activar ni modificar servicios legacy**. Si limpieza incompleta, no repetir el piloto. `systemctl daemon-reload` forma parte del ensayo (relee unidades globales, no reinicia legacy). Nada se ha desplegado en los dispositivos; las banderas continúan en `False`.
 
 **Próximo gate:** obtener PASS físico en el MASTER con esta revisión y luego avanzar a ensayo crypt/OneDrive real bajo autorización operativa. No declarar el problema resuelto en dispositivo solo porque CI pasó.
+
+## 18/11/2026 — RESULTADO REAL: systemd local 2 FUSE + 4 bind PASS, limpieza PASS
+
+El operador ejecutó en el MASTER KodiELEC la **versión corregida** del laboratorio aislado (código `d79a6fd3d4a64b0d0cf93f76d1fd77fa7d09a95c`) y confirmó esta salida final exacta:
+
+```text
+LAB_MODE=RCLONE_2FUSE_4BIND_REAL_SYSTEMD_ISOLATED
+ONEDRIVE_ACCESSED=NO
+LIVE_RCLONE_CONFIG_READ=NO
+KODI_MOUNT_PATHS_CHANGED=NO
+LEGACY_SERVICE_START_STOP=NO
+LEGACY_UNIT_FILES_CHANGED=NO
+SYSTEMD_DAEMON_RELOAD=ISOLATED_RUN_ONLY
+SYSTEMD_RUNTIME_UNITS_ONLY=YES
+PERMANENT_UNITS_ENABLED=NO
+GITHUB_UPLOAD=NO
+CLEANUP=COMPLETE
+LAB_RESULT=PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL
+```
+
+**Alcance confirmado:** 2 rclone FUSE con backend LOCAL ficticio, 4 bind bajo unidades temporales de systemd, comprobación de `mountinfo` con dos superblocks diferentes y los cuatro bind exactos, lectura de las cuatro muestras, parada y limpieza completa. Únicamente `/tmp/masqelec-sd-lab-*` y `/run/systemd/system/masqelec-sd-lab-*.service`; `daemon-reload` del gestor systemd, sin stop/start de unidades de producción ni habilitaciones permanentes. No se accedió a OneDrive ni a OAuth. **No repetir laboratorio local superado salvo cambio pertinente del runtime.**
+
+**Histórico del fallo resuelto:** la primera ejecución falló `BIND_VIDEOS_1` por `/bin/test: No such file or directory`, repitiendo 30 veces. Se corrigieron tanto `tools/rclone_two_mount_systemd_local_lab.py` como `lib/rclone_two_mount_plan.py` para usar builtin de `/bin/sh`: `[ -d ... ]`. El reensayo REAL prueba la corrección para unidades del laboratorio. El generador definitivo comparte la corrección y tiene test de regresión, pero **no se ha desplegado ni probado con OneDrive**.
+
+**Mejora adicional post-PASS:** `lib/rclone_two_mount_plan.py::_root_unit` ahora utiliza `ExecStop=/bin/umount <fuse_root>` en vez de `/bin/fusermount -uz`. `/bin/umount` fue utilizado por las unidades del piloto real (limpieza PASS). La parada de unidades de producción con estos parámetros todavía no ha sido ensayada. Suite final [Actions 44406909094](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44406909094) **624/624 PASS**.
+
+### Lo pendiente antes de permitir migración REAL
+
+- `rclone_two_mount_real_probe_lab.py --real-probe` está **bloqueado por diseño** si hay montajes rclone activos y además bloquea si no existe coordinación demostrable entre dispositivos con tokens OneDrive compartidos. No quitar barreras ni lanzar `rclone lsf` sobre cuentas reales por el PASS local. Una simple solicitud remota puede renovar un refresh token e invalidar o desincronizar el de otro cliente.
+- Definir ventana de mantenimiento y coordinación MASTER/CLIENTES con comprobación de escritores OAuth, copias privadas 0600 de tokens y rollback; verificar criptografía y lectura de **un archivo conocido por cuenta** sin rastreo de bibliotecas.
+- Probar la reproducción `.strm` real de Kodi en las cuatro rutas originales, la restauración efectiva de los cuatro servicios y el comportamiento tras reinicio. `boot_guard` es bloqueo conservador, no un mecanismo de recuperación automática ya probado en KodiELEC real.
+- `RCLONE_TWO_MOUNT_STAGING_ENABLED=False`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`, `RCLONE_TOKEN_SYNC_ENABLED=False`. No ha habido despliegue de las seis unidades candidatas ni modificación de cuatro montajes legacy. Sin cambios en `addon/main` ni `cloud/develop/master`.
+
+**GATE REAL_SYSTEMD_LOCAL_2FUSE_4BIND=PASS**; **GATE REAL_ONEDRIVE_2FUSE=NOT_RUN**; **CUTOVER_AUTHORIZED=NO**.
