@@ -356,7 +356,7 @@ def _cleanup(root, units):
     names = _unit_names(root)
     safe = True
     # Detener primero bind, luego FUSE. No matar servicios legacy.
-    for name in reversed(names["bind"] + names["fuse"]):
+    for name in list(reversed(names["bind"])) + list(reversed(names["fuse"])):
         try:
             if not _control("stop", name):
                 # Servicios fallidos o no iniciados pueden devolver error.
