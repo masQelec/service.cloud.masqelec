@@ -12,6 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import rclone_two_mount_live_adapter as live
 from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_journal as journal
+from lib import rclone_two_mount_plan as plan
+from lib import rclone_token_policy as policy
 from test_rclone_mount_isolation import wrapped_conf, sample_units
 
 
@@ -249,6 +251,54 @@ class AdapterTests(unittest.TestCase):
         self.assertNotIn("os.replace(", text)
         self.assertNotIn("os.rename(", text)
         self.assertIn("canonical-recovery-candidate.conf", text)
+
+    def _prepare_reconcile_context(self, *, rotated=False):
+        self.assertTrue(self.adapter.legacy_preflight())
+        with journal.locked(str(self.txn)):
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            journal.transition(self.adapter.txn, "prepared", "cutover_started")
+        original = self.config.read_bytes()
+        self.adapter.at_stop = original
+        self.accounts.mkdir(mode=0o700)
+        for i in (0, 1):
+            raw = plan.account_snapshot(original, i)
+            if rotated and i == 0:
+                raw = raw.replace(b"refresh-users_library_1",
+                                  b"ROTATED-ONEDRIVE-ACCOUNT-1")
+                self.assertIn(b"ROTATED-ONEDRIVE-ACCOUNT-1", raw)
+            path = Path(self.adapter.account_confs[i])
+            path.write_bytes(raw)
+            path.chmod(0o600)
+        return original
+
+    def test_integrated_rollback_stages_refreshed_oauth_but_does_not_write_shared(self):
+        original = self._prepare_reconcile_context(rotated=True)
+        with journal.locked(str(self.txn)):
+            with self.assertRaisesRegex(RuntimeError, "manual recovery"):
+                self.adapter.reconcile_and_restore_legacy()
+        self.assertEqual(self.config.read_bytes(), original)
+        self.assertEqual(journal.phase(self.adapter.txn), "rollback_required")
+        candidate = Path(self.adapter.txn,
+                         "canonical-recovery-candidate.conf")
+        self.assertTrue(candidate.is_file())
+        self.assertEqual(candidate.stat().st_mode & 0o777, 0o600)
+        content = candidate.read_bytes()
+        self.assertIn(b"ROTATED-ONEDRIVE-ACCOUNT-1", content)
+        self.assertEqual(
+            policy.oauth_tokens(content)["updater"],
+            policy.oauth_tokens(original)["updater"])
+        self.assertEqual(
+            policy.oauth_tokens(content)["logs"],
+            policy.oauth_tokens(original)["logs"])
+
+    def test_integrated_rollback_without_token_rotation_leaves_canonical_intact(self):
+        original = self._prepare_reconcile_context(rotated=False)
+        with journal.locked(str(self.txn)):
+            self.adapter.reconcile_and_restore_legacy()
+        self.assertEqual(self.config.read_bytes(), original)
+        self.assertFalse(Path(
+            self.adapter.txn, "canonical-recovery-candidate.conf").exists())
+        self.assertEqual(journal.phase(self.adapter.txn), "rollback_required")
 
     def test_known_systemctl_commands_only(self):
         with self.assertRaises(ValueError):

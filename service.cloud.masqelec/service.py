@@ -279,12 +279,6 @@ def _two_mounts_ready() -> bool:
 
 
 def _mounts_ready() -> bool:
-    if rclone_two_mount_boot_guard.recovery_required(
-            feature_allowed=getattr(
-                constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)):
-        log("_mounts_ready: transición interrumpida; escaneo remoto/local bloqueado",
-            "ERROR")
-        return False
     """
     Verifica que los montajes rclone están:
       ✔ en /proc/mounts como fuse.rclone
@@ -292,6 +286,12 @@ def _mounts_ready() -> bool:
       ✔ NO vacíos
       ✔ sin bloquear por FUSE colgado
     """
+    if rclone_two_mount_boot_guard.recovery_required(
+            feature_allowed=getattr(
+                constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)):
+        log("_mounts_ready: transición interrumpida; escaneo remoto/local bloqueado",
+            "ERROR")
+        return False
     mode = rclone_two_mount_rollout.mode(
         getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
     )
