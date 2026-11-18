@@ -33,7 +33,8 @@ class LocalAdapter:
     def __init__(self, rpc_call=None, *, live_enabled=False,
                  canonical=stage.LOCAL_CONF, unit_dir=stage.LEGACY_UNIT_DIR,
                  account_confs=plan.ACCOUNT_CONFS, state_path=rollout.STATE_PATH,
-                 txn_parent=TXN_PARENT, runner=None, mount_reader=None):
+                 txn_parent=TXN_PARENT, runner=None, mount_reader=None,
+                 known_media_files=()):
         self.rpc = rpc_call
         self.enabled = live_enabled is True
         self.canonical = canonical
@@ -51,6 +52,8 @@ class LocalAdapter:
         self.candidate = None
         self.installed = {}
         self.started_roots = set()
+        self.attempted_binds = set()
+        self.known_media_files = tuple(known_media_files)
 
     def _require_enabled(self):
         if not self.enabled:
@@ -220,18 +223,49 @@ class LocalAdapter:
     def start_binds(self):
         self._require_enabled()
         for unit in rollout.BIND_SERVICES:
+            # Registrar antes del comando: pudo arrancar aunque systemctl
+            # expirase. El rollback debe intentar detenerlo.
+            self.attempted_binds.add(unit)
             self._systemctl("start", unit)
+
+    def _known_media_verified(self):
+        """Una lectura exacta por OneDrive. No recorre directorios remotos."""
+        if len(self.known_media_files) != 2:
+            return False
+        for index, path in enumerate(self.known_media_files, 1):
+            prefixes = (
+                "/storage/.mnt/videos/{}/".format(index),
+                "/storage/.mnt/tvshows/{}/".format(index),
+            )
+            if (not isinstance(path, str) or not os.path.isabs(path)
+                    or os.path.normpath(path) != path
+                    or not path.startswith(prefixes)):
+                return False
+            fd = None
+            try:
+                fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+                if not os.read(fd, 1):
+                    return False
+            except OSError:
+                return False
+            finally:
+                if fd is not None:
+                    os.close(fd)
+        return True
 
     def complete_health(self):
         self._require_enabled()
         return (health.check_two_fuse_four_bind(self.mount_reader())
                 and all(self._active(unit) for unit in (
-                    rollout.NEW_SERVICES + rollout.BIND_SERVICES)))
+                    rollout.NEW_SERVICES + rollout.BIND_SERVICES))
+                and self._known_media_verified())
 
     def mark_active(self):
         self._require_enabled()
         if self.txn is None or journal.phase(self.txn) != "cutover_started":
             raise ValueError("Durable phase not ready")
+        if not self.complete_health():
+            raise ValueError("2 FUSE, 4 bind or known-media read failed")
         for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
             self._systemctl("enable", unit)
         for unit in rollout.LEGACY_SERVICES:
@@ -265,13 +299,15 @@ class LocalAdapter:
     def stop_binds(self):
         self._require_enabled()
         for unit in reversed(rollout.BIND_SERVICES):
-            if os.path.lexists(os.path.join(self.unit_dir, unit)):
+            if (os.path.lexists(os.path.join(self.unit_dir, unit))
+                    and (unit in self.attempted_binds or self._active(unit))):
                 self._systemctl("stop", unit)
 
     def stop_fuse(self):
         self._require_enabled()
         for unit in reversed(rollout.NEW_SERVICES):
-            if os.path.lexists(os.path.join(self.unit_dir, unit)):
+            if (os.path.lexists(os.path.join(self.unit_dir, unit))
+                    and (unit in self.started_roots or self._active(unit))):
                 self._systemctl("stop", unit)
 
     def new_fully_unmounted(self):

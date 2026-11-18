@@ -103,7 +103,10 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(journal.phase(self.adapter.txn),
                          "cutover_started")
         self.assertEqual(rollout.mode(False, str(self.marker)), "unsafe")
-        self.assertEqual(self.actions, [])
+        self.assertTrue(all(a[:3] == (
+            "systemctl", "is-active", "--quiet") for a in self.actions))
+        self.assertNotIn(("systemctl", "stop",
+                          "rclone_videos_1.service"), self.actions)
 
     def test_mount_guard_identifies_old_and_new(self):
         self.assertTrue(self.adapter._old_mounted())
@@ -122,6 +125,46 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(self.adapter.playback_still_idle())
         self.adapter.rpc = lambda _: '{"jsonrpc":"2.0","id":1,"result":[{"playerid":1,"type":"video"}]}'
         self.assertFalse(self.adapter.playback_still_idle())
+
+    def test_health_refuses_without_two_known_media(self):
+        self.adapter.mountinfo = self.legacy_mountinfo
+        self.assertFalse(self.adapter._known_media_verified())
+
+    def test_known_media_rejects_non_kodi_paths_without_open(self):
+        self.adapter.known_media_files = (
+            "/tmp/fake/movie.mkv", "/storage/.mnt/videos/2/film.mkv")
+        with mock.patch.object(live.os, "open",
+                               side_effect=AssertionError("must not open")):
+            self.assertFalse(self.adapter._known_media_verified())
+
+    def test_known_media_rejects_path_traversal(self):
+        self.adapter.known_media_files = (
+            "/storage/.mnt/videos/1/../other.mkv",
+            "/storage/.mnt/videos/2/a.mkv")
+        with mock.patch.object(live.os, "open",
+                               side_effect=AssertionError("must not open")):
+            self.assertFalse(self.adapter._known_media_verified())
+
+    def test_known_media_reads_one_byte_per_account(self):
+        self.adapter.known_media_files = (
+            "/storage/.mnt/videos/1/one.mkv",
+            "/storage/.mnt/tvshows/2/two.mkv")
+        with mock.patch.object(live.os, "open", return_value=91) as opening, \\
+             mock.patch.object(live.os, "read", return_value=b"x") as reading, \\
+             mock.patch.object(live.os, "close"):
+            self.assertTrue(self.adapter._known_media_verified())
+        self.assertEqual(opening.call_count, 2)
+        self.assertEqual(reading.call_count, 2)
+        self.assertEqual(reading.call_args.args[1], 1)
+
+    def test_known_media_empty_file_fails(self):
+        self.adapter.known_media_files = (
+            "/storage/.mnt/videos/1/one.mkv",
+            "/storage/.mnt/tvshows/2/two.mkv")
+        with mock.patch.object(live.os, "open", return_value=91), \
+             mock.patch.object(live.os, "read", return_value=b""), \
+             mock.patch.object(live.os, "close"):
+            self.assertFalse(self.adapter._known_media_verified())
 
     def test_known_systemctl_commands_only(self):
         with self.assertRaises(ValueError):
