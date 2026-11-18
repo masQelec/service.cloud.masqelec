@@ -17,20 +17,29 @@ def fn(name):
     raise AssertionError("Expected service function absent: " + name)
 
 
+def calls_inside(name):
+    return [
+        ast.unparse(call.func)
+        for call in ast.walk(fn(name))
+        if isinstance(call, ast.Call)
+    ]
+
+
 class RemoteScanFenceTests(unittest.TestCase):
     def test_v2_mount_health_does_not_use_remote_filesystem(self):
-        block = ast.dump(fn("_two_mounts_ready"))
-        for forbidden in ("_safe_listdir", "listdir", "scandir", "walk",
-                          "isdir", "stat", "rclone lsf"):
+        calls = calls_inside("_two_mounts_ready")
+        for forbidden in ("_safe_listdir", "os.listdir", "os.scandir",
+                          "os.walk", "os.path.isdir", "os.stat",
+                          "os.path.exists", "subprocess.run"):
             with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, block)
+                self.assertNotIn(forbidden, calls)
 
     def test_legacy_mount_health_does_not_enumerate_onedrive(self):
-        block = ast.dump(fn("_mounts_ready"))
+        calls = calls_inside("_mounts_ready")
         for forbidden in ("_safe_listdir", "os.listdir", "os.scandir",
-                          "os.walk", "os.stat"):
+                          "os.walk", "os.stat", "os.path.isdir"):
             with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, block)
+                self.assertNotIn(forbidden, calls)
 
     def test_both_paths_use_kernel_mount_tables(self):
         source = SERVICE.read_text(encoding="utf-8")
