@@ -1,0 +1,396 @@
+# -*- coding: utf-8 -*-
+"""Adaptador local EN DESARROLLO para motor 4 FUSE -> 2 FUSE + 4 bind.
+
+No importado por service.py ni expuesto como comando --apply. Se crea con
+live_enabled=False por defecto, que bloquea CUALQUIER operación mutable.
+Aún requiere pruebas integradas con systemd/KodiELEC y recuperación de reboot.
+No hay autorización de despliegue.
+"""
+import os
+import stat
+import subprocess
+import tempfile
+import time
+
+from lib import rclone_two_mount_atomic_install as atomic
+from lib import rclone_two_mount_cutover_engine as engine
+from lib import rclone_two_mount_health as health
+from lib import rclone_two_mount_journal as journal
+from lib import rclone_two_mount_kodi_idle as kodi_idle
+from lib import rclone_two_mount_plan as plan
+from lib import rclone_two_mount_rollout as rollout
+from lib import rclone_two_mount_startup_stage as stage
+from lib import rclone_two_mount_token_rollback as oauth
+from lib import rclone_conf_merge as conf
+
+
+TXN_PARENT = "/storage/.config/masqelec/rclone-v2-transaction"
+
+
+class LocalAdapter:
+    """Inyección explícita de acceso real: por defecto NUNCA ejecuta."""
+
+    def __init__(self, rpc_call=None, *, live_enabled=False,
+                 canonical=stage.LOCAL_CONF, unit_dir=stage.LEGACY_UNIT_DIR,
+                 account_confs=plan.ACCOUNT_CONFS, state_path=rollout.STATE_PATH,
+                 txn_parent=TXN_PARENT, runner=None, mount_reader=None):
+        self.rpc = rpc_call
+        self.enabled = live_enabled is True
+        self.canonical = canonical
+        self.unit_dir = unit_dir
+        self.account_confs = tuple(account_confs)
+        self.state_path = state_path
+        self.txn_parent = txn_parent
+        self.runner = runner if runner is not None else self._system_runner
+        self.mount_reader = (mount_reader if mount_reader is not None
+                             else self._system_mountinfo)
+        self.baseline = None
+        self.units = None
+        self.txn = None
+        self.at_stop = None
+        self.candidate = None
+        self.installed = {}
+        self.started_roots = set()
+
+    def _require_enabled(self):
+        if not self.enabled:
+            raise PermissionError("Cutover operator is disabled")
+
+    @staticmethod
+    def _system_runner(args):
+        completed = subprocess.run(
+            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=50, check=False)
+        return completed.returncode == 0
+
+    @staticmethod
+    def _system_mountinfo():
+        with open("/proc/self/mountinfo", "r", encoding="utf-8") as source:
+            return source.read()
+
+    def _systemctl(self, operation, *names):
+        self._require_enabled()
+        allowed_operations = {
+            "start", "stop", "enable", "disable",
+            "daemon-reload", "is-active",
+        }
+        allowed_names = set(rollout.LEGACY_SERVICES)
+        allowed_names.update(rollout.NEW_SERVICES)
+        allowed_names.update(rollout.BIND_SERVICES)
+        if operation not in allowed_operations:
+            raise ValueError("Unauthorized systemctl operation")
+        if operation == "daemon-reload":
+            if names:
+                raise ValueError("Unexpected reload unit")
+        elif len(names) != 1 or names[0] not in allowed_names:
+            raise ValueError("Unexpected systemd unit")
+        if self.runner(["systemctl", operation] + list(names)) is not True:
+            raise RuntimeError("Local systemd action did not complete")
+
+    def _active(self, unit):
+        self._require_enabled()
+        return self.runner(["systemctl", "is-active", "--quiet", unit]) is True
+
+    def _mounts(self):
+        return health.mount_entries(self.mount_reader())
+
+    def _old_mounted(self):
+        entries = self._mounts()
+        return all(entries.get(dst, {}).get("fstype") == "fuse.rclone"
+                   for _, _, _, dst in plan.BIND_MAP)
+
+    def legacy_preflight(self):
+        self._require_enabled()
+        if (os.path.lexists(self.state_path)
+                or any(os.path.lexists(os.path.join(self.unit_dir, x))
+                       for x in rollout.NEW_SERVICES + rollout.BIND_SERVICES)
+                or any(os.path.lexists(path) for path in self.account_confs)):
+            return False
+        raw, _ = stage._read_file(self.canonical, confidential=True)
+        units = {
+            name: stage._read_file(os.path.join(self.unit_dir, name))[0]
+            for name in rollout.LEGACY_SERVICES
+        }
+        plan.generate(raw, units)
+        if not self._old_mounted():
+            return False
+        entries = self._mounts()
+        if any(root in entries for root in plan.FUSE_ROOTS):
+            return False
+        if not all(self._active(unit) for unit in rollout.LEGACY_SERVICES):
+            return False
+        self.baseline = raw
+        self.units = units
+        return True
+
+    def playback_still_idle(self):
+        self._require_enabled()
+        return kodi_idle.is_playback_idle(self.rpc)
+
+    def prepare_durable_rollback(self):
+        self._require_enabled()
+        if self.baseline is None or self.units is None:
+            return False
+        self.txn = journal.prepare(self.txn_parent, self.baseline, self.units)
+        return journal.phase(self.txn) == "prepared"
+
+    @staticmethod
+    def _unsafe_marker():
+        return (
+            '{"schema":1,"layout":"two-fuse-v1","state":"cutover_started",'
+            '"candidate_id":"2026-11-17-two-fuse-v1"}\n'
+        ).encode("utf-8")
+
+    @staticmethod
+    def _active_marker():
+        return (
+            '{"schema":1,"layout":"two-fuse-v1","state":"active",'
+            '"candidate_id":"2026-11-17-two-fuse-v1"}\n'
+        ).encode("utf-8")
+
+    def mark_cutover_started(self):
+        self._require_enabled()
+        if self.txn is None or journal.phase(self.txn) != "prepared":
+            raise ValueError("Missing durable backup")
+        # Bloquea el actualizador legacy incluso si Kodi reinicia durante
+        # el corte. El estado es inválido para rollout.mode => unsafe.
+        atomic.install_exclusive(self.state_path, self._unsafe_marker(), 0o600)
+        journal.transition(self.txn, "prepared", "cutover_started")
+
+    def stop_legacy(self):
+        self._require_enabled()
+        for unit in rollout.LEGACY_SERVICES:
+            self._systemctl("stop", unit)
+
+    def legacy_fully_unmounted(self):
+        self._require_enabled()
+        entries = self._mounts()
+        return (all(target not in entries
+                    for _, _, _, target in plan.BIND_MAP)
+                and not any(self._active(unit)
+                            for unit in rollout.LEGACY_SERVICES))
+
+    def install_current_v2(self):
+        self._require_enabled()
+        if not self.legacy_fully_unmounted() or self.baseline is None:
+            raise ValueError("Legacy still active")
+        latest, _ = stage._read_file(self.canonical, confidential=True)
+        if not conf.same_non_token_settings(self.baseline, latest):
+            raise ValueError("Canonical identity changed")
+        proposal = plan.generate(latest, self.units)
+        self.at_stop = latest
+        journal._write_new(os.path.join(self.txn, "canonical-at-stop.conf"),
+                           latest)
+        journal._sync(self.txn)
+        parent = os.path.dirname(self.account_confs[0])
+        if os.path.dirname(self.account_confs[1]) != parent:
+            raise ValueError("Account config parents differ")
+        os.makedirs(parent, mode=0o700, exist_ok=True)
+        journal._private_dir(parent)
+        self.candidate = proposal
+        for i in (0, 1):
+            name = "account{}.conf".format(i + 1)
+            data, mode = proposal[name]
+            path = self.account_confs[i]
+            atomic.install_exclusive(path, data, mode)
+            self.installed[path] = data
+        for name in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
+            data, mode = proposal[name]
+            path = os.path.join(self.unit_dir, name)
+            atomic.install_exclusive(path, data, mode)
+            self.installed[path] = data
+        self._systemctl("daemon-reload")
+
+    def start_fuse(self):
+        self._require_enabled()
+        for unit in rollout.NEW_SERVICES:
+            self._systemctl("start", unit)
+            self.started_roots.add(unit)
+
+    def fuse_ready(self):
+        self._require_enabled()
+        for _ in range(60):
+            entries = self._mounts()
+            if all(entries.get(path, {}).get("fstype") == "fuse.rclone"
+                   for path in plan.FUSE_ROOTS):
+                return True
+            time.sleep(0.25)
+        return False
+
+    def start_binds(self):
+        self._require_enabled()
+        for unit in rollout.BIND_SERVICES:
+            self._systemctl("start", unit)
+
+    def complete_health(self):
+        self._require_enabled()
+        return (health.check_two_fuse_four_bind(self.mount_reader())
+                and all(self._active(unit) for unit in (
+                    rollout.NEW_SERVICES + rollout.BIND_SERVICES)))
+
+    def mark_active(self):
+        self._require_enabled()
+        if self.txn is None or journal.phase(self.txn) != "cutover_started":
+            raise ValueError("Durable phase not ready")
+        for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
+            self._systemctl("enable", unit)
+        for unit in rollout.LEGACY_SERVICES:
+            self._systemctl("disable", unit)
+        self._replace_marker(self._unsafe_marker(), self._active_marker())
+        journal.transition(self.txn, "cutover_started", "active")
+
+    def _replace_marker(self, expected, new):
+        old, generation = stage._read_file(self.state_path, confidential=True)
+        if old != expected:
+            raise ValueError("Unexpected architecture marker")
+        fd, path = tempfile.mkstemp(
+            prefix=".rclone-v2-mode-", dir=os.path.dirname(self.state_path))
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb", closefd=False) as dest:
+                dest.write(new)
+                dest.flush()
+            os.fsync(fd)
+            now, newer_generation = stage._read_file(
+                self.state_path, confidential=True)
+            if (now != expected or newer_generation != generation):
+                raise ValueError("Architecture marker changed")
+            os.replace(path, self.state_path)
+            journal._sync(os.path.dirname(self.state_path))
+        finally:
+            os.close(fd)
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def stop_binds(self):
+        self._require_enabled()
+        for unit in reversed(rollout.BIND_SERVICES):
+            if os.path.lexists(os.path.join(self.unit_dir, unit)):
+                self._systemctl("stop", unit)
+
+    def stop_fuse(self):
+        self._require_enabled()
+        for unit in reversed(rollout.NEW_SERVICES):
+            if os.path.lexists(os.path.join(self.unit_dir, unit)):
+                self._systemctl("stop", unit)
+
+    def new_fully_unmounted(self):
+        self._require_enabled()
+        entries = self._mounts()
+        if any(root in entries for root in plan.FUSE_ROOTS):
+            return False
+        # No confundir legacy FUSE (fsroot=/) con bind v2 (fsroot=/movies).
+        for _, _, folder, target in plan.BIND_MAP:
+            entry = entries.get(target)
+            if entry is not None and entry["fsroot"].rstrip("/") == "/" + folder:
+                return False
+        return True
+
+    def _rewrite_canonical_if_stable(self, baseline, new):
+        current, generation = stage._read_file(self.canonical, confidential=True)
+        if current != baseline:
+            raise ValueError("Concurrent canonical update")
+        if current == new:
+            return
+        fd, path = tempfile.mkstemp(prefix=".two-mount-recovery-",
+                                    dir=os.path.dirname(self.canonical))
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb", closefd=False) as out:
+                out.write(new)
+                out.flush()
+            os.fsync(fd)
+            check, newer = stage._read_file(self.canonical, confidential=True)
+            if check != baseline or newer != generation:
+                raise ValueError("Concurrent OAuth change")
+            # No existe CAS filesystem interoperable con rclone en marcha:
+            # el futuro operador debe excluir escritores sobre este fichero.
+            os.replace(path, self.canonical)
+            journal._sync(os.path.dirname(self.canonical))
+        finally:
+            os.close(fd)
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def reconcile_and_restore_legacy(self):
+        self._require_enabled()
+        if self.txn is None:
+            raise ValueError("No rollback journal")
+        phase = journal.phase(self.txn)
+        if phase in ("cutover_started", "active"):
+            journal.transition(self.txn, phase, "rollback_required")
+        current, _ = stage._read_file(self.canonical, confidential=True)
+        if self.at_stop is not None:
+            snapshots = []
+            for index, path in enumerate(self.account_confs):
+                if os.path.lexists(path):
+                    raw = stage._read_file(path, confidential=True)[0]
+                elif self.candidate is not None and not self.started_roots:
+                    raw = self.candidate["account{}.conf".format(index+1)][0]
+                else:
+                    raise ValueError("Missing refreshed account state")
+                snapshots.append(raw)
+            new = oauth.reconcile_canonical_for_rollback(
+                self.at_stop, current, snapshots[0], snapshots[1])
+            self._rewrite_canonical_if_stable(current, new)
+        elif self.baseline is not None:
+            # Falla antes de instalar v2: no se sobrescriben tokens canónicos.
+            if not conf.same_non_token_settings(self.baseline, current):
+                raise ValueError("Canonical changed before install")
+        else:
+            raise ValueError("Missing baseline")
+
+    def start_legacy(self):
+        self._require_enabled()
+        for unit in rollout.NEW_SERVICES + rollout.BIND_SERVICES:
+            if os.path.lexists(os.path.join(self.unit_dir, unit)):
+                self._systemctl("disable", unit)
+        for unit in rollout.LEGACY_SERVICES:
+            self._systemctl("enable", unit)
+            self._systemctl("start", unit)
+
+    def legacy_healthy(self):
+        self._require_enabled()
+        return (self._old_mounted()
+                and all(self._active(unit) for unit in rollout.LEGACY_SERVICES))
+
+    def mark_legacy_restored(self):
+        self._require_enabled()
+        if not self.new_fully_unmounted() or not self.legacy_healthy():
+            raise ValueError("Unsafe rollback state")
+        for path, content in reversed(tuple(self.installed.items())):
+            if path in self.account_confs:
+                # Account secrets pueden haberse renovado: ya conciliados.
+                content = stage._read_file(path, confidential=True)[0]
+            atomic.remove_if_identical(path, content)
+        self._systemctl("daemon-reload")
+        if os.path.lexists(self.state_path):
+            existing, _ = stage._read_file(
+                self.state_path, confidential=True)
+            if existing not in (self._unsafe_marker(), self._active_marker()):
+                raise ValueError("Unknown marker cannot be removed")
+            os.unlink(self.state_path)
+            journal._sync(os.path.dirname(self.state_path))
+        phase = journal.phase(self.txn)
+        if phase == "rollback_required":
+            journal.transition(self.txn, "rollback_required",
+                               "legacy_restored")
+        elif phase != "prepared":
+            raise ValueError("Inconsistent restored phase")
+
+
+def execute_with_local_lock(adapter, *, authorized=False,
+                            verified_rollback=False):
+    """No bootstrap live. Requiere callback Kodi; ambos flags default NO."""
+    if authorized is not True or not adapter.enabled:
+        return "BLOCKED_NOT_AUTHORIZED"
+    if verified_rollback is not True:
+        return "BLOCKED_ROLLBACK_NOT_READY"
+    try:
+        with journal.locked(adapter.txn_parent):
+            return engine.run(
+                adapter, release_authorized=True,
+                playback_idle=kodi_idle.is_playback_idle(adapter.rpc),
+                rollback_ready=True)
+    except (OSError, ValueError, BlockingIOError):
+        return "MANUAL_RECOVERY_REQUIRED"
