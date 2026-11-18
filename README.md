@@ -221,3 +221,7 @@ El MASTER KodiELEC tiene **4 rclone mount activos / 4 FUSE legacy**, sin raíces
 ### 19/11/2026 — ruta independiente de configuración cifrada v2
 
 Nuevo contrato puro `rclone_two_mount_config_routes.py`: la versión antigua permanece en `rclone/rclone.conf.crypt`; la futura versión v2 utilizará **`rclone/rclone-v2.conf.crypt`**. 657/657 tests CI OK; **no existe todavía el archivo v2 en cloud ni se ha conectado el lector/escritor de producción**. En la primera ejecución del addon se retirarán los cuatro unit files antiguos después de validar 2 FUSE+4 bind y asegurar recuperación. La biblioteca `.strm` sigue local. [Diseño y gates](service.cloud.masqelec/docs/AUTO_UPDATE_TWO_MOUNT_ARCHITECTURE_2026-11-18.md).
+
+### 19/11/2026 — MASTER: creación y actualización de MQC2 v2 en GitHub (desactivado)
+
+MASTER v2 está preparado para **crear `rclone/rclone-v2.conf.crypt` si el GET autenticado es 404**, o **actualizarlo mediante CAS cuando cambien refresh tokens verificados**, cifrando y comprobando readback. La versión actual mantiene las banderas False y no ha publicado nada; el endpoint cloud v2 aún no existe. CI 704/704 OK. [Diseño y pruebas](service.cloud.masqelec/docs/MASTER_V2_GITHUB_SYNC_2026-11-19.md).

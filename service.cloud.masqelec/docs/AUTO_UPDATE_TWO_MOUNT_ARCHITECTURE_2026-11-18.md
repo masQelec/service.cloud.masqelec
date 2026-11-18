@@ -81,3 +81,9 @@ La existencia de dispositivos todavía sin actualizar es inevitable porque las a
 **Estado verificable:** `REAL_SYSTEMD_LOCAL_2FUSE_4BIND=PASS`, `CONFIG_ROUTE_SPLIT_PURE_TESTS=PASS`, `V2_REMOTE_FILE_PUBLISHED=NO`, `V2_MASTER_WRITER_WIRED=NO`, `V2_CLIENT_RECOVERY_WIRED=NO`, `AUTO_CUTOVER_WIRED=NO`, `LEGACY_UNIT_CLEANUP_WIRED=NO`, `RELEASE_AUTHORIZED=NO`. Las tres banderas siguen en `False`.
 
 **GitHub CI** para el selector de ruta: 657/657 Python OK, [run 44419097420](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44419097420). No valida el acceso al endpoint v2 todavía inexistente.
+
+### 19/11/2026 — MASTER v2 crea MQC2 en GitHub si falta y actualiza cambios verificados
+
+Se implementa (bajo flags **False**) el camino MASTER v2 `rclone_two_mount_master_sync.py` + `rclone_two_mount_master_runtime.py`, conectado al worker `rclone_token_sync.tick()`. Contra `cloud.masqelec/develop/rclone/rclone-v2.conf.crypt`: HEAD autenticado+GET; si 404 crea con PUT sin SHA, si 200 comprueba opciones/refresh y actualiza con SHA, si igual no escribe. Candidato cifrado MQC2 y fuentes local 0600; sondas OAuth en copia temporal por cada remoto cambiado, recaptura local, CAS sin retry 409/422 y readback autenticado posterior. Protege las cuentas Google y no toca el viejo `rclone/rclone.conf.crypt`. CI **704/704 PASS**, [Actions 44421911947](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44421911947).
+
+**AÚN NO:** fichero v2 real (no existe en cloud), prueba real OneDrive/GitHub, limpieza legacy automática ni recuperación CLIENTE v2. `RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED=False` + `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False` + `RCLONE_TOKEN_SYNC_ENABLED=False`: ningún PUT en Kodi actual. [Runbook](MASTER_V2_GITHUB_SYNC_2026-11-19.md).
