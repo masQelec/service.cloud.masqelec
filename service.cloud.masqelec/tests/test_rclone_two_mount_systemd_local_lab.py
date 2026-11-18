@@ -156,6 +156,44 @@ class SystemdLocalLabTests(unittest.TestCase):
         self.assertIn("READY_FOR_ISOLATED_SYSTEMD", out.getvalue())
         self.assertIn("ONEDRIVE_ACCESSED=NO", out.getvalue())
 
+    def test_preflight_blocks_prior_run_leftovers(self):
+        def listing(path):
+            if path == lab.TMP:
+                return ["masqelec-sd-lab-0123456789abcdef"]
+            return []
+        with mock.patch.object(lab.os, "listdir", side_effect=listing):
+            self.assertFalse(lab._no_prior_lab())
+
+    def test_preflight_blocks_remaining_runtime_unit(self):
+        def listing(path):
+            if path == lab.RUNTIME_UNITS:
+                return ["masqelec-sd-lab-0123456789abcdef-fuse1.service"]
+            return []
+        with mock.patch.object(lab.os, "listdir", side_effect=listing):
+            self.assertFalse(lab._no_prior_lab())
+
+    def test_preflight_allows_unrelated_legacy_units(self):
+        def listing(path):
+            if path == lab.RUNTIME_UNITS:
+                return ["rclone_videos_1.service", "rclone_tvshows_2.service"]
+            return ["masqelec-fuse-local-old", "something-else"]
+        with mock.patch.object(lab.os, "listdir", side_effect=listing):
+            self.assertTrue(lab._no_prior_lab())
+
+    def test_unreadable_mount_unit_dir_blocks_another_run(self):
+        with mock.patch.object(lab.os, "listdir",
+                               side_effect=OSError("permission denied")):
+            self.assertFalse(lab._no_prior_lab())
+
+    def test_temp_allocation_failure_returns_closed_status(self):
+        with mock.patch.object(lab, "prerequisites",
+                               return_value={"ok": True}), \
+             mock.patch.object(lab, "_create_root",
+                               side_effect=OSError("readonly")):
+            self.assertEqual(
+                lab.run_isolated(),
+                "FAIL_CANNOT_ALLOCATE_ISOLATED_TMP")
+
     def test_preflight_missing_systemd_blocks(self):
         with mock.patch.object(
                 lab, "prerequisites",

@@ -81,6 +81,16 @@ def _systemd_online():
         return False
 
 
+def _no_prior_lab():
+    """No iniciar otro ensayo si queda una transacción anterior incompleta."""
+    try:
+        return (not any(name.startswith(PREFIX) for name in os.listdir(TMP))
+                and not any(name.startswith(PREFIX)
+                            for name in os.listdir(RUNTIME_UNITS)))
+    except OSError:
+        return False
+
+
 def prerequisites():
     binary = rclone_binary()
     try:
@@ -95,6 +105,7 @@ def prerequisites():
         "rclone_flags": _rclone_ready(binary),
         "systemctl": shutil.which("systemctl") is not None,
         "systemd_online": _systemd_online(),
+        "no_prior_lab": _no_prior_lab(),
         "runtime_dir": (os.path.isdir(RUNTIME_UNITS)
                         and not os.path.islink(RUNTIME_UNITS)
                         and os.access(RUNTIME_UNITS, os.W_OK)),
@@ -401,7 +412,10 @@ def run_isolated():
     requirements = prerequisites()
     if not all(requirements.values()):
         return "BLOCKED_MISSING_PREREQUISITE"
-    root = _create_root()
+    try:
+        root = _create_root()
+    except (OSError, ValueError):
+        return "FAIL_CANNOT_ALLOCATE_ISOLATED_TMP"
     names = _unit_names(root)
     units = {}
     status = "FAIL_ISOLATED_SYSTEMD"
