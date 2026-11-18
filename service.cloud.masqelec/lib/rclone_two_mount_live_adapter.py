@@ -174,6 +174,11 @@ class LocalAdapter:
         # el corte. El estado es inválido para rollout.mode => unsafe.
         atomic.install_exclusive(self.state_path, self._unsafe_marker(), 0o600)
         journal.transition(self.txn, "prepared", "cutover_started")
+        # Systemd inicia servicios ANTES de service.py tras un reinicio.
+        # Deshabilitar legacy ANTES de pararlo impide que el reboot lo
+        # remonte usando tokens antiguos mientras la migración está a medias.
+        for unit in rollout.LEGACY_SERVICES:
+            self._systemctl("disable", unit)
 
     def stop_legacy(self):
         self._require_enabled()

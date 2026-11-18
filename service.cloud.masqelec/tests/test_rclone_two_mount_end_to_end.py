@@ -235,6 +235,8 @@ class IntegratedCutoverTests(unittest.TestCase):
             self.assertTrue(self.adapter.prepare_durable_rollback())
             self.adapter.mark_cutover_started()
             self.adapter.stop_legacy()
+        self.assertFalse(self.system.enabled.intersection(
+            set(rollout.LEGACY_SERVICES)))
         self.assertTrue(boot.recovery_required(
             parent=str(self.txn_parent), state_path=str(self.marker)))
         self.assertEqual(len(self.system.mounts), 0)

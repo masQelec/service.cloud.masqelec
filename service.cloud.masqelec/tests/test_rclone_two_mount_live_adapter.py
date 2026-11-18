@@ -169,10 +169,25 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(journal.phase(self.adapter.txn),
                          "cutover_started")
         self.assertEqual(rollout.mode(False, str(self.marker)), "unsafe")
-        self.assertTrue(all(a[:3] == (
-            "systemctl", "is-active", "--quiet") for a in self.actions))
+        disables = [a for a in self.actions if a[1] == "disable"]
+        self.assertEqual(disables,
+                         [("systemctl", "disable", unit)
+                          for unit in rollout.LEGACY_SERVICES])
         self.assertNotIn(("systemctl", "stop",
                           "rclone_videos_1.service"), self.actions)
+
+    def test_cutover_disables_legacy_before_stop_and_is_journaled(self):
+        self.assertTrue(self.adapter.legacy_preflight())
+        with journal.locked(str(self.txn)):
+            self.assertTrue(self.adapter.prepare_durable_rollback())
+            self.adapter.mark_cutover_started()
+        self.assertEqual(journal.phase(self.adapter.txn),
+                         "cutover_started")
+        ops = [a for a in self.actions if a[1] in ("disable", "stop")]
+        self.assertEqual(ops, [
+            ("systemctl", "disable", unit)
+            for unit in rollout.LEGACY_SERVICES])
+        self.assertTrue(self.marker.exists())
 
     def test_mount_guard_identifies_old_and_new(self):
         self.assertTrue(self.adapter._old_mounted())
