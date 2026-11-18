@@ -104,11 +104,11 @@ class AdapterTests(unittest.TestCase):
         changes = [x for x in self.actions
                    if x[1] in ("disable", "enable")]
         self.assertEqual(
-            changes[:4],
+            changes[:8],
             [("systemctl", "disable", n)
-             for n in rollout.LEGACY_SERVICES])
+             for n in rollout.LEGACY_SERVICES] * 2)
         self.assertEqual(
-            changes[4:],
+            changes[8:],
             [("systemctl", "enable", n)
              for n in rollout.NEW_SERVICES + rollout.BIND_SERVICES])
         self.assertEqual(journal.phase(self.adapter.txn), "active")
@@ -129,11 +129,11 @@ class AdapterTests(unittest.TestCase):
         actions = [x for x in self.actions
                    if x[1] in ("disable", "enable")]
         self.assertEqual(
-            actions[:4],
+            actions[:8],
             [("systemctl", "disable", n)
-             for n in rollout.LEGACY_SERVICES])
+             for n in rollout.LEGACY_SERVICES] * 2)
         self.assertEqual(
-            actions[4], ("systemctl", "enable", rollout.NEW_SERVICES[0]))
+            actions[8], ("systemctl", "enable", rollout.NEW_SERVICES[0]))
         self.assertFalse(any(x[1] == "enable" and
                              x[2] in rollout.LEGACY_SERVICES
                              for x in actions))
