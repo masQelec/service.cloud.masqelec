@@ -226,8 +226,11 @@ def _check_mounts(text, root):
         entries = _mount_records(text)
         for point in fuse:
             if (len(entries.get(point, ())) != 1 or
-                    entries[point][0]["fstype"] != "fuse.rclone"):
+                    entries[point][0]["fstype"] != "fuse.rclone"
+                    or entries[point][0]["fsroot"] != "/"):
                 return False
+        if entries[fuse[0]][0]["device"] == entries[fuse[1]][0]["device"]:
+            return False
         for index, folder, target in binds:
             if len(entries.get(target, ())) != 1:
                 return False
@@ -410,29 +413,31 @@ def run_isolated():
             umount_cmd=shutil.which("umount"),
             mountpoint_cmd=shutil.which("mountpoint"))
         if _any_lab_mounted(root):
-            return "BLOCKED_UNEXPECTED_LAB_MOUNT"
-        _write_units(units)
-        if not _control("daemon-reload"):
-            return "FAIL_RUNTIME_RELOAD"
-        for name in names["fuse"] + names["bind"]:
-            if not _control("start", name):
-                status = "FAIL_SERVICE_START"
-                break
+            status = "BLOCKED_UNEXPECTED_LAB_MOUNT"
         else:
-            try:
-                if (not all(_is_active(n) for n in
-                            names["fuse"] + names["bind"])
-                        or not _check_mounts(_read_mountinfo(), root)):
-                    status = "FAIL_SYSTEMD_MOUNT_LAYOUT"
+            _write_units(units)
+            if not _control("daemon-reload"):
+                status = "FAIL_RUNTIME_RELOAD"
+            else:
+                for name in names["fuse"] + names["bind"]:
+                    if not _control("start", name):
+                        status = "FAIL_SERVICE_START"
+                        break
                 else:
-                    _, binds, _ = _layout(root)
-                    if all(_read_sample(os.path.join(dest, "sample.bin"))
-                           for _, _, dest in binds):
-                        status = "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL"
-                    else:
-                        status = "FAIL_LOCAL_SAMPLE_READ"
-            except (OSError, ValueError, UnicodeError):
-                status = "FAIL_SYSTEMD_HEALTH"
+                    try:
+                        if (not all(_is_active(n) for n in
+                                    names["fuse"] + names["bind"])
+                                or not _check_mounts(_read_mountinfo(), root)):
+                            status = "FAIL_SYSTEMD_MOUNT_LAYOUT"
+                        else:
+                            _, binds, _ = _layout(root)
+                            if all(_read_sample(os.path.join(dest, "sample.bin"))
+                                   for _, _, dest in binds):
+                                status = "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL"
+                            else:
+                                status = "FAIL_LOCAL_SAMPLE_READ"
+                    except (OSError, ValueError, UnicodeError):
+                        status = "FAIL_SYSTEMD_HEALTH"
     except (OSError, ValueError, subprocess.SubprocessError):
         status = "FAIL_SYSTEMD_RUNTIME"
     finally:
