@@ -46,6 +46,12 @@ def fixture_mountinfo(root=ROOT, *, duplicate=None, same_device=False,
 
 
 class SystemdLocalLabTests(unittest.TestCase):
+    def setUp(self):
+        # Runner CI no necesita tener rclone instalado; simular su ruta.
+        patcher = mock.patch.object(lab, "rclone_binary", return_value=RCLONE)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_lab_identity_permits_only_random_tmp(self):
         self.assertEqual(lab._identity(ROOT), ROOT.name)
         for bad in (
@@ -132,8 +138,6 @@ class SystemdLocalLabTests(unittest.TestCase):
 
     def test_truncated_mountinfo_rejected(self):
         self.assertFalse(lab._check_mounts("broken", ROOT))
-        self.assertTrue(lab._any_lab_mounted(ROOT) is True
-                        if False else True)  # parser case checked above
 
     def test_no_credentials_inherited_in_subprocess(self):
         vars = {"PATH": "/usr/bin", "RCLONE_CONFIG": "/storage/secret",
@@ -143,8 +147,6 @@ class SystemdLocalLabTests(unittest.TestCase):
             self.assertEqual(lab._clean_env(), {"PATH": "/usr/bin"})
 
     def test_preflight_read_only_no_mutation(self):
-        ready = {x: True for x in lab.prerequisites.__code__.co_consts
-                 if False}  # avoid requiring host runtime
         ready = {"root": True, "rclone": True, "fuse": True}
         with mock.patch.object(lab, "prerequisites", return_value=ready), \
              mock.patch.object(lab, "run_isolated",
