@@ -245,7 +245,8 @@ class IntegratedCutoverTests(unittest.TestCase):
         self.assertEqual(self.system.active, set(rollout.LEGACY_SERVICES))
         self.assertFalse(self.marker.exists())
         self.assertFalse(boot.recovery_required(
-            parent=str(self.txn_parent), state_path=str(self.marker)))
+            parent=str(self.txn_parent), state_path=str(self.marker),
+            unit_dir=str(self.units)))
         self.assertEqual(journal.phase(self.adapter.txn),
                          "legacy_restored")
         recovery = Path(self.adapter.txn, "canonical-recovery-candidate.conf")
