@@ -164,3 +164,7 @@ Próximo paso: piloto de verificación read-only de prerrequisitos KodiELEC y, p
 
 
 **Riesgo residual:** un snapshot de `rclone.conf` leído con metadatos estables no sustituye un bloqueo con rclone; si el token cambia después de preparar, el futuro activador deberá revalidar contra fuentes vivas. El staging no otorga acceso ni autoridad de publicación MQC2.
+
+## Piloto 2 FUSE + 4 bind en rutas aisladas (18-11-2026)
+
+Nuevo script standalone `tools/rclone_two_mount_fuse_bind_local_lab.py` para KodiELEC: `--preflight` **solo lectura**, y `--run-local-pilot --confirm-isolated-only` (monta dos fuentes **locales ficticias** y cuatro bind en una ruta aleatoria de `/tmp`, valida lecturas y desmonta). No usa `rclone.conf`, tokens OneDrive, `crypt`, rutas `.strm`, `systemd` ni cambios en catálogo. `rclone_two_mount_health.check_layout_at` permite validar rutas temporales sin modificar la comprobación original de Kodi; se preservó el error `ValueError` en `mountinfo` truncado. **399/399 tests CI PASS**, [run 44339477354](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44339477354). **Ningún piloto FUSE/bind real se ha ejecutado todavía en KodiELEC**. El paso siguiente es obtener salida del preflight y, si procede, ejecutar el piloto local controlado antes de probar OneDrive real y `Type=notify`. Ver [procedimiento](TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md).

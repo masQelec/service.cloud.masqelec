@@ -1,6 +1,6 @@
 # Operaciones, pruebas y diagnóstico — masQelec
 
-**Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **371/371 OK** (GitHub Actions run 44201463687). Preflight real BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-C/P0-D: laboratorios, **no** despliegue ni sincronización.
+**Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **399/399 OK** (GitHub Actions run 44339477354). Preflight real BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-C/P0-D: laboratorios, **no** despliegue ni sincronización.
 
 ## 1. Protocolo de cambios
 
@@ -209,3 +209,17 @@ Controles: valida inventario `crypt→OneDrive`, las cuatro unidades legacy comp
 
 Próximo paso: piloto de verificación read-only de prerrequisitos KodiELEC y, posteriormente, **dos FUSE + cuatro bind exclusivamente en rutas alternativas**, prueba de reproducción y rollback. El modo operativo legacy seguirá intacto hasta autorización explícita.
 
+
+## Piloto 2 FUSE + 4 bind en rutas aisladas (18-11-2026)
+
+Nuevo script standalone `tools/rclone_two_mount_fuse_bind_local_lab.py` para KodiELEC: `--preflight` **solo lectura**, y `--run-local-pilot --confirm-isolated-only` (monta dos fuentes **locales ficticias** y cuatro bind en una ruta aleatoria de `/tmp`, valida lecturas y desmonta). No usa `rclone.conf`, tokens OneDrive, `crypt`, rutas `.strm`, `systemd` ni cambios en catálogo. `rclone_two_mount_health.check_layout_at` permite validar rutas temporales sin modificar la comprobación original de Kodi; se preservó el error `ValueError` en `mountinfo` truncado. **399/399 tests CI PASS**, [run 44339477354](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44339477354). **Ningún piloto FUSE/bind real se ha ejecutado todavía en KodiELEC**. El paso siguiente es obtener salida del preflight y, si procede, ejecutar el piloto local controlado antes de probar OneDrive real y `Type=notify`. Ver [procedimiento](TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md).
+
+**Comando exacto del preflight — no monta nada:**
+
+```bash
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/678d96f5e158df3c04e9c76d18c0def913103de2/service.cloud.masqelec/tools/rclone_two_mount_fuse_bind_local_lab.py' -O /tmp/rclone_two_mount_fuse_bind_local_lab.py
+python3 -m py_compile /tmp/rclone_two_mount_fuse_bind_local_lab.py
+python3 /tmp/rclone_two_mount_fuse_bind_local_lab.py --preflight
+```
+
+No ejecutar `--run-local-pilot` sin conocer sus efectos temporales y el procedimiento de limpieza. La ejecución real no está registrada como PASS.

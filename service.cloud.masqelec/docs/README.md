@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **371/371 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **399/399 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 
@@ -17,6 +17,7 @@
 | [Coordinación OAuth entre MASTER y CLIENTES (P0-C)](OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md) | Flota sintética, 322/322 PASS, riesgos de legacy y opciones de arquitectura |
 
 | [Diagnóstico divergencia real OneDrive](PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md) | Evidencia de KodiELEC, causa confirmada y bloqueo de recuperación |
+| [Piloto aislado 2 FUSE + 4 bind](TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md) | Preflight sin cambios, piloto local opcional, pruebas CI y pasos para KodiELEC |
 | [Actualización del addon y migración local](ADDON_STARTUP_ROLLOUT_2026-11-17.md) | Flujo real MASTER/CLIENTES, STRM, 2 FUSE+4 bind, fases y pruebas |
 
 ## Historial de laboratorios (fotos del progreso, no instrucciones de despliegue)
