@@ -7,7 +7,9 @@ Aún requiere pruebas integradas con systemd/KodiELEC y recuperación de reboot.
 No hay autorización de despliegue.
 """
 import os
+import shutil
 import stat
+import sys
 import subprocess
 import tempfile
 import time
@@ -240,6 +242,31 @@ class LocalAdapter:
             self.attempted_binds.add(unit)
             self._systemctl("start", unit)
 
+    @staticmethod
+    def _probe_known_media(path):
+        """Lectura de 1 byte en subproceso, timeout 15s sin shell.
+
+        Un FUSE de OneDrive bloqueado no debe congelar indefinidamente
+        el thread de control de la transición. Solo se reciben códigos
+        de estado: ningún dato del fichero se imprime.
+        """
+        python = shutil.which("python3")
+        if not python:
+            return False
+        probe = (
+            "import sys; f=open(sys.argv[1], 'rb'); "
+            "sys.exit(0 if f.read(1) else 2)"
+        )
+        try:
+            p = subprocess.run(
+                [python, "-c", probe, path],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=15, check=False,
+            )
+            return p.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+
     def _known_media_verified(self):
         """Una lectura exacta por OneDrive. No recorre directorios remotos."""
         if len(self.known_media_files) != 2:
@@ -253,16 +280,8 @@ class LocalAdapter:
                     or os.path.normpath(path) != path
                     or not path.startswith(prefixes)):
                 return False
-            fd = None
-            try:
-                fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-                if not os.read(fd, 1):
-                    return False
-            except OSError:
+            if not self._probe_known_media(path):
                 return False
-            finally:
-                if fd is not None:
-                    os.close(fd)
         return True
 
     def complete_health(self):

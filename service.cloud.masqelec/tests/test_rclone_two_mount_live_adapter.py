@@ -145,38 +145,64 @@ class AdapterTests(unittest.TestCase):
     def test_known_media_rejects_non_kodi_paths_without_open(self):
         self.adapter.known_media_files = (
             "/tmp/fake/movie.mkv", "/storage/.mnt/videos/2/film.mkv")
-        with mock.patch.object(live.os, "open",
-                               side_effect=AssertionError("must not open")):
+        with mock.patch.object(self.adapter, "_probe_known_media",
+                               side_effect=AssertionError("must not probe")):
             self.assertFalse(self.adapter._known_media_verified())
 
     def test_known_media_rejects_path_traversal(self):
         self.adapter.known_media_files = (
             "/storage/.mnt/videos/1/../other.mkv",
             "/storage/.mnt/videos/2/a.mkv")
-        with mock.patch.object(live.os, "open",
-                               side_effect=AssertionError("must not open")):
+        with mock.patch.object(self.adapter, "_probe_known_media",
+                               side_effect=AssertionError("must not probe")):
             self.assertFalse(self.adapter._known_media_verified())
 
     def test_known_media_reads_one_byte_per_account(self):
         self.adapter.known_media_files = (
             "/storage/.mnt/videos/1/one.mkv",
             "/storage/.mnt/tvshows/2/two.mkv")
-        with mock.patch.object(live.os, "open", return_value=91) as opening, \
-             mock.patch.object(live.os, "read", return_value=b"x") as reading, \
-             mock.patch.object(live.os, "close"):
+        with mock.patch.object(self.adapter, "_probe_known_media",
+                               return_value=True) as probe:
             self.assertTrue(self.adapter._known_media_verified())
-        self.assertEqual(opening.call_count, 2)
-        self.assertEqual(reading.call_count, 2)
-        self.assertEqual(reading.call_args.args[1], 1)
+        self.assertEqual(probe.call_count, 2)
 
     def test_known_media_empty_file_fails(self):
         self.adapter.known_media_files = (
             "/storage/.mnt/videos/1/one.mkv",
             "/storage/.mnt/tvshows/2/two.mkv")
-        with mock.patch.object(live.os, "open", return_value=91), \
-             mock.patch.object(live.os, "read", return_value=b""), \
-             mock.patch.object(live.os, "close"):
+        with mock.patch.object(self.adapter, "_probe_known_media",
+                               return_value=False):
             self.assertFalse(self.adapter._known_media_verified())
+
+    def test_bounded_media_subprocess_uses_no_shell_and_one_byte(self):
+        class Done:
+            returncode = 0
+        with mock.patch.object(live.shutil, "which",
+                               return_value="/usr/bin/python3"), \
+             mock.patch.object(live.subprocess, "run",
+                               return_value=Done()) as run:
+            self.assertTrue(self.adapter._probe_known_media(
+                "/storage/.mnt/videos/1/film.mkv"))
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[0], "/usr/bin/python3")
+        self.assertEqual(argv[1], "-c")
+        self.assertEqual(argv[3], "/storage/.mnt/videos/1/film.mkv")
+        self.assertEqual(run.call_args.kwargs["timeout"], 15)
+        self.assertFalse(run.call_args.kwargs["check"])
+
+    def test_media_timeout_blocks(self):
+        with mock.patch.object(live.shutil, "which",
+                               return_value="/usr/bin/python3"), \
+             mock.patch.object(live.subprocess, "run",
+                               side_effect=live.subprocess.TimeoutExpired(
+                                   "probe", 15)):
+            self.assertFalse(self.adapter._probe_known_media(
+                "/storage/.mnt/videos/1/film.mkv"))
+
+    def test_missing_python3_blocks_probe(self):
+        with mock.patch.object(live.shutil, "which", return_value=None):
+            self.assertFalse(self.adapter._probe_known_media(
+                "/storage/.mnt/videos/1/film.mkv"))
 
     def test_known_systemctl_commands_only(self):
         with self.assertRaises(ValueError):
