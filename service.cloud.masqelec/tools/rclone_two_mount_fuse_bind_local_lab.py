@@ -197,8 +197,13 @@ def _cleanup(root, binds, fuse, processes):
     return all_unmounted
 
 
+class _PilotStop(Exception):
+    def __init__(self, status):
+        self.status = status
+
+
 def run_local_pilot():
-    """Piloto físico LOCAL, sin credenciales; no registra salidas externas."""
+    """PASS solo tras confirmar además desmontaje y limpieza completos."""
     required = prerequisites()
     if not all(required.values()):
         return "BLOCKED_MISSING_LOCAL_PREREQUISITE"
@@ -231,27 +236,31 @@ def run_local_pilot():
             )
             processes.append(proc)
             if not _wait_for_fuse(proc, point):
-                return "FAIL_LOCAL_FUSE_NOT_READY"
+                raise _PilotStop("FAIL_LOCAL_FUSE_NOT_READY")
 
         for index, folder, target in binds:
             source_path = str(Path(fuse[index]) / folder)
             _run(["mount", "--bind", source_path, target])
 
         if not _check_alternate_layout(_mountinfo(), fuse, binds):
-            return "FAIL_LOCAL_MOUNTINFO_LAYOUT"
+            raise _PilotStop("FAIL_LOCAL_MOUNTINFO_LAYOUT")
 
         for _, _, target in binds:
             with open(os.path.join(target, "sample.bin"), "rb") as f:
                 if f.read(1024) != _SAMPLE:
-                    return "FAIL_LOCAL_READ_MISMATCH"
+                    raise _PilotStop("FAIL_LOCAL_READ_MISMATCH")
         result = "PASS_LOCAL_FUSE_BIND_LAB"
-        return result
+    except _PilotStop as exc:
+        result = exc.status
     except (OSError, ValueError, subprocess.SubprocessError):
-        return "FAIL_LOCAL_RUNTIME"
+        result = "FAIL_LOCAL_RUNTIME"
     finally:
-        # No limpiar directorios que siguen siendo puntos de montaje.
-        if not _cleanup(root, binds, fuse, processes):
-            print("CLEANUP=INCOMPLETE_TEMP_PATH_REQUIRES_MANUAL_REVIEW")
+        # No borrar directorios donde aún puede existir un FUSE o bind.
+        cleaned = _cleanup(root, binds, fuse, processes)
+    if not cleaned:
+        print("CLEANUP=INCOMPLETE_TEMP_PATH_REQUIRES_MANUAL_REVIEW")
+        return "FAIL_LOCAL_CLEANUP"
+    return result
 
 
 def main(argv=None):
