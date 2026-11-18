@@ -156,8 +156,73 @@ class LocalFuseBindPilotTests(unittest.TestCase):
         with mock.patch.object(lab.subprocess, "run",
                                return_value=fake) as run:
             self.assertTrue(lab._rclone_mount_flags_supported("/tmp/rclone"))
-            self.assertEqual(run.call_args.args[0],
+            self.assertEqual(run.call_args_list[0].args[0],
                              ["/tmp/rclone", "mount", "--help"])
+            self.assertEqual(run.call_args_list[1].args[0],
+                             ["/tmp/rclone", "help", "flags"])
+
+
+    def test_global_config_absent_from_mount_help_is_supported(self):
+        def simulate(argv, **kwargs):
+            self.assertEqual(argv[0], "/tmp/rclone")
+            if argv[1:] == ["mount", "--help"]:
+                output = b"--read-only --vfs-cache-mode"
+            elif argv[1:] == ["help", "flags"]:
+                output = b"--config string (global)"
+            else:
+                self.fail("Unnecessary subprocess: " + repr(argv))
+            return types.SimpleNamespace(returncode=0, stdout=output)
+        with mock.patch.object(lab.subprocess, "run",
+                               side_effect=simulate) as runner:
+            self.assertTrue(lab._rclone_mount_flags_supported("/tmp/rclone"))
+            self.assertEqual(runner.call_count, 2)
+
+    def test_rclone_old_help_fallback_for_global_config(self):
+        def simulate(argv, **kwargs):
+            if argv[1:] == ["mount", "--help"]:
+                return types.SimpleNamespace(
+                    returncode=0, stdout=b"--read-only --vfs-cache-mode")
+            if argv[1:] == ["help", "flags"]:
+                return types.SimpleNamespace(returncode=1, stdout=b"")
+            if argv[1:] == ["--help"]:
+                return types.SimpleNamespace(
+                    returncode=0, stdout=b"--config string")
+            self.fail("Unexpected command")
+        with mock.patch.object(lab.subprocess, "run",
+                               side_effect=simulate):
+            self.assertTrue(lab._rclone_mount_flags_supported("/tmp/rclone"))
+
+    def test_global_config_absent_from_both_help_sources_blocks(self):
+        def simulate(argv, **kwargs):
+            return types.SimpleNamespace(
+                returncode=0,
+                stdout=(b"--read-only --vfs-cache-mode"
+                        if argv[1] == "mount" else b"no config option"))
+        with mock.patch.object(lab.subprocess, "run",
+                               side_effect=simulate):
+            self.assertFalse(lab._rclone_mount_flags_supported("/tmp/rclone"))
+
+    def test_wait_for_fuse_uses_local_mount_parser_not_missing_import(self):
+        class Alive:
+            def poll(self):
+                return None
+        sample = (
+            "51 1 0:44 / /tmp/masqelec-fuse-local-A/fuse/1 rw "
+            "- fuse.rclone test: rw")
+        with mock.patch.object(lab, "_mountinfo", return_value=sample), \\
+             mock.patch.object(lab.time, "sleep",
+                               side_effect=AssertionError("not expected")):
+            self.assertTrue(lab._wait_for_fuse(
+                Alive(), "/tmp/masqelec-fuse-local-A/fuse/1", seconds=1))
+
+    def test_wait_for_fuse_exited_process_does_not_wait(self):
+        class Exited:
+            def poll(self):
+                return 1
+        with mock.patch.object(lab, "_mountinfo",
+                               side_effect=AssertionError("not expected")):
+            self.assertFalse(lab._wait_for_fuse(
+                Exited(), "/tmp/mount", seconds=1))
 
     def test_help_missing_flag_blocks_pilot(self):
         fake = types.SimpleNamespace(

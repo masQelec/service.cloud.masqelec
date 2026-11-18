@@ -67,22 +67,37 @@ def rclone_binary():
     return shutil.which("rclone")
 
 
-def _rclone_mount_flags_supported(executable):
-    """Consulta ayuda local del binario, sin llamar a ningún backend."""
-    if not executable:
-        return False
+def _rclone_help(executable, args):
+    """Lee ayuda CLI local sin configuración ni conexiones OAuth."""
     try:
-        help_text = subprocess.run(
-            [executable, "mount", "--help"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            check=False, timeout=12,
+        response = subprocess.run(
+            [executable] + args, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, check=False, timeout=12,
         )
     except (OSError, subprocess.SubprocessError):
+        return None
+    if response.returncode != 0 or not isinstance(response.stdout, bytes):
+        return None
+    return response.stdout
+
+
+def _rclone_mount_flags_supported(executable):
+    """Las opciones globales NO tienen que aparecer en mount --help.
+
+    --read-only y --vfs-cache-mode pertenecen al montaje.
+    --config es una opción global: consultar rclone help flags y, en
+    binarios antiguos que no implementen ese comando, rclone --help.
+    """
+    if not executable:
         return False
-    if help_text.returncode:
+    mount_help = _rclone_help(executable, ["mount", "--help"])
+    if mount_help is None or not all(flag in mount_help for flag in (
+            b"--read-only", b"--vfs-cache-mode")):
         return False
-    return all(flag in help_text.stdout for flag in (
-        b"--read-only", b"--vfs-cache-mode", b"--config"))
+    global_help = _rclone_help(executable, ["help", "flags"])
+    if global_help is None or b"--config" not in global_help:
+        global_help = _rclone_help(executable, ["--help"])
+    return global_help is not None and b"--config" in global_help
 
 
 def prerequisites():
@@ -134,7 +149,7 @@ def _wait_for_fuse(proc, target, seconds=12):
         if proc.poll() is not None:
             return False
         try:
-            entry = health.mount_entries(_mountinfo()).get(target)
+            entry = _mount_entries(_mountinfo()).get(target)
         except (ValueError, OSError):
             entry = None
         if entry is not None and entry["fstype"] == "fuse.rclone":
