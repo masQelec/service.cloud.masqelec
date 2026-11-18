@@ -105,6 +105,7 @@ def inspect_mounts(raw):
         if not isinstance(raw, str) or not raw or len(raw) > MAX_MOUNTINFO:
             return result
         counts = {}
+        fstype_by_path = {}
         for line in raw.splitlines():
             left, separator, right = line.partition(" - ")
             a = left.split()
@@ -113,14 +114,19 @@ def inspect_mounts(raw):
                 return result
             point = _mount_path(a[4])
             counts[point] = counts.get(point, 0) + 1
+            fstype_by_path[point] = b[0]
             if b[0] == "fuse.rclone":
                 result["fuse_total"] += 1
                 if point not in KNOWN_ROOTS:
                     result["extra_fuse"] += 1
-        result["legacy"] = sum(counts.get(path, 0) == 1
-                               for path in EXPECTED_LEGACY)
-        result["new"] = sum(counts.get(path, 0) == 1
-                            for path in EXPECTED_V2)
+        result["legacy"] = sum(
+            counts.get(path, 0) == 1 and
+            fstype_by_path.get(path) == "fuse.rclone"
+            for path in EXPECTED_LEGACY)
+        result["new"] = sum(
+            counts.get(path, 0) == 1 and
+            fstype_by_path.get(path) == "fuse.rclone"
+            for path in EXPECTED_V2)
         result["stacked"] = sum(counts.get(path, 0) > 1
                                 for path in KNOWN_ROOTS)
         result["complete"] = True

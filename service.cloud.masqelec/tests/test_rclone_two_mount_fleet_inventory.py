@@ -60,6 +60,22 @@ class FleetInventoryTests(unittest.TestCase):
         self.assertEqual(m["new"], 2)
         self.assertEqual(m["fuse_total"], 6)
 
+    def test_non_rclone_mount_does_not_count_as_legacy(self):
+        path = lab.EXPECTED_LEGACY[0]
+        text = mock_mounts().replace(
+            line(path), line(path, "ext4"))
+        m = lab.inspect_mounts(text)
+        self.assertTrue(m["complete"])
+        self.assertEqual(m["legacy"], 3)
+        self.assertEqual(m["fuse_total"], 3)
+
+    def test_non_rclone_mount_does_not_count_as_v2(self):
+        text = (mock_mounts() + "\n" +
+                line(lab.EXPECTED_V2[0], "tmpfs"))
+        m = lab.inspect_mounts(text)
+        self.assertTrue(m["complete"])
+        self.assertEqual(m["new"], 0)
+
     def test_mount_stack_not_reported_as_unique_valid(self):
         txt = mock_mounts() + "\n" + line(lab.EXPECTED_LEGACY[0])
         m = lab.inspect_mounts(txt)
