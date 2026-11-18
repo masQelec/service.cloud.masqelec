@@ -1,6 +1,6 @@
 # Piloto aislado de 2 FUSE + 4 bind — masQelec/KodiELEC
 
-**Fecha:** 18-11-2026 · **Rama:** addon `develop` · **Versión inmóvil del script:** `678d96f5e158df3c04e9c76d18c0def913103de2` · **Sin deploy**.
+**Fecha:** 18-11-2026 · **Rama:** addon `develop` · **Versión inmóvil del script:** `c6c776c47a79ed892fd9be70e107d46d4c49cec9` · **Sin deploy**.
 
 ## Objetivo y límite
 
@@ -15,7 +15,7 @@ El piloto es `tools/rclone_two_mount_fuse_bind_local_lab.py`: script **autoconte
 Consola SSH del dispositivo de laboratorio (no altera montajes, ni OneDrive ni la biblioteca):
 
 ```bash
-wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/678d96f5e158df3c04e9c76d18c0def913103de2/service.cloud.masqelec/tools/rclone_two_mount_fuse_bind_local_lab.py' -O /tmp/rclone_two_mount_fuse_bind_local_lab.py
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/c6c776c47a79ed892fd9be70e107d46d4c49cec9/service.cloud.masqelec/tools/rclone_two_mount_fuse_bind_local_lab.py' -O /tmp/rclone_two_mount_fuse_bind_local_lab.py
 python3 -m py_compile /tmp/rclone_two_mount_fuse_bind_local_lab.py
 python3 /tmp/rclone_two_mount_fuse_bind_local_lab.py --preflight
 ```
@@ -56,6 +56,7 @@ Este comando **sí realiza cambios temporales locales**: crea con `mkdtemp` una 
 
 - `LAB_RESULT=PASS_LOCAL_FUSE_BIND_LAB`: dos FUSE y cuatro bind + lecturas observadas. **No indica prueba sobre OneDrive/crypt, Type=notify ni Kodi**.
 - `LAB_RESULT=FAIL_LOCAL_*`: no iniciar migración.
+- `LAB_RESULT=FAIL_LOCAL_CLEANUP`: aunque la lectura y los montajes fueran correctos, **NO PASS** si quedó algún FUSE/bind temporal o falló su limpieza. El resultado de la prueba se considera fallido; revisar únicamente rutas de `/tmp/masqelec-fuse-local-*`.
 - `CLEANUP=INCOMPLETE_TEMP_PATH_REQUIRES_MANUAL_REVIEW`: algún montaje temporal puede seguir montado. **No borrar a mano ni forzar desmontajes de rutas originales Kodi**; revisar `/proc/self/mountinfo` y actuar únicamente sobre rutas que empiecen por `/tmp/masqelec-fuse-local-`.
 - `LAB_RESULT=BLOCKED_INVALID_MODE`: falta confirmación exacta o argumentos no admitidos; no inicia ningún montaje.
 
@@ -69,7 +70,7 @@ Este comando **sí realiza cambios temporales locales**: crea con `mkdtemp` una 
 | Compatibilidad con semántica legacy de `ValueError` para mountinfo truncado | Regresión corregida | PASS |
 | Rechazo de bind repetidos, cuenta equivocada, directorio incorrecto | Pruebas negativas | PASS |
 | Preflight offline, selección del binario KodiELEC, argumentos seguros y limpieza | Tests de piloto aislado | PASS sintético |
-| Suite completa Python 3.11 | GitHub Actions [44339477354](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44339477354): **399/399 OK** | **PASS CI** |
+| Suite completa Python 3.11 | GitHub Actions [44340361783](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44340361783): **401/401 OK** | **PASS CI** |
 | Preflight en KodiELEC real | No se ha recibido salida del operador | **NOT RUN** |
 | Dos FUSE y cuatro bind temporales reales | No se ha ejecutado en KodiELEC | **NOT RUN** |
 | `Type=notify` para el binario exacto del dispositivo | No probado bajo systemd | **NOT RUN** |
@@ -91,3 +92,7 @@ LIVE_FUSE_BIND_MIGRATION=NOT_EXECUTED
 CLOUD_SYSTEMD_CHANGED=NO
 GITHUB_OAUTH_PUT=NO
 ```
+
+### Corrección de cierre (18-11-2026)
+
+Al auditar el flujo de salida se encontró que una versión inicial podía devolver PASS aunque la limpieza del laboratorio fallase. Corregido en commits `e4140dc8`, `bae1e203` y `c6c776c` con 2 pruebas adicionales, incluyendo fallo de limpieza después de una simulación completamente satisfactoria. **El script que debe descargarse es el referenciado por el SHA `c6c776c47a79ed892fd9be70e107d46d4c49cec9` de esta página**, no el original; GitHub Actions [44340361783](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44340361783): `Ran 401 tests ... OK`. Esto sigue sin equivaler a un FUSE real probado en KodiELEC.

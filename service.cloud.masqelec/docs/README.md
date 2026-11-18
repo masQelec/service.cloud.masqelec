@@ -1,6 +1,6 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **399/399 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **401/401 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
 ## Documentación mantenida (fuente de trabajo)
 

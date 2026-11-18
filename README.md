@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 18-11-2026.** GitHub Actions **399/399 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+> **Estado actualizado: 18-11-2026.** GitHub Actions **401/401 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## ¿Qué es?
 
@@ -160,4 +160,4 @@ La fase 1 del addon tiene un hook **desactivado** para preparar localmente dos `
 
 ### Laboratorio aislado 2 FUSE + 4 bind (18-11-2026)
 
-Disponible el preflight independiente y un piloto opcional con dos fuentes **locales ficticias**: no toca OneDrive, `.strm` ni montajes Kodi. Pruebas sintéticas **399/399 PASS** en CI; la ejecución física en KodiELEC sigue **NOT RUN**. [Instrucciones detalladas](service.cloud.masqelec/docs/TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md).
+Disponible el preflight independiente y un piloto opcional con dos fuentes **locales ficticias**: no toca OneDrive, `.strm` ni montajes Kodi. Pruebas sintéticas **401/401 PASS** en CI; la ejecución física en KodiELEC sigue **NOT RUN**. [Instrucciones detalladas](service.cloud.masqelec/docs/TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md).
