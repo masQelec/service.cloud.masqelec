@@ -1,3 +1,5 @@
+> **Decisión aprobada por operador (19/11/2026):** mantener userdata para ajustes, logs y estado ordinario; usar `/storage/.config/masqelec/` para journal, respaldos y estado crítico de montajes. Ruta aceptada, despliegue de cutover todavía NO autorizado.
+
 # Auditoría: userdata real del addon y ubicación del journal (19/11/2026)
 
 ## Evidencia: ZIP entregado por el operador
@@ -55,14 +57,13 @@ permisos corregidos), logs y preferencias. Reservar `/storage/.config/masqelec/`
 para journal de recuperación y marcador de arquitectura cuyo ciclo de vida debe
 sobrevivir a Kodi, actualizaciones y posible eliminación de datos del addon.
 
-Esta decisión no se considera autorizada hasta que el operador elija ubicación y se
-verifiquen permisos y directorios del MASTER. No alterar rutas ni ejecutar cutover.
+Ubicación elegida por el operador. Persisten las verificaciones de permisos y directorios del MASTER antes del cutover. No alterar montajes todavía.
 
 ## Estado
 
 ```text
 AUDIT_USERDATA_ZIP=COMPLETE
 OAUTH_SECRETS_EXPOSED_IN_REPORT=NO
-RECOVERY_STORAGE_LOCATION=DECISION_PENDING
+RECOVERY_STORAGE_LOCATION=/storage/.config/masqelec
 CUTOVER_AUTHORIZED=NO
 ```
