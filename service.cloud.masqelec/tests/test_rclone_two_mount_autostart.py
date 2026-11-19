@@ -17,7 +17,7 @@ FILES = ("/storage/.mnt/videos/1/probe.mkv",
 
 class FirstRunTests(unittest.TestCase):
     def config(self, *, enabled=True, feature=True, rollback=True,
-               retire=True, recovery=False, known=FILES):
+               retire=True, recovery=True, known=FILES):
         patches = [
             mock.patch.object(constants, "RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED",
                               enabled),
@@ -76,6 +76,17 @@ class FirstRunTests(unittest.TestCase):
     def test_rollback_gate_must_be_true(self):
         result, _, _, _, adapter = self.run_case("legacy", rollback=False)
         self.assertEqual(result, "BLOCKED_RELEASE_GATES")
+        adapter.assert_not_called()
+
+    def test_first_cutover_requires_armed_early_boot_recovery(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no discovery")):
+            result, execute, recover, retire, adapter = self.run_case(
+                "legacy", recovery=False, known=())
+        self.assertEqual(result, "BLOCKED_BOOT_RECOVERY_NOT_ARMED")
+        execute.assert_not_called()
+        recover.assert_not_called()
+        retire.assert_not_called()
         adapter.assert_not_called()
 
     def test_no_rpc_blocks_before_any_adapter(self):
