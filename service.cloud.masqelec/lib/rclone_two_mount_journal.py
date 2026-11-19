@@ -86,6 +86,18 @@ def _state_bytes(phase):
     }, sort_keys=True) + "\n").encode("utf-8")
 
 
+def _trusted_base(base):
+    """Allow CoreELEC's root-owned shared state root, not secret directories."""
+    if base == "/storage/.config/masqelec" and os.geteuid() == 0:
+        info = os.lstat(base)
+        if (not stat.S_ISDIR(info.st_mode)
+                or info.st_uid != 0
+                or stat.S_IMODE(info.st_mode) not in (0o700, 0o755)):
+            raise ValueError("Unsafe journal base directory")
+    else:
+        _private_dir(base)
+
+
 @contextmanager
 def locked(parent):
     """Bloqueo exclusivo por dispositivo, sin seguir .lock symlink."""
@@ -105,14 +117,7 @@ def locked(parent):
     # /storage/.config/masqelec is shared with other addon state and may
     # already exist as root-owned 0755 on CoreELEC. Never chmod it: only
     # the dedicated transaction directory may contain private credentials.
-    if base == "/storage/.config/masqelec" and os.geteuid() == 0:
-        info = os.lstat(base)
-        if (not stat.S_ISDIR(info.st_mode)
-                or info.st_uid != 0
-                or stat.S_IMODE(info.st_mode) not in (0o700, 0o755)):
-            raise ValueError("Unsafe journal base directory")
-    else:
-        _private_dir(base)
+    _trusted_base(base)
     os.makedirs(parent, mode=0o700, exist_ok=True)
     _private_dir(parent)
     lock = os.path.join(parent, ".lock")
