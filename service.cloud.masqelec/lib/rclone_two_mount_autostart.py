@@ -45,6 +45,7 @@ _STATUSES = frozenset({
     "BLOCKED_BOOT_INSTALL_CONFLICT",
     "BLOCKED_BOOT_SCRIPT_MISSING", "BLOCKED_BOOT_INSTALL_FAILED",
     "BLOCKED_BOOT_RECOVERY_NOT_ARMED",
+    "BLOCKED_V2_CONFIG_NOT_PUBLISHED",
 })
 
 
@@ -139,6 +140,11 @@ def tick(rpc_call, *, adapter_factory=None):
         if (getattr(constants, "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
                     False) is not True):
             return "BLOCKED_BOOT_RECOVERY_NOT_ARMED"
+        # The v2 MQC2 endpoint must exist BEFORE legacy units are stopped.
+        # Once marked active, CLIENT never falls back to legacy MQC2.
+        from lib import rclone_two_mount_v2_publication as publication
+        if not publication.available():
+            return "BLOCKED_V2_CONFIG_NOT_PUBLISHED"
         # First migration demands two independent, locally discoverable
         # media fixtures before disabling a single legacy FUSE.
         known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
