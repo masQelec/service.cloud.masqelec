@@ -9,6 +9,7 @@ Las rutas seleccionadas NO deben aparecer en logs.
 import os
 import stat
 import time
+import sys
 
 CATALOG_ROOTS = ("/storage/videos", "/storage/tvshows")
 SAMPLE_PREFIXES = {
@@ -117,3 +118,29 @@ def discover(roots=CATALOG_ROOTS, *, max_files=MAX_FILES,
         return None
     except (OSError, ValueError, UnicodeError):
         return None
+
+
+def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args != ["--inventory"]:
+        print("MEDIA_DISCOVERY_RESULT=BLOCKED_INVALID_MODE")
+        return 2
+    print("LAB_MODE=LOCAL_STRM_MEDIA_SAMPLES_READ_ONLY")
+    print("ONEDRIVE_ACCESSED=NO")
+    print("FUSE_OR_SYSTEMD_CHANGED=NO")
+    print("OAUTH_CONFIG_READ=NO")
+    print("STRM_FILES_CHANGED=NO")
+    print("MEDIA_PATHS_PRINTED=NO")
+    result = discover()
+    print("ACCOUNT_1_SAMPLE=" + ("FOUND" if result else "NOT_VERIFIED"))
+    print("ACCOUNT_2_SAMPLE=" + ("FOUND" if result else "NOT_VERIFIED"))
+    print("REAL_OAUTH_PROBE_ALLOWED=NO")
+    print("CUTOVER_AUTHORIZED=NO")
+    print("MEDIA_DISCOVERY_RESULT=" + (
+        "PASS_2_LOCAL_STRM_ACCOUNTS" if result
+        else "BLOCKED_NO_TWO_LOCAL_SAMPLES"))
+    return 0 if result else 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

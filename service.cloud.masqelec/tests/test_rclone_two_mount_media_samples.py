@@ -110,6 +110,44 @@ class LocalStrmDiscoveryTests(unittest.TestCase):
             with self.subTest(value=type(raw).__name__):
                 self.assertIsNone(samples._media_account(raw))
 
+    def test_inventory_cli_only_reports_presence_not_media_paths(self):
+        from unittest import mock
+        from contextlib import redirect_stdout
+        from io import StringIO
+        with mock.patch.object(
+                samples, "discover",
+                return_value=("/storage/.mnt/videos/1/SECRET-FILM.mkv",
+                              "/storage/.mnt/videos/2/SECRET-SERIES.mkv")), \
+             redirect_stdout(StringIO()) as output:
+            code = samples.main(["--inventory"])
+        self.assertEqual(code, 0)
+        text = output.getvalue()
+        self.assertIn("MEDIA_DISCOVERY_RESULT=PASS_2_LOCAL_STRM_ACCOUNTS", text)
+        self.assertNotIn("SECRET-FILM", text)
+        self.assertNotIn("SECRET-SERIES", text)
+        self.assertIn("OAUTH_CONFIG_READ=NO", text)
+
+    def test_invalid_cli_does_not_scan(self):
+        from unittest import mock
+        from contextlib import redirect_stdout
+        from io import StringIO
+        with mock.patch.object(samples, "discover",
+                               side_effect=AssertionError("no scan")), \
+             redirect_stdout(StringIO()) as output:
+            self.assertEqual(samples.main(["--migrate"]), 2)
+        self.assertEqual(output.getvalue().strip(),
+                         "MEDIA_DISCOVERY_RESULT=BLOCKED_INVALID_MODE")
+
+    def test_inventory_cli_missing_account_reports_block(self):
+        from unittest import mock
+        from contextlib import redirect_stdout
+        from io import StringIO
+        with mock.patch.object(samples, "discover", return_value=None), \
+             redirect_stdout(StringIO()) as output:
+            self.assertEqual(samples.main(["--inventory"]), 2)
+        self.assertIn("BLOCKED_NO_TWO_LOCAL_SAMPLES", output.getvalue())
+        self.assertIn("REAL_OAUTH_PROBE_ALLOWED=NO", output.getvalue())
+
     def test_source_has_no_remote_media_reads(self):
         code = (Path(__file__).resolve().parents[1] /
                 "lib/rclone_two_mount_media_samples.py").read_text()
