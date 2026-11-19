@@ -208,3 +208,27 @@ Añadido a `tools/rclone_two_mount_systemd_local_lab.py` el modo `--fake-oauth-r
 Comandos: `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q` en Ubuntu y en KodiELEC `python3 /tmp/rclone_two_mount_systemd_local_lab.py --fake-oauth-rollback-isolated --confirm-isolated-only` tras bajar la última versión del script en `develop`.
 
 Marcadores exigidos: `CLEANUP=COMPLETE` y `LAB_RESULT=PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED`. `RELEASE_AUTHORIZED=NO`.
+
+## Resultado confirmado por operador: 911/911 + rollback físico aislado PASS
+
+El operador reporta en Ubuntu `Ran 911 tests in 1.333s` / `OK` tras incorporar las pruebas del rollback ficticio. Los marcadores `MASQELEC_EARLY_BOOT=INVALID_MODE`, `MASQELEC_EARLY_BOOT=ROLLED_BACK` y `LAB_RESULT=BLOCKED_INVALID_MODE` corresponden a ensayos negativos, no a fallos de la suite.
+
+En KodiELEC, el laboratorio de `--fake-oauth-rollback-isolated --confirm-isolated-only` ha devuelto:
+```text
+LAB_MODE=RCLONE_2FUSE_4BIND_REAL_SYSTEMD_ISOLATED
+ONEDRIVE_ACCESSED=NO
+LIVE_RCLONE_CONFIG_READ=NO
+KODI_MOUNT_PATHS_CHANGED=NO
+LEGACY_SERVICE_START_STOP=NO
+LEGACY_UNIT_FILES_CHANGED=NO
+SYSTEMD_DAEMON_RELOAD=ISOLATED_RUN_ONLY
+SYSTEMD_RUNTIME_UNITS_ONLY=YES
+PERMANENT_UNITS_ENABLED=NO
+GITHUB_UPLOAD=NO
+CLEANUP=COMPLETE
+LAB_RESULT=PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED
+```
+
+**Gates superados**: regresión automatizada 911/911 en Ubuntu y ensayo físico aislado de rollback de bytes ficticios con systemd en KodiELEC, preservando los montajes reales.
+
+**No cubre**: sonda OAuth Microsoft real; validación real del paquete MQC2 MASTER/CLIENT; crash/reinicio durante transición; conexión del worker a `recover_one` y garantía de mismo candidato probado y aplicado. `RELEASE_AUTHORIZED=NO`, gates de producción `False`.
