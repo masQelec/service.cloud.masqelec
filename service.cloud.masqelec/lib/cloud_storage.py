@@ -24,6 +24,7 @@ from lib import constants
 from lib import rclone_conf_merge
 from lib import rclone_two_mount_rollout
 from lib import rclone_two_mount_boot_guard
+from lib import coreelec_systemd_dir
 
 # ==============================
 # Config red
@@ -238,7 +239,7 @@ def handle_service_file(service_name: str, base_url: str, systemd_dir: str) -> b
                 log_utils.write_log(f"'{service_unit}' coincide con la versión remota.")
         else:
             log_utils.write_log(f"Archivo '{service_unit}' no encontrado. Creándolo (atómico).")
-            os.makedirs(systemd_dir, exist_ok=True)
+            coreelec_systemd_dir.ensure_directory(systemd_dir)
             _atomic_write_bytes(dest, remote_content, mode=0o644)
             changed = True
 
@@ -411,7 +412,7 @@ def start_cloud_storage():
         ]
 
         systemd_dir = "/storage/.config/system.d/"
-        os.makedirs(systemd_dir, exist_ok=True)
+        coreelec_systemd_dir.ensure_directory(systemd_dir)
 
         base_units_url = f"{constants.CLOUD_RAW_BASE}/system.d/"
 
