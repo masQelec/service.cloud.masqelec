@@ -12,6 +12,7 @@ from lib import constants
 from lib import rclone_two_mount_client_file_ops as files
 from lib import rclone_two_mount_client_systemd as systemd
 from lib import rclone_two_mount_client_transaction as transaction
+from lib import rclone_two_mount_client_runtime as runtime
 from lib import rclone_two_mount_plan as plan
 from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_boot_guard as guard
@@ -70,3 +71,39 @@ def apply_verified(prepared, *, authorized=False, verified_probe=False,
     except (OSError, ValueError, TypeError, RuntimeError,
             PermissionError, BlockingIOError):
         return "MANUAL_RECOVERY_REQUIRED"
+
+
+def recover_one(*, account_index, auth_status, read_sources, head, get,
+                probe, key, rpc_call, media_check, authorized=False,
+                adapter_factory=None, account_path=None, journal_dir=None):
+    """Verify GitHub MQC2 and commit one account, only behind release flags.
+
+    This is not a Kodi worker. Caller must independently attest AUTH and
+    provide authenticated GET/HEAD, temporary-copy probe and media-check.
+    Returned text is a closed status, NEVER candidate OAuth bytes.
+    """
+    if authorized is not True:
+        return "BLOCKED_NOT_AUTHORIZED"
+    if (getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED", False)
+            is not True or
+            getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is not True):
+        return "BLOCKED_RELEASE_GATES"
+    from lib import device_utils
+    if device_utils.get_device_role() != "CLIENT":
+        return "BLOCKED_NOT_CLIENT"
+    if rollout.mode(True) != "active":
+        return "BLOCKED_NOT_ACTIVE"
+    result = runtime.verify_once(
+        account_index=account_index, auth_status=auth_status,
+        read_sources=read_sources, head=head, get=get, probe=probe,
+        key=key, release_authorized=True, return_candidate=True)
+    if not isinstance(result, dict):
+        return result
+    if result.get("status") != "candidate_probe_verified":
+        return "BLOCKED_CANDIDATE"
+    return apply_verified(
+        result["prepared"], authorized=True, verified_probe=True,
+        rpc_call=rpc_call, media_check=media_check,
+        adapter_factory=adapter_factory,
+        account_path=account_path, journal_dir=journal_dir)
