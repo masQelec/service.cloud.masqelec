@@ -61,8 +61,10 @@ class FirstRunTests(unittest.TestCase):
             result = auto.tick(lambda _: '{}')
         return result, execute, recover, retire, adapter
 
-    def test_default_disabled_without_any_calls(self):
-        with mock.patch.object(auto.rollout, "mode",
+    def test_explicitly_disabled_without_any_calls(self):
+        with mock.patch.object(constants, "RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED",
+                               False), \
+             mock.patch.object(auto.rollout, "mode",
                                side_effect=AssertionError("no state")), \
              mock.patch.object(auto.live, "LocalAdapter",
                                side_effect=AssertionError("no IO")):
