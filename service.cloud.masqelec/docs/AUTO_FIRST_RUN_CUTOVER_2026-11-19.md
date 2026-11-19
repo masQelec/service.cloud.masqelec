@@ -106,3 +106,23 @@ Si falta cualquier muestra, `MEDIA_DISCOVERY_RESULT=BLOCKED_NO_TWO_LOCAL_SAMPLES
 Tests de `test_rclone_two_mount_media_samples.py` + regresiones de arranque verifican directorios de series anidados, dos remotos en películas, catálogo corrupto, symlinks, rutas manipuladas, falta de cuenta, límite de recorrido, ausencia de operaciones de red, y devolución de estados sin nombres de archivos. **773/773 PASS** ([GitHub Actions 44426001148](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44426001148)). Los flags de publicación y transición continúan en `False`.
 
 **Riesgo pendiente:** si el orden del catálogo local contiene más de 200 000 entradas antes de hallar un .strm válido de cada cuenta, o el dispositivo tarda más de 12 segundos, la detección bloquea por diseño. La selección no garantiza que el archivo exista todavía en OneDrive; eso se comprobará después del corte. Hay que ejecutar el preflight en al menos MASTER y un CLIENTE y probar físicamente el corte y rollback antes de autorizar la release.
+
+## Resultado físico MASTER — descubrimiento STRM (19/11/2026)
+
+Resultado comunicado por el operador desde KodiELEC:
+
+```text
+LAB_MODE=LOCAL_STRM_MEDIA_SAMPLES_READ_ONLY
+ONEDRIVE_ACCESSED=NO
+FUSE_OR_SYSTEMD_CHANGED=NO
+OAUTH_CONFIG_READ=NO
+STRM_FILES_CHANGED=NO
+MEDIA_PATHS_PRINTED=NO
+ACCOUNT_1_SAMPLE=FOUND
+ACCOUNT_2_SAMPLE=FOUND
+REAL_OAUTH_PROBE_ALLOWED=NO
+CUTOVER_AUTHORIZED=NO
+MEDIA_DISCOVERY_RESULT=PASS_2_LOCAL_STRM_ACCOUNTS
+```
+
+**MASTER: preflight local PASS.** Este resultado confirma selección de rutas STRM locales para las dos cuentas; no acredita la existencia o lectura remota de esos vídeos. No existe todavía evidencia equivalente de todos los CLIENTES. El corte real, renovación OAuth, recuperación y reinicio continúan sin autorización.
