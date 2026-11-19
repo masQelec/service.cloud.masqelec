@@ -34,10 +34,14 @@ def checked(paths, predicate):
     return all(predicate(path) for path in paths)
 
 
+def _is_root():
+    return os.geteuid() == 0
+
+
 def assess():
     """Return status-only flags; never expose paths or source contents."""
     report = {}
-    report["ROOT"] = os.geteuid() == 0
+    report["ROOT"] = _is_root()
     try:
         report["UNIT_DIRECTORY_SAFE"] = safe_dir(UNIT_DIR)
     except OSError:
