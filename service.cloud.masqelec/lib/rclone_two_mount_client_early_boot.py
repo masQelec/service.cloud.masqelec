@@ -8,6 +8,7 @@ separately authorized. No OAuth, no GitHub, no Kodi RPC.
 import os
 
 from lib import constants
+from lib import rclone_two_mount_client_role as client_role
 from lib import rclone_two_mount_boot_guard as guard
 from lib import rclone_two_mount_client_file_ops as files
 from lib import rclone_two_mount_client_crash_recovery as crash
@@ -45,7 +46,7 @@ def execute(*, authorized=False, proc_root="/proc", adapter_factory=None,
         return "BLOCKED_FEATURE_DISABLED"
     if not _is_root():
         return "BLOCKED_NOT_ROOT"
-    if _get_role() != "CLIENT":
+    if not client_role.allowed(_get_role()):
         return "BLOCKED_NOT_CLIENT"
     if rollout.mode(True) != "active":
         return "BLOCKED_NOT_ACTIVE"
