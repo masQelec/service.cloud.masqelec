@@ -21,6 +21,13 @@ def client_recovery_pending(parent=None):
     """A v2 CLIENT with a partial recovery must not resume normal tasks."""
     parent = CLIENT_TXN_PARENT if parent is None else parent
     try:
+        if not os.path.lexists(parent):
+            return False
+        meta = os.lstat(parent)
+        if (not stat.S_ISDIR(meta.st_mode) or
+                stat.S_IMODE(meta.st_mode) != 0o700 or
+                meta.st_uid != os.geteuid()):
+            return True
         return any(client_files.recovery_pending(
             os.path.join(parent, "account{}".format(i)),
             account_index=i-1) for i in (1, 2))
