@@ -41,6 +41,8 @@ from lib import rclone_two_mount_health
 from lib import rclone_two_mount_startup_stage
 from lib import rclone_two_mount_boot_guard
 from lib import rclone_two_mount_autostart
+from lib import rclone_two_mount_master_runtime
+from lib import rclone_two_mount_client_worker
 
 # ---- Config constante ----
 SLEEP_INTERVAL_SECS = 10
@@ -509,6 +511,37 @@ def _rclone_v2_autostart_worker():
         if _rclone_v2_autostart_last != "BLOCKED_LOCAL_ERROR":
             _rclone_v2_autostart_last = "BLOCKED_LOCAL_ERROR"
             log("rclone v2 autostart: BLOCKED_LOCAL_ERROR", "WARNING")
+
+
+def _rclone_v2_oauth_worker():
+    """Account-scoped v2 sync only after the local layout is ACTIVE."""
+    if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is not True):
+        return
+    if rclone_two_mount_rollout.mode(True) != "active":
+        return
+    try:
+        role = utils.get_device_role()
+        if (role == "MASTER"
+                and getattr(constants,
+                            "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
+                            False) is True):
+            result = rclone_two_mount_master_runtime.run_once(
+                release_authorized=True)
+            if result not in ("unchanged", "created_verified",
+                              "updated_verified"):
+                log("rclone v2 MASTER MQC2: BLOCKED_OR_DEFERRED", "WARNING")
+        elif (role == "CLIENT"
+                and getattr(constants,
+                            "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                            False) is True):
+            result = rclone_two_mount_client_worker.tick(
+                xbmc.executeJSONRPC, authorized=True, role=role)
+            if result not in ("HEALTHY_OR_UNAVAILABLE",
+                              "DEFERRED_INTERVAL", "DEFERRED_PLAYBACK"):
+                log("rclone v2 CLIENT OAuth: CHECK_REQUIRED", "WARNING")
+    except Exception:
+        log("rclone v2 OAuth: BLOCKED_UNEXPECTED_ERROR", "WARNING")
 
 
 # ------------- FASES -------------
@@ -1031,6 +1064,7 @@ def run_service():
         StoppableWorker("periodic_clean_tick", _periodic_clean_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_update_tick", _periodic_update_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_rclone_v2_cutover", _rclone_v2_autostart_worker, monitor, interval=CHECK_TICK_SECS),
+        StoppableWorker("periodic_rclone_v2_oauth", _rclone_v2_oauth_worker, monitor, interval=3600),
         StoppableWorker("periodic_rclone_token_tick", rclone_token_sync.tick, monitor, interval=CHECK_TICK_SECS),
     ]
     for w in workers_periodic:
