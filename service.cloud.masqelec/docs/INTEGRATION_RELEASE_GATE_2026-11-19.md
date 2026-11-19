@@ -112,3 +112,7 @@ Las operaciones systemd, exclusión de procesos rclone y salud FUSE se reciben c
 `CLIENT_V2_SYSTEMD_ADAPTER=NOT_IMPLEMENTED`
 `CLIENT_V2_KODIELEC_REAL_TEST=NOT_RUN`
 `RELEASE_AUTHORIZED=NO`
+
+## Regresión Ubuntu confirmada por operador — 874/874 (19/11/2026)
+
+El operador ha ejecutado `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'` tras sincronizar `develop` y ha comunicado `Ran 874 tests in 1.394s` seguido de `OK`. Queda validada la suite local, incluidas las pruebas con archivos temporales del adaptador CLIENTE v2. No demuestra integración systemd real, exclusión de escritores rclone físicos ni recuperación tras reinicio. `RELEASE_AUTHORIZED=NO`.
