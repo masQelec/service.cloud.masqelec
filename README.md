@@ -107,6 +107,10 @@ python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
 
 Este `--preflight` descarga y valida el respaldo MQC2 publicado: **lectura, no escritura**; no ejecuta consultas OAuth. Si falla por divergencia local/GitHub, conservar ambos estados y analizar; no sobrescribir tokens. **No ejecutar `--real-probe` con montajes activos**.
 
+## Referencia operativa KodiELEC / CoreELEC
+
+**Leer antes de modificar rutas, unidades systemd o journal:** [Sistema de archivos, rutas y compatibilidad TX3/X96 X4](service.cloud.masqelec/docs/KODIELEC_COREELEC_FILESYSTEM_AND_PATHS.md). Incluye evidencia real del MASTER, diferencias con Ubuntu, inventario de rutas confirmadas/propuestas, y discrepancias del preflight todavía pendientes. No equiparar `/etc/systemd/system` con el directorio persistente de KodiELEC `/storage/.config/system.d`.
+
 ## Documentación
 
 La documentación mantenida está en [**docs/README.md**](service.cloud.masqelec/docs/README.md):
