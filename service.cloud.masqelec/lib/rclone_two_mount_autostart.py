@@ -148,8 +148,7 @@ def tick(rpc_call, *, adapter_factory=None):
             # MASTER, leave its four FUSE and retry later on the same
             # addon version: no partial per-device migration.
             from lib import rclone_two_mount_master_runtime as master_runtime
-            from lib import device_utils
-            if (device_utils.get_device_role() == "MASTER"
+            if (master_runtime._get_role() == "MASTER"
                     and getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
                                 False) is True):
                 publish = master_runtime.publish_from_legacy_before_cutover(
