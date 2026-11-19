@@ -71,7 +71,9 @@ class RunnerTests(unittest.TestCase):
                              "BLOCKED_REAL_RECOVERY_ENABLED")
 
     def test_dev_fake_recovery_invoked_only_in_real_recover_mode(self):
-        with mock.patch.object(runner, "_dev_fake_boot_lab",
+        flags = self._disable_real_flags()
+        with flags[0], flags[1], flags[2], flags[3], \
+             mock.patch.object(runner, "_dev_fake_boot_lab",
                                return_value="PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK") as lab, \
              mock.patch.object(runner.early, "execute",
                                return_value="BLOCKED_NOT_AUTHORIZED"), \
