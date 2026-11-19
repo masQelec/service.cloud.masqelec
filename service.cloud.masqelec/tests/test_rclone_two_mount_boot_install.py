@@ -55,10 +55,20 @@ class BootInstallerTests(unittest.TestCase):
 
     def test_existing_operator_dropin_blocks_before_mutation(self):
         drop = self.units / "kodi.service.d"
-        drop.mkdir()
+        drop.mkdir(mode=0o755)
+        drop.chmod(0o755)  # Independiente de umask 0002/0022.
         (drop / installer.DROPIN_NAME).write_text("custom")
         self.assertEqual(self.install(), "BLOCKED_BOOT_INSTALL_CONFLICT")
         self.assertFalse((self.units / installer.UNIT_NAME).exists())
+
+    def test_group_writable_dropin_directory_fails_closed(self):
+        drop = self.units / "kodi.service.d"
+        drop.mkdir()
+        drop.chmod(0o775)
+        (drop / installer.DROPIN_NAME).write_text("custom")
+        self.assertEqual(self.install(), "BLOCKED_BOOT_INSTALL_FAILED")
+        self.assertFalse((self.units / installer.UNIT_NAME).exists())
+        self.assertEqual(self.actions, [])
 
     def test_unverified_ordering_blocks_cutover(self):
         with mock.patch.object(installer, "ADDON_SCRIPT", str(self.script)), \
