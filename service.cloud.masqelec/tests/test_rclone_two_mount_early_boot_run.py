@@ -16,6 +16,17 @@ spec.loader.exec_module(runner)
 
 
 class RunnerTests(unittest.TestCase):
+    def _disable_real_flags(self):
+        return [
+            mock.patch.object(runner.constants, name, False)
+            for name in (
+                "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
+                "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                "RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED",
+            )
+        ]
+
     def test_failure_does_not_fail_kodi_boot(self):
         with mock.patch.object(runner.early, "execute",
                                return_value="MANUAL_RECOVERY_REQUIRED"):
@@ -73,7 +84,9 @@ class RunnerTests(unittest.TestCase):
                       output.getvalue())
 
     def test_pending_fake_lab_requires_kodi_absent(self):
-        with mock.patch.object(
+        flags = self._disable_real_flags()
+        with flags[0], flags[1], flags[2], flags[3], \
+             mock.patch.object(
                 runner.constants, "RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED",
                 True), \
              mock.patch.object(runner.early, "kodi_process_absent",
@@ -88,11 +101,13 @@ class RunnerTests(unittest.TestCase):
 
     def test_real_runner_uses_fake_journal_verify_api(self):
         from tools import rclone_two_mount_reboot_journal_lab as lab
+        flags = self._disable_real_flags()
         boot_a = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         boot_b = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "journal"
-            with mock.patch.object(lab, "ROOT", root), \
+            with flags[0], flags[1], flags[2], flags[3], \
+                 mock.patch.object(lab, "ROOT", root), \
                  mock.patch.object(lab, "_is_root", return_value=True), \
                  mock.patch.object(lab, "_mounts_clear", return_value=True), \
                  mock.patch.object(lab, "_boot_id", return_value=boot_a):
