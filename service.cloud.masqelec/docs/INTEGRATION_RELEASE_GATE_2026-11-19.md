@@ -551,3 +551,7 @@ Cambios de candidato en develop:
 RELEASE_CANDIDATE_FLAGS=ON
 PHYSICAL_CUTOVER_VERIFIED=NO
 ZIP_PUBLISHED_BY_OPERATOR=NO
+
+## Regresión de candidato automático: 1006 ejecutados, 2 tests de fixture fallidos — corregidos
+
+Operador informó `Ran 1006 tests in 1.426s; FAILED (failures=2)` después de encender gates de release en constants.py. Fallos concretos: `test_dev_fake_recovery_invoked_only_in_real_recover_mode` esperaba recuperar con flag CLIENT apagado pero lo heredaba ON de la release, provocando evaluación real de identidad y marcador `MANUAL_RECOVERY_REQUIRED` en el entorno de prueba Ubuntu; `test_standalone_role_does_not_import_kodi` esperaba `BLOCKED_FAKE_LAB_ENABLED`, pero flags reales ON bloqueaban antes con `BLOCKED_REAL_FEATURE_FLAGS_ENABLED`. Ambos escenarios antiguos ahora fuerzan los flags de release explícitamente a OFF dentro de la prueba, sin alterar las barreras reales ni rebajar expectativas. Commits `b249353967174db83e40ff70349b9a896bcfd2cd` y `7b4250d665176eaada5ec26e8920cd459824e230`. La regresión de esta corrección **todavía no ha sido comunicada**; el ZIP continúa no publicado por operador. La salida `MASQELEC_EARLY_BOOT=MANUAL_RECOVERY_REQUIRED` en esa suite provenía del escenario mock mal aislado; no es evidencia de fallo de CoreELEC real. `RELEASE_CANDIDATE_TESTS_PENDING=YES`.
