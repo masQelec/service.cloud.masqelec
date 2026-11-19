@@ -17,7 +17,7 @@
 
 **Gate integrado antes de release:** [Auditoría y bloqueos de migración v2 (19/11/2026)](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md). El laboratorio aislado pasó; faltan recuperación OAuth CLIENTE v2 y validación física de cutover/rollback/reboot. No publicar ni activar flags todavía.
 
-**Estado CLIENTE v2 (19/11/2026):** integración en `develop` de verificación MQC2 → transacción de archivos privada → callbacks systemd por cuenta, con nuevo gate desactivado `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED=False` y detección de journals incompletos durante el arranque. La última suite confirmada por el operador fue **874/874 OK**; las nuevas pruebas de integración **todavía no están confirmadas**. Sin conexión al worker, prueba OAuth/OneDrive real, ni recuperación física tras reinicio: **NO PUBLICAR**. [Gate completo](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md).
+**Estado CLIENTE v2 (19/11/2026):** última suite confirmada por el operador **911/911 OK** antes de los cambios más recientes. KodiELEC pasó los ensayos físicos aislados de ciclo de cuenta y rollback de credenciales *ficticias* (`PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED`, `PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED`). La lógica AUTH por cuenta → MQC2 v2 → sonda privada con token renovado → transacción/journal → recuperación en arranque está ahora conectada al worker y al runner temprano **solo detrás de banderas desactivadas**. Estas nuevas pruebas todavía no han sido ejecutadas por el operador. **NO PUBLICAR** hasta validar reinicio/interrupción real, OAuth/OneDrive real y publicación MASTER v2. [Gate completo](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md).
 
 ## ¿Qué es?
 
