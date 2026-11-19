@@ -25,8 +25,9 @@ def _is_root():
 
 
 def _get_role():
-    from lib import device_utils
-    return device_utils.get_device_role()
+    """Standalone systemd Python cannot import Kodi's xbmcvfs."""
+    from tools import rclone_two_mount_real_oauth_grouped_preflight as role_probe
+    return role_probe._read_role_standalone()
 
 
 def execute(*, authorized=False, proc_root="/proc", adapter_factory=None,
