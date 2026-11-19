@@ -436,3 +436,11 @@ La salida `PILOT_GATE=BLOCKED_V2_LAYOUT_NOT_VERIFIED` es **esperable** si el equ
 Pruebas nuevas `tests/test_rclone_two_mount_real_oauth_grouped_preflight.py`: modo inválido, no root, rechazo de flags, laboratorio no desactivado, no MASTER, configuración local insegura, ausencia bind y auditoría positiva simulada. **Pruebas no ejecutadas en el host operador todavía**.
 
 Procedimiento del operador (después de `git pull --ff-only origin develop`, regresión total y actualizar addon de CoreELEC): `python3 /storage/.kodi/addons/service.cloud.masqelec/tools/rclone_two_mount_real_oauth_grouped_preflight.py --read-only`. Enviar únicamente las líneas de estado, nunca `rclone.conf`, tokens, MQC2 cifrado, `authorized_keys` ni credenciales GitHub. Los flags reales continúan deshabilitados. `RELEASE_AUTHORIZED=NO`.
+
+## Preflight OAuth agrupado — bloqueo standalone role solucionado (pendiente regresión física)
+
+El operador informó `PILOT_GATE=BLOCKED_ROLE_UNAVAILABLE` al ejecutar el nuevo script por SSH en CoreELEC. Diagnóstico de código: el auditor importaba `lib.device_utils` que importa `xbmcvfs` a nivel módulo; este módulo Kodi no está disponible necesariamente en el `/usr/bin/python3` del shell independiente. **No demuestra fallo de identidad MASTER**.
+
+Corrección en `tools/rclone_two_mount_real_oauth_grouped_preflight.py`: detección MASTER independiente de Kodi, exclusivamente de lectura, que extrae mediante AST los dos literales de identidad originales de `lib/device_utils.py`, lee la MAC eth0 de sysfs, comprueba su inclusión en la lista permitida y exige también el `n=` del fichero ZeroTier escogido con la misma prioridad de directorios. Ante fuente inaccesible/ilegible devuelve bloqueo o rol desconocido, nunca eleva a MASTER. No altera `device_utils.get_device_role()`, servicio Kodi, configuración ZeroTier ni banderas OAuth. Se incorporaron pruebas nuevas de identidad positiva, negativa y fail-closed.
+
+**Acción del operador:** `git pull --ff-only origin develop`, ejecutar regresión `unittest discover`, actualizar addon instalado en CoreELEC, repetir `tools/rclone_two_mount_real_oauth_grouped_preflight.py --read-only`. El modo legacy activo debe seguir dando `BLOCKED_V2_LAYOUT_NOT_VERIFIED`; es resultado diagnóstico y no autoriza falsificar marcador. `RELEASE_AUTHORIZED=NO`.
