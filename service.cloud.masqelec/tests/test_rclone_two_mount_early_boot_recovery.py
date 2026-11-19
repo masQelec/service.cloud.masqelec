@@ -29,6 +29,8 @@ class EarlyBootRecoveryTests(unittest.TestCase):
         params.update(kw)
         with mock.patch.object(boot.constants,
                                "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", True), \
+             mock.patch.object(boot.constants,
+                               "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED", True), \
              mock.patch.object(boot.os, "geteuid", return_value=0):
             return boot.execute(**params)
 
@@ -126,6 +128,14 @@ class EarlyBootRecoveryTests(unittest.TestCase):
                                return_value=nullcontext()):
             self.assertEqual(self.run_gate(adapter_factory=BadAdapter),
                              "MANUAL_RECOVERY_REQUIRED")
+
+    def test_recovery_gate_refuses_auto_recovery_flag_off(self):
+        with mock.patch.object(boot.constants,
+                               "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", True), \
+             mock.patch.object(boot.constants,
+                               "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED", False):
+            self.assertEqual(boot.execute(authorized=True,
+                rollback_verified=True), "BLOCKED_FEATURE_DISABLED")
 
     def test_recovery_gate_refuses_feature_off(self):
         with mock.patch.object(boot.constants,
