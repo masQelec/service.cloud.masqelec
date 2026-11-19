@@ -387,3 +387,20 @@ La salida de journal presenta fecha `Feb 27` sin año mientras la conversación 
 El operador comprobó en CoreELEC mediante `journalctl -b -o short-monotonic -u masqelec-v2-recovery.service -u kodi.service --no-pager`: inicio de recuperación `[6.135086]`, `MASQELEC_EARLY_BOOT=BLOCKED_NOT_AUTHORIZED` `[8.644896]`, finalización de recuperador `[8.735075]`, inicio `kodi.service` `[15.949814]` y arranque Kodi `[16.036970]`. Separación de **7.214739 s** desde `Finished masqelec-v2-recovery.service` hasta `Starting kodi.service`. `GATE_REAL_SYSTEMD_PRE_KODI_ORDER=PASS` y `GATE_DENIED_RECOVERY_NO_SIDE_EFFECT=PASS` conforme a la ruta autorizada, que permanece deshabilitada. Marcas de reloj monotónico evitaban discrepancias de wall clock del dispositivo.
 
 **No demostrar más de lo medido:** no existe todavía evidencia de restauración OAuth automática de un journal real ni de operación MQC2 MASTER/CLIENTE. `RELEASE_AUTHORIZED=NO`.
+
+## Ensayo REAL de ejecución automática del journal ficticio ANTES de Kodi — preparado (19/11/2026)
+
+En `develop`, la unidad **real ya instalada** `masqelec-v2-recovery.service` sigue ejecutando `tools/rclone_two_mount_early_boot_run.py --recover`. El runner incorpora el hook privado `_dev_fake_boot_lab()`, con nueva bandera predeterminada `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=False` en `lib/constants.py`. **Solo cuando esta bandera se habilita localmente en el MASTER de desarrollo y existe el journal exacto** de `rclone_two_mount_reboot_journal_lab.py`, el proceso unitario llama a `lab.verify()` antes de Kodi. Comprueba los bytes ficticios, permisos, mountinfo, boot_id cambiado y Kodi ausente; realiza rollback ficticio y limpieza exacta. Luego continúa por la ruta habitual, que permanece `MASQELEC_EARLY_BOOT=BLOCKED_NOT_AUTHORIZED`. La salida esperada de la unidad incluye `MASQELEC_DEV_FAKE_BOOT_LAB=PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK`.
+
+El hook **rechaza** si las banderas `RCLONE_TWO_MOUNT_FEATURE_ALLOWED`, `RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED`, `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED` o `RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED` están habilitadas, o si Kodi está arrancado. No llama al sistema de remotos reales, no cambia la función MASTER ni toca `/storage/.config/rclone` ni `/storage/.mnt`. Se han añadido tests de ejecución opt-in, rechazo de Kodi activo y encadenamiento real API lab↔runner con cambio de boot_id simulado.
+
+### Procedimiento para el operador en el único equipo MASTER de desarrollo
+
+1. Ejecutar **regresión completa** en Ubuntu tras `git pull --ff-only origin develop`. **Pendiente**; no asumir PASS.
+2. Actualizar en CoreELEC el addon instalado con esta versión de `develop`; no basta actualizar la copia de Ubuntu. Mantener las banderas reales de migración/OAuth desactivadas.
+3. Solo en la copia local instalada del MASTER de desarrollo, establecer `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=True` (nunca commit a GitHub). Confirmar que la unidad sigue apuntando al runner real del addon instalado.
+4. Ejecutar `python3 /storage/.kodi/addons/service.cloud.masqelec/tools/rclone_two_mount_reboot_journal_lab.py --prepare --confirm-isolated-only` y exigir `REBOOT_LAB_RESULT=PREPARED_REBOOT_REQUIRED`.
+5. Reiniciar manualmente. Tras la reconexión, `journalctl -b -o short-monotonic -u masqelec-v2-recovery.service -u kodi.service --no-pager`. Se exige el marcador `MASQELEC_DEV_FAKE_BOOT_LAB=PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK` **antes** de `Starting kodi.service`, `MASQELEC_EARLY_BOOT=BLOCKED_NOT_AUTHORIZED` y Kodi arrancado. Comprobar `test ! -e /storage/.config/masqelec-v2-reboot-journal-lab`.
+6. Devolver `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=False` en el addon local de desarrollo; reiniciar o iniciar nueva instancia del runner para verificar que el hook está inactivo. No borrar manualmente un journal que haya fallado; conservar evidencia.
+
+**Este gate verifica la recuperación automática del journal ficticio por el servicio REAL pre-Kodi**, no un OAuth real, no la restauración de cuentas OneDrive productivas ni MQC2 de GitHub. No habilitar release/first-run/mount migration. `RELEASE_AUTHORIZED=NO`.
