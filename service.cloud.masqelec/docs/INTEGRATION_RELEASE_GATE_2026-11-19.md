@@ -302,3 +302,11 @@ En `develop` se añade `tools/rclone_two_mount_reboot_journal_lab.py`, autoconte
 Se incorpora `tests/test_rclone_two_mount_reboot_journal_lab.py` (6 escenarios) para fail-closed, reinicio requerido, persistencia y rechazo de contenido ajeno/corrupto. **Regresión y ensayo físico pendientes de resultados**. Última suite confirmada previamente: 941/941 OK.
 
 **Límite fundamental**: prueba persistencia del journal y restauración de bytes ficticios tras boot_id diferente, NO valida orden de unidad systemd antes de Kodi, recuperación automáticamente ejecutada por el addon, continuidad de FUSE real ni OAuth Microsoft. Por tanto `RELEASE_AUTHORIZED=NO`.
+
+## Resultado físico confirmado: persistencia/rollback tras reboot real en CoreELEC
+
+El operador ejecutó en el equipo CoreELEC 21.2.5-Omega_devel (Amlogic-ng.arm) la fase `--prepare --confirm-isolated-only` del laboratorio `tools/rclone_two_mount_reboot_journal_lab.py`, obteniendo `REBOOT_LAB_RESULT=PREPARED_REBOOT_REQUIRED`. A continuación ejecutó `reboot`, se perdió la sesión SSH por reinicio y se reconectó tras arrancar. La verificación manual `--verify-after-reboot --confirm-isolated-only` devolvió `REBOOT_LAB_RESULT=PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK`.
+
+Marcadores declarados por el laboratorio: `REAL_OAUTH_ACCESSED=NO`, `SYSTEMD_UNITS_CHANGED=NO`, `KODI_MOUNTS_CHANGED=NO`, `REBOOT_TRIGGERED=NO`. El programa verifica cambio del `boot_id`, integridad exacta del journal y bytes ficticios, restaura la cuenta 1, comprueba que la cuenta 2 ficticia no cambia y limpia exclusivamente su ruta persistente privada.
+
+**GATE_REAL_REBOOT_FAKE_JOURNAL_PERSISTENCE=PASS**. Este resultado **NO prueba** la ejecución automática de la recuperación previa a Kodi, systemd productivo ni OAuth/MQC2 real. La última suite Python confirmada por operador fue 941/941 PASS antes de incorporar los seis tests de este laboratorio; sigue pendiente la regresión de los últimos commits. `RELEASE_AUTHORIZED=NO`.
