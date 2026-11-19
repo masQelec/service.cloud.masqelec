@@ -44,3 +44,7 @@ RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES = ()
 
 # CLIENT v2 OAuth transactional installer. NEVER enable without physical gates.
 RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED = False
+
+# Laboratorio: permite ejercer SOLO el flujo CLIENT v2 OAuth en un MASTER.
+# No altera rol global ni publica MQC2. Permanece desactivado por defecto.
+RCLONE_TWO_MOUNT_DEV_CLIENT_OAUTH_ON_MASTER = False
