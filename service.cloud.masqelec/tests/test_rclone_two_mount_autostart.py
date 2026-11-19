@@ -82,6 +82,48 @@ class FirstRunTests(unittest.TestCase):
             self.assertEqual(auto.tick(None), "BLOCKED_KODI_RPC")
             adapter.assert_not_called()
 
+    def test_empty_config_autodiscovers_samples_without_network(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               return_value=FILES) as discovery:
+            result, execute, _, retire, adapter = self.run_case(
+                "legacy", known=())
+        self.assertEqual(result, "ACTIVE_VERIFIED_LEGACY_RETIRED")
+        discovery.assert_called_once_with()
+        execute.assert_called_once()
+        self.assertEqual(adapter.call_args.kwargs["known_media_files"], FILES)
+        retire.assert_called_once()
+
+    def test_autodiscovery_no_second_account_blocks_mutations(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               return_value=None) as discovery:
+            result, execute, recover, retire, adapter = self.run_case(
+                "legacy", known=())
+        self.assertEqual(result, "BLOCKED_MEDIA_FIXTURES")
+        discovery.assert_called_once_with()
+        adapter.assert_not_called()
+        execute.assert_not_called()
+        retire.assert_not_called()
+
+    def test_unsafe_recovery_does_not_depend_on_media_discovery(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no catalog scan")):
+            result, execute, recover, _, adapter = self.run_case(
+                "unsafe", known=(), recovery=True)
+        self.assertEqual(result, "ROLLED_BACK")
+        recover.assert_called_once()
+        self.assertEqual(adapter.call_args.kwargs["known_media_files"], ())
+        execute.assert_not_called()
+
+    def test_playback_active_defers_without_catalog_scan(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no scan")):
+            result, execute, _, retire, adapter = self.run_case(
+                "legacy", playback_idle=False, known=())
+        self.assertEqual(result, "DEFERRED_PLAYBACK_ACTIVE")
+        adapter.assert_not_called()
+        execute.assert_not_called()
+        retire.assert_not_called()
+
     def test_media_missing_fails_closed_before_touch(self):
         result, _, _, _, adapter = self.run_case("legacy", known=())
         self.assertEqual(result, "BLOCKED_MEDIA_FIXTURES")

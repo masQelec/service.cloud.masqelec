@@ -11,6 +11,7 @@ from lib import rclone_two_mount_kodi_idle as kodi_idle
 from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_live_adapter as live
 from lib import rclone_two_mount_legacy_cleanup as cleanup
+from lib import rclone_two_mount_media_samples as media_samples
 from lib import rclone_two_mount_plan as plan
 
 _STATUSES = frozenset({
@@ -69,9 +70,6 @@ def tick(rpc_call, *, adapter_factory=None):
         return "BLOCKED_NOT_ROOT"
     if not callable(rpc_call):
         return "BLOCKED_KODI_RPC"
-    known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
-    if not _valid_media_paths(known):
-        return "BLOCKED_MEDIA_FIXTURES"
     try:
         mode = rollout.mode(True)
         maker = (adapter_factory if adapter_factory is not None
@@ -81,8 +79,29 @@ def tick(rpc_call, *, adapter_factory=None):
         if mode == "prepared":
             # Un journal prepared anterior no debe eliminarse ciegamente.
             return "BLOCKED_PREPARED_STATE"
-        # Construir adaptador puede cargar metadatos, pero nunca invoca
-        # systemctl ni OAuth por sí mismo.
+        # La recuperación de un corte unsafe NO depende de que el catálogo
+        # local aún contenga dos vídeos válidos: restaurar los cuatro FUSE
+        # sigue siendo prioritario.
+        if mode in ("legacy", "unsafe") and not kodi_idle.is_playback_idle(
+                rpc_call):
+            return "DEFERRED_PLAYBACK_ACTIVE"
+        if mode == "unsafe":
+            if (getattr(constants, "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
+                        False) is not True):
+                return "BLOCKED_RECOVERY_NOT_ENABLED"
+            adapter = maker(rpc_call=rpc_call, live_enabled=True,
+                            known_media_files=())
+            recovered = live.recover_with_local_lock(
+                adapter, authorized=True, verified_rollback=True)
+            return recovered if recovered in _STATUSES else (
+                "BLOCKED_MANUAL_RECOVERY_REQUIRED")
+        # Localizar muestras en los .strm LOCALES, sin tocar FUSE/OneDrive.
+        # Configuración explícita errónea no cae a autodetección silenciosa.
+        known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
+        if known == ():
+            known = media_samples.discover()
+        if not _valid_media_paths(known):
+            return "BLOCKED_MEDIA_FIXTURES"
         adapter = maker(rpc_call=rpc_call, live_enabled=True,
                         known_media_files=known)
         if mode == "active":
@@ -96,16 +115,6 @@ def tick(rpc_call, *, adapter_factory=None):
                 "ALREADY_CLEAN": "ACTIVE_CLEAN_ALREADY",
             }.get(result, result if result in _STATUSES
                   else "BLOCKED_LOCAL_ERROR")
-        if not kodi_idle.is_playback_idle(rpc_call):
-            return "DEFERRED_PLAYBACK_ACTIVE"
-        if mode == "unsafe":
-            if (getattr(constants, "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
-                        False) is not True):
-                return "BLOCKED_RECOVERY_NOT_ENABLED"
-            recovered = live.recover_with_local_lock(
-                adapter, authorized=True, verified_rollback=True)
-            return recovered if recovered in _STATUSES else (
-                "BLOCKED_MANUAL_RECOVERY_REQUIRED")
         outcome = live.execute_with_local_lock(
             adapter, authorized=True, verified_rollback=True)
         if outcome == "ACTIVE":
