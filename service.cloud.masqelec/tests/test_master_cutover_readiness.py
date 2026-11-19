@@ -35,6 +35,7 @@ class MasterReadinessTests(unittest.TestCase):
             mock.patch.object(gate, "UNIT_DIR", str(self.system)),
             mock.patch.object(gate, "CANONICAL", str(self.conf)),
             mock.patch.object(gate, "PARENT", str(self.parent)),
+            mock.patch.object(gate, "SPACE_ANCHOR", str(self.root)),
             mock.patch.object(gate, "TXN_PARENT", str(self.parent / "transaction")),
             mock.patch.object(gate, "ISOLATED_PARENT", str(self.parent / "isolated")),
             mock.patch.object(gate, "STATE", str(self.parent / "state.json")),
@@ -46,6 +47,28 @@ class MasterReadinessTests(unittest.TestCase):
 
     def test_fixture_readiness(self):
         self.assertTrue(all(gate.assess().values()))
+
+    def test_missing_journal_base_is_safe_for_first_install(self):
+        self.parent.rmdir()
+        result = gate.assess()
+        self.assertTrue(result["JOURNAL_PARENT_SAFE"])
+        self.assertTrue(result["FREE_SPACE"])
+        self.assertTrue(all(result.values()))
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(gate.main(["--read-only"]), 0)
+        self.assertIn("JOURNAL_PARENT=ABSENT_BOOTSTRAP_REQUIRED",
+                      out.getvalue())
+        self.assertFalse(self.parent.exists())
+
+    def test_symlink_journal_base_is_unsafe(self):
+        self.parent.rmdir()
+        self.parent.symlink_to(self.root)
+        self.assertFalse(gate.assess()["JOURNAL_PARENT_SAFE"])
+
+    def test_group_writable_storage_parent_blocks_bootstrap(self):
+        self.parent.rmdir()
+        self.root.chmod(0o777)
+        self.assertFalse(gate.assess()["JOURNAL_PARENT_SAFE"])
 
     def test_non_root_blocks_cutover_readiness(self):
         with mock.patch.object(gate, "_is_root", return_value=False):
