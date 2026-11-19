@@ -339,3 +339,11 @@ FINAL_GATE=BLOCKED_AUTOMATIC_BOOT_ORDER_NOT_VERIFIED
 PRODUCTION_RELEASE_AUTHORIZED=NO
 ```
 Diagnóstico preciso: la unidad `masqelec-v2-recovery.service` no está instalada en CoreELEC; por tanto tampoco hay dependencia `Wants/After` ni un `ExecStart` verificable. **Esto no demuestra fallo del código de recuperación** y tampoco prueba la ejecución automática. No instalarla sobre `kodi.service` productivo sin autorización de release y ensayo aislado. Falta comunicar resultado del modo `--ubuntu-regression`.
+
+## Laboratorio en MASTER ejerciendo solo la lógica CLIENT OAuth v2
+
+A petición del operador, `develop` incorpora la bandera específica `RCLONE_TWO_MOUNT_DEV_CLIENT_OAUTH_ON_MASTER=False` en `lib/constants.py` y la decisión pura `lib/rclone_two_mount_client_role.py`. Cuando la bandera se activa **únicamente en la copia local del addon del MASTER de desarrollo**, el worker OAuth v2, su `recover_one` y el recuperador CLIENT de arranque temprano aceptan ese equipo como sujeto de prueba CLIENT; **no cambia** `device_utils.get_device_role()`, el catálogo o el comportamiento normal de otros componentes. Se inhibe la publicación MASTER v2 durante el ensayo para evitar funciones contrapuestas en el mismo tick.
+
+El mero cambio de esa bandera NO habilita acciones: `RCLONE_TOKEN_SYNC_ENABLED`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED`, `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED`, estado local `active`, idle de Kodi, salud de medios y el resto de guardas mantienen sus requisitos. Los nuevos tests `test_rclone_two_mount_client_role.py` verifican aislamiento y ausencia de autorización implícita.
+
+**No activar todas las banderas ni forzar marcadores solo para satisfacer la prueba.** Primero confirmar regresión y verificar/instalar la unidad real de arranque en el equipo de desarrollo con preflight/rollback. Un MASTER en estado legacy no puede ejercer honestamente la recuperación OAuth CLIENT v2 de un sistema active sin completar una migración controlada. La prueba de tokens OneDrive reales y publicación MQC2 sigue pendiente. `RELEASE_AUTHORIZED=NO`.
