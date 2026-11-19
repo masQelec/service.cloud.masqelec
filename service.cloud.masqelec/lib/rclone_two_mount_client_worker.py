@@ -17,11 +17,20 @@ from lib import rclone_two_mount_live_adapter as live
 from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_plan as plan
 from lib import rclone_token_policy as policy
-from lib import rclone_token_sync as tokens
 from lib import rclone_two_mount_boot_guard as guard
 
 _last_attempt = None
 _INTERVAL = 3600
+
+
+def _token_probe(name, path):
+    """Load Kodi-dependent rclone probe only after explicit worker gates.
+
+    Keeping this import lazy makes the module safely importable on Ubuntu
+    during offline regression tests and avoids Kodi side effects at import.
+    """
+    from lib import rclone_token_sync as tokens
+    return tokens._probe(name, path)
 
 
 def _probe_private(index, content):
@@ -40,7 +49,7 @@ def _probe_private(index, content):
             output.write(content)
             output.flush()
             os.fsync(output.fileno())
-        result = tokens._probe(name, path)
+        result = _token_probe(name, path)
         if result != "ok":
             return result, b""
         # Probe can renew the refresh token. Only return the tested copy.
