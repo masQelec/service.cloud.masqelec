@@ -123,6 +123,54 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("MASQELEC_DEV_FAKE_BOOT_LAB=MANUAL_RECOVERY_REQUIRED",
                       output.getvalue())
 
+    def test_enabled_client_recovery_uses_headless_role_and_client_path(self):
+        from lib import rclone_two_mount_client_early_boot as client
+        with mock.patch.object(
+                runner.constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                True), mock.patch.object(
+                client, "_get_role", return_value="CLIENT") as identity, mock.patch.object(
+                client, "execute", return_value="NO_PENDING") as recover, mock.patch.object(
+                runner.early, "execute", side_effect=AssertionError(
+                    "Must not use MASTER cutover recovery")), mock.patch.object(
+                runner, "_dev_fake_boot_lab", return_value="DISABLED"), contextlib.redirect_stdout(
+                io.StringIO()) as output:
+            self.assertEqual(runner.main(["--recover"]), 0)
+        identity.assert_called()
+        recover.assert_called_once_with(authorized=True)
+        self.assertIn("MASQELEC_EARLY_BOOT=NO_PENDING", output.getvalue())
+
+    def test_unknown_role_never_invokes_any_real_recovery(self):
+        from lib import rclone_two_mount_client_early_boot as client
+        with mock.patch.object(
+                runner.constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                True), mock.patch.object(
+                client, "_get_role", return_value="UNKNOWN"), mock.patch.object(
+                client, "execute", side_effect=AssertionError(
+                    "No CLIENT recovery")) as recovery, mock.patch.object(
+                runner.early, "execute", side_effect=AssertionError(
+                    "No MASTER recovery")) as legacy, mock.patch.object(
+                runner, "_dev_fake_boot_lab", return_value="DISABLED"), contextlib.redirect_stdout(
+                io.StringIO()) as output:
+            self.assertEqual(runner.main(["--recover"]), 0)
+        recovery.assert_not_called()
+        legacy.assert_not_called()
+        self.assertIn("MASQELEC_EARLY_BOOT=BLOCKED_ROLE_UNAVAILABLE", output.getvalue())
+
+    def test_real_master_without_override_retains_master_rollback(self):
+        from lib import rclone_two_mount_client_early_boot as client
+        with mock.patch.object(
+                runner.constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                True), mock.patch.object(
+                runner.constants, "RCLONE_TWO_MOUNT_DEV_CLIENT_OAUTH_ON_MASTER",
+                False), mock.patch.object(
+                client, "_get_role", return_value="MASTER"), mock.patch.object(
+                client, "execute", side_effect=AssertionError(
+                    "No CLIENT override")), mock.patch.object(
+                runner.early, "execute", return_value="NO_PENDING") as legacy, mock.patch.object(
+                runner, "_dev_fake_boot_lab", return_value="DISABLED"):
+            self.assertEqual(runner.main(["--recover"]), 0)
+        legacy.assert_called_once()
+
     def test_invalid_mode_never_attempts_recovery(self):
         with mock.patch.object(runner.early, "execute",
                                side_effect=AssertionError("no call")):
