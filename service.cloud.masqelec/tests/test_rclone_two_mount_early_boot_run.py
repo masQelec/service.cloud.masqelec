@@ -71,6 +71,20 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("MASQELEC_EARLY_BOOT=BLOCKED_NOT_AUTHORIZED",
                       output.getvalue())
 
+    def test_pending_fake_lab_requires_kodi_absent(self):
+        with mock.patch.object(
+                runner.constants, "RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED",
+                True), \
+             mock.patch.object(runner.early, "kodi_process_absent",
+                               return_value=False), \
+             mock.patch("tools.rclone_two_mount_reboot_journal_lab.verify",
+                        side_effect=AssertionError("must not write")) as verify, \
+             mock.patch("tools.rclone_two_mount_reboot_journal_lab.os.path.lexists",
+                        return_value=True):
+            self.assertEqual(runner._dev_fake_boot_lab(),
+                             "BLOCKED_KODI_RUNNING_OR_UNKNOWN")
+            verify.assert_not_called()
+
     def test_invalid_mode_never_runs_dev_fake_recovery(self):
         with mock.patch.object(runner, "_dev_fake_boot_lab",
                                side_effect=AssertionError("must not run")):
