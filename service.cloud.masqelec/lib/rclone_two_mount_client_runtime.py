@@ -7,6 +7,7 @@ El callback probe debe usar una copia temporal privada y limpiar sus bytes.
 """
 from lib import rclone_two_mount_client_recovery as recovery
 from lib import rclone_two_mount_config_routes as routes
+from lib import rclone_conf_merge as conf
 
 
 def verify_once(*, account_index, auth_status, read_sources, head, get,
@@ -47,6 +48,18 @@ def verify_once(*, account_index, auth_status, read_sources, head, get,
         if planned["status"] != "candidate_requires_probe":
             return planned["status"]
         result = probe(account_index, planned["candidate_account"])
+        # A real rclone probe may rotate its private OAuth copy. Accept
+        # renewed bytes only if all non-token settings are identical and
+        # the probe returned explicit success. Never persist unprobed bytes.
+        if isinstance(result, tuple) and len(result) == 2:
+            status, checked_bytes = result
+            if (status != "ok" or type(checked_bytes) is not bytes or
+                    not checked_bytes or
+                    not conf.same_non_token_settings(
+                        planned["candidate_account"], checked_bytes)):
+                return "blocked_probe_or_generation"
+            planned = dict(planned, candidate_account=checked_bytes)
+            result = status
         # La sonda puede renovar su copia; nunca convertir ese cambio en
         # permiso para sobrescribir un writer rclone en ejecución.
         same_local = read_sources() == first
