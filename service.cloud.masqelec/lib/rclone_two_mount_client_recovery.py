@@ -8,6 +8,8 @@ operativo futuro, autorizado por separado. No registrar bytes OAuth.
 import hmac
 import re
 
+from lib import rclone_conf_merge as conf
+from lib import rclone_two_mount_oauth as oauth
 from lib import rclone_token_policy as policy
 from lib import rclone_two_mount_plan as plan
 from lib import rclone_two_mount_publish_guard as mqc2
@@ -47,26 +49,22 @@ def prepare(account_index, local_canonical, local_account,
         expected_account = plan.account_snapshot(local_canonical, account_index)
         # El account real puede haber renovado OAuth desde el canónico.
         # La identidad y las opciones, excepto token, deben seguir iguales.
-        from lib import rclone_conf_merge as conf
         if not conf.same_non_token_settings(local_account, expected_account):
             return {"status": "blocked_local_identity"}
-        account_sections = policy.sections(local_account)
-        account_tokens = policy.oauth_tokens(local_account)
-        if len(account_tokens) != 1:
-            return {"status": "blocked_local_identity"}
-        name = next(iter(account_tokens))
-        if account_sections[name].get("type", "").lower() != "onedrive":
-            return {"status": "blocked_local_identity"}
+        name, _ = oauth._account(local_canonical, account_index, local_account)
         if not key:
             return {"status": "blocked_key"}
         decoded = mqc2.decode_remote_contents(remote_contents, key)
         remote = decoded["canonical"]
+        if not conf.same_non_token_settings(local_canonical, remote):
+            return {"status": "blocked_remote_identity"}
         # Conservar toda la configuración canónica local excepto token OAuth.
         # Esto valida la identidad de secciones y remotos, incluso Drive/crypt.
         candidate_canonical = policy.tokens_from_master(
             local_canonical, remote, (name,), allow_same_refresh=True)
         candidate_account = plan.account_snapshot(
             candidate_canonical, account_index)
+        oauth._account(candidate_canonical, account_index, candidate_account)
         if not conf.same_non_token_settings(local_account, candidate_account):
             return {"status": "blocked_account_identity"}
         if candidate_account == local_account:
