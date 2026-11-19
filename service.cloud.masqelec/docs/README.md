@@ -2,6 +2,22 @@
 
 **Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **530/530 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
 
+## Estado MASTER / recuperación (19-11-2026)
+
+La regresión confirmada por el operador antes del candidato de recuperación
+temprana es **798/798 PASS**. MASTER: `MASTER_READINESS=PASS_READ_ONLY`,
+11/11 controles correctos; `system.d` root:root modo 0755. El corte real
+no se ha ejecutado.
+
+- [Sistema de archivos KodiELEC/CoreELEC y rutas persistentes](KODIELEC_COREELEC_FILESYSTEM_AND_PATHS.md).
+- [Auditoría userdata frente a journal persistente](USERDATA_VS_RECOVERY_STORAGE_AUDIT_2026-11-19.md).
+- [Recuperación temprana previa a Kodi — candidato sin instalar](EARLY_BOOT_RECOVERY_KODIELEC_2026-11-19.md).
+
+**No confundir nuevo código en `develop` con gates PASS de hardware**:
+el coordinador de recuperación temprana exige un orden systemd de arranque
+todavía no verificado en TX3/X96 X4. No hay servicio de recuperación
+instalado ni activación del addon v2.
+
 ## Documentación mantenida (fuente de trabajo)
 
 | Documento | Cuándo consultarlo |
