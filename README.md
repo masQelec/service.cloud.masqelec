@@ -17,6 +17,8 @@
 
 **Gate integrado antes de release:** [Auditoría y bloqueos de migración v2 (19/11/2026)](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md). El laboratorio aislado pasó; faltan recuperación OAuth CLIENTE v2 y validación física de cutover/rollback/reboot. No publicar ni activar flags todavía.
 
+**Estado CLIENTE v2 (19/11/2026):** integración en `develop` de verificación MQC2 → transacción de archivos privada → callbacks systemd por cuenta, con nuevo gate desactivado `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED=False` y detección de journals incompletos durante el arranque. La última suite confirmada por el operador fue **874/874 OK**; las nuevas pruebas de integración **todavía no están confirmadas**. Sin conexión al worker, prueba OAuth/OneDrive real, ni recuperación física tras reinicio: **NO PUBLICAR**. [Gate completo](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md).
+
 ## ¿Qué es?
 
 Addon de servicio para la distribución masQelec basada en Kodi/KodiELEC. Coordina al arrancar la configuración cifrada de rclone, los servicios de montajes, las actualizaciones del sistema, la biblioteca de Kodi, el catálogo, los procesos PVR/Tvheadend y tareas de mantenimiento. Dispone de roles **MASTER** y **CLIENT**, detectados localmente (código en `lib/device_utils.py`), y utiliza un repositorio de configuración separado: **[masQelec/cloud.masqelec](https://github.com/masQelec/cloud.masqelec)**.
