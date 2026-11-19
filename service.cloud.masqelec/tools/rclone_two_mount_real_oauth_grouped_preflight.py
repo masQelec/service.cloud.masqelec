@@ -17,6 +17,7 @@ sys.path.insert(0, str(ADDON))
 from lib import constants
 from lib import rclone_two_mount_boot_guard as guard
 from lib import rclone_two_mount_config_routes as routes
+from lib import rclone_two_mount_health as health
 from lib import rclone_two_mount_plan as plan
 from lib import rclone_two_mount_rollout as rollout
 
@@ -56,18 +57,15 @@ def _systemd_value(unit, prop):
         return "unknown"
 
 
-def _mount_targets():
-    targets = set()
+def _mount_topology():
+    """Return raw mountpoint inventory plus independently verified v2 layout."""
     try:
         with open("/proc/self/mountinfo", encoding="utf-8") as stream:
-            for line in stream:
-                fields = line.partition(" - ")[0].split()
-                if len(fields) < 5:
-                    return None
-                targets.add(fields[4].replace("\\040", " "))
-    except (OSError, UnicodeError):
-        return None
-    return targets
+            raw = stream.read()
+        entries = health.mount_entries(raw)
+        return set(entries), health.check_two_fuse_four_bind(raw)
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return None, False
 
 
 def _literal_master_identity():
@@ -184,7 +182,9 @@ def inspect(role=None):
         "YES" if guard.client_recovery_pending() else "NO")
     output["MQC2_V2_ROUTE"] = routes.V2_REMOTE_PATH
     output["EARLY_BOOT_UNIT"] = _systemd_value(UNIT, "LoadState")
-    mounts = _mount_targets()
+    mounts, topology_verified = _mount_topology()
+    output["V2_MOUNT_TOPOLOGY"] = (
+        "VERIFIED" if topology_verified else "NOT_VERIFIED")
     for index, unit in enumerate(UNITS):
         output["UNIT_{}".format(index + 1)] = (
             _systemd_value(unit, "ActiveState"))
@@ -195,15 +195,17 @@ def inspect(role=None):
     for index, bind in enumerate(plan.BIND_MAP):
         target = bind[3]
         output["BIND_{}".format(index + 1)] = (
+            "VERIFIED_V2_BIND" if topology_verified else
             "UNKNOWN" if mounts is None else
-            "MOUNTED" if target in mounts else "NOT_MOUNTED")
+            "LEGACY_OR_UNVERIFIED" if target in mounts else "NOT_MOUNTED")
     active_ready = (
         output["MODE"] == "active"
         and all(output["UNIT_{}".format(i)] == "active"
                 for i in range(1, 7))
+        and topology_verified
         and all(output["FUSE_{}".format(i)] == "MOUNTED"
                 for i in range(1, 3))
-        and all(output["BIND_{}".format(i)] == "MOUNTED"
+        and all(output["BIND_{}".format(i)] == "VERIFIED_V2_BIND"
                 for i in range(1, 5))
         and output["ACCOUNT1_CONFIG"] == "PRIVATE"
         and output["ACCOUNT2_CONFIG"] == "PRIVATE"
