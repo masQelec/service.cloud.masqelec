@@ -426,3 +426,13 @@ La unidad real restauró automáticamente los bytes ficticios del primer archivo
 ## Cierre confirmado del laboratorio en dispositivo (operador)
 
 El operador confirmó `LAB_CLEAN=YES` (no existe el directorio de journal ficticio) y `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=False` en el addon instalado. `GATE_DEV_FAKE_BOOT_LAB_CLOSED=PASS`. El cierre no autoriza activar OAuth de producción, publicar MQC2, migrar servicios ni desplegar el addon. `RELEASE_AUTHORIZED=NO`.
+
+## Gate agrupado de preparación OAuth REAL — implementación read-only, sin activación
+
+Se añadió `tools/rclone_two_mount_real_oauth_grouped_preflight.py --read-only` para concentrar en una ejecución las comprobaciones previas a una prueba OAuth real usando el dispositivo MASTER como CLIENTE OAuth de laboratorio. El comando inspecciona sin imprimir bytes secretos: rol MASTER, rama `develop`, banderas de release/aplicación desactivadas, laboratorio previo desactivado y limpio, estado local `legacy/prepared/active/unsafe`, permisos y existencia de `rclone.conf` y ambos `accountN.conf`, journal de recuperación pendiente, seis unidades systemd, presencia de dos FUSE y cuatro bind en `/proc/self/mountinfo` y ruta fija GitHub MQC2 v2. **No ejecuta rclone, red, OAuth, recuperación, actualización de addon, systemctl reload/start/stop ni migración.**
+
+La salida `PILOT_GATE=BLOCKED_V2_LAYOUT_NOT_VERIFIED` es **esperable** si el equipo sigue en cuatro FUSE legacy. No falsificar marcador `active` para pasar el preflight. `PILOT_GATE=READONLY_ACTIVE_LAYOUT_PRESENT_NEEDS_OAUTH_GATES` significa únicamente que aparecen componentes de disposición activos; no certifica identidad MQC2, salud de contenido ni tokens. Estas verificaciones requieren gates separados y posterior ensayo de OAuth auténtico.
+
+Pruebas nuevas `tests/test_rclone_two_mount_real_oauth_grouped_preflight.py`: modo inválido, no root, rechazo de flags, laboratorio no desactivado, no MASTER, configuración local insegura, ausencia bind y auditoría positiva simulada. **Pruebas no ejecutadas en el host operador todavía**.
+
+Procedimiento del operador (después de `git pull --ff-only origin develop`, regresión total y actualizar addon de CoreELEC): `python3 /storage/.kodi/addons/service.cloud.masqelec/tools/rclone_two_mount_real_oauth_grouped_preflight.py --read-only`. Enviar únicamente las líneas de estado, nunca `rclone.conf`, tokens, MQC2 cifrado, `authorized_keys` ni credenciales GitHub. Los flags reales continúan deshabilitados. `RELEASE_AUTHORIZED=NO`.
