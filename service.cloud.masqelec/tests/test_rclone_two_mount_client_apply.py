@@ -57,7 +57,7 @@ class ClientApplyTests(unittest.TestCase):
                 apply.constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
                 True), mock.patch.object(
                 apply.rollout, "mode", return_value="active"), mock.patch.object(
-                apply.os, "geteuid", return_value=0), mock.patch.object(
+                apply, "_is_root", return_value=True), mock.patch.object(
                 apply.guard, "client_recovery_pending", return_value=False):
             return apply.apply_verified(self.prepared, **params)
 
@@ -118,7 +118,7 @@ class ClientApplyTests(unittest.TestCase):
                 apply.constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
                 True), mock.patch.object(
                 apply.rollout, "mode", return_value="active"), mock.patch.object(
-                apply.os, "geteuid", return_value=0), mock.patch.object(
+                apply, "_is_root", return_value=True), mock.patch.object(
                 apply.guard, "client_recovery_pending", return_value=False), mock.patch.object(
                 apply, "_get_role", return_value="CLIENT"), mock.patch.object(
                 apply.runtime, "verify_once",
@@ -165,7 +165,7 @@ class ClientApplyTests(unittest.TestCase):
                 apply.constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
                 True), mock.patch.object(
                 apply.rollout, "mode", return_value="active"), mock.patch.object(
-                apply.os, "geteuid", return_value=0):
+                apply, "_is_root", return_value=True):
             self.assertEqual(apply.apply_verified(
                 bad, authorized=True, verified_probe=True,
                 rpc_call=self.rpc, media_check=lambda _: True),
