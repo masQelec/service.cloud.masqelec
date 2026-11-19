@@ -27,12 +27,16 @@ def main(argv=None):
         print("MASQELEC_EARLY_BOOT=INVALID_MODE")
         return 0  # Kodi must never be blocked by this optional component.
     # Rollback gate and feature gates are independent of systemd installation.
-    result = early.execute(
-        authorized=True,
-        rollback_verified=(getattr(
-            constants, "RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED", False)
-            is True),
-    )
+    try:
+        result = early.execute(
+            authorized=True,
+            rollback_verified=(getattr(
+                constants, "RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED", False)
+                is True),
+        )
+    except Exception:
+        # No traceback or exception text: they might contain path/token data.
+        result = "MANUAL_RECOVERY_REQUIRED"
     if result not in _ALLOWED:
         result = "MANUAL_RECOVERY_REQUIRED"
     print("MASQELEC_EARLY_BOOT=" + result)
