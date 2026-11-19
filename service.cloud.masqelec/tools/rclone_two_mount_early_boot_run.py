@@ -20,6 +20,7 @@ _ALLOWED = frozenset({
     "BLOCKED_KODI_RUNNING_OR_UNKNOWN", "BLOCKED_STATE_CHANGED",
     "MANUAL_RECOVERY_REQUIRED", "BLOCKED_NOT_CLIENT",
     "BLOCKED_NOT_ACTIVE", "BLOCKED_MEDIA",
+    "BLOCKED_ROLE_UNAVAILABLE",
 })
 
 
@@ -74,9 +75,11 @@ def main(argv=None):
     try:
         if getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
                    False) is True:
-            from lib import device_utils
-            if client_role.allowed(device_utils.get_device_role()):
-                from lib import rclone_two_mount_client_early_boot as client
+            from lib import rclone_two_mount_client_early_boot as client
+            role = client._get_role()
+            if role not in ("MASTER", "CLIENT"):
+                result = "BLOCKED_ROLE_UNAVAILABLE"
+            elif client_role.allowed(role):
                 result = client.execute(authorized=True)
             else:
                 result = early.execute(
