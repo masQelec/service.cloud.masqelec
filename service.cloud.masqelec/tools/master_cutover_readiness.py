@@ -109,7 +109,9 @@ def main(argv=None):
         "NO_LEGACY_DROPINS", "NO_TRANSACTION", "NO_ISOLATED_CONFIGS",
         "JOURNAL_PARENT_SAFE", "FREE_SPACE",
     )
-    print("JOURNAL_PARENT=" +\n          ("ABSENT_BOOTSTRAP_REQUIRED" if not os.path.lexists(PARENT)\n           else "EXISTS"))
+    print("JOURNAL_PARENT=" +
+          ("ABSENT_BOOTSTRAP_REQUIRED" if not os.path.lexists(PARENT)
+           else "EXISTS"))
     for name in fields:
         print(name + "=" + ("PASS" if result.get(name) is True
                             else "BLOCKED"))
