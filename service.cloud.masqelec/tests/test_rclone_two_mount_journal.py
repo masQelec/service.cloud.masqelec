@@ -36,6 +36,36 @@ class JournalTests(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(txn.stat().st_mode), 0o700)
         self.assertTrue((txn / ".lock").exists())
 
+    def test_shared_coreelec_base_0755_accepted_only_as_root(self):
+        from types import SimpleNamespace
+        fake = SimpleNamespace(
+            st_mode=stat.S_IFDIR | 0o755, st_uid=0, st_gid=0)
+        with mock.patch.object(journal.os, "geteuid", return_value=0), \
+             mock.patch.object(journal.os, "lstat", return_value=fake):
+            journal._trusted_base("/storage/.config/masqelec")
+        with mock.patch.object(journal.os, "geteuid", return_value=1000), \
+             mock.patch.object(journal.os, "lstat", return_value=fake):
+            with self.assertRaises(ValueError):
+                journal._trusted_base("/storage/.config/masqelec")
+
+    def test_shared_coreelec_base_rejects_writable_and_foreign_owner(self):
+        from types import SimpleNamespace
+        for mode, uid in ((0o775, 0), (0o777, 0), (0o755, 100)):
+            fake = SimpleNamespace(
+                st_mode=stat.S_IFDIR | mode, st_uid=uid, st_gid=0)
+            with self.subTest(mode=mode, uid=uid), \
+                 mock.patch.object(journal.os, "geteuid", return_value=0), \
+                 mock.patch.object(journal.os, "lstat", return_value=fake):
+                with self.assertRaises(ValueError):
+                    journal._trusted_base("/storage/.config/masqelec")
+
+    def test_other_shared_directory_stays_private_0700(self):
+        shared = Path(self.tmp.name) / "shared"
+        shared.mkdir(mode=0o700)
+        shared.chmod(0o755)
+        with self.assertRaises(ValueError):
+            journal._trusted_base(str(shared))
+
     def test_symlink_bootstrap_base_is_rejected(self):
         base = Path(self.tmp.name, "masqelec")
         base.symlink_to(self.tmp.name)
