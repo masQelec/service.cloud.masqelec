@@ -206,15 +206,15 @@ class AccountFileOps:
         self._require(index)
         if recovery_pending(self.journal_dir, index):
             return False
+        raw, gen = _read(self.account_path)
+        if raw != expected:
+            return False
         # A completed earlier transaction cannot permanently prevent later
         # OAuth token rotations. Under the same exclusive lock, safely
         # retire it; never discard an incomplete/unknown journal.
         if os.path.lexists(_state_path(self.journal_dir)):
             if not retire_finalized(self.journal_dir, index):
                 return False
-        raw, gen = _read(self.account_path)
-        if raw != expected:
-            return False
         backup = os.path.join(self.journal_dir,
                               "account{}.bak".format(index + 1))
         if os.path.lexists(backup):
