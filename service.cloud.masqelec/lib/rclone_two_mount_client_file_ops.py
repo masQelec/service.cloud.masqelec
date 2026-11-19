@@ -61,6 +61,29 @@ def _read(path):
     return content, generation
 
 
+def provision_private_journal(folder):
+    """Create only a private account journal under an existing trusted base.
+
+    The base /storage/.config/masqelec must already exist at 0700 and be
+    owned by this user; never mkdir parents recursively or follow symlinks.
+    Only used by the explicitly enabled apply path.
+    """
+    if os.path.basename(folder) not in ("account1", "account2"):
+        raise ValueError("Unexpected CLIENT journal name")
+    parent = os.path.dirname(folder)
+    ancestor = os.path.dirname(parent)
+    _dir(ancestor)
+    if not os.path.lexists(parent):
+        os.mkdir(parent, 0o700)
+        _sync(ancestor)
+    _dir(parent)
+    if not os.path.lexists(folder):
+        os.mkdir(folder, 0o700)
+        _sync(parent)
+    _dir(folder)
+    return True
+
+
 @contextmanager
 def locked(folder):
     """Exclusive local lock; caller holds it throughout transaction."""
