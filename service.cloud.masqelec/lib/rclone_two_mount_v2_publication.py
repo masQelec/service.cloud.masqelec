@@ -17,9 +17,7 @@ MAX_BODY = 8 * 1024 * 1024
 def available(open_url=None):
     if constants.CLOUD_BRANCH != "develop":
         return False
-    base = constants.CLOUD_RAW_BASE_URL if hasattr(
-        constants, "CLOUD_RAW_BASE_URL") else (
-        "https://raw.githubusercontent.com/masQelec/cloud.masqelec/develop")
+    base = constants.CLOUD_RAW_BASE
     try:
         url = routes.remote_url_for_mount_mode(base, "active")
         if open_url is None:
