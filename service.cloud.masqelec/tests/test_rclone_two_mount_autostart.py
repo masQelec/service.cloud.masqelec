@@ -9,6 +9,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import rclone_two_mount_autostart as auto
 from lib import constants
+from lib import rclone_two_mount_v2_publication as publication
 
 
 FILES = ("/storage/.mnt/videos/1/probe.mkv",
@@ -53,6 +54,7 @@ class FirstRunTests(unittest.TestCase):
                                return_value="ACTIVE_HEALTHY"), \
              mock.patch.object(auto.boot_install, "ensure_installed",
                                return_value="READY"), \
+             mock.patch.object(publication, "available", return_value=True), \
              mock.patch.object(auto.live, "LocalAdapter") as adapter, \
              patches[0], patches[1], patches[2], patches[3], patches[4], \
              patches[5], patches[6]:
@@ -88,6 +90,21 @@ class FirstRunTests(unittest.TestCase):
         recover.assert_not_called()
         retire.assert_not_called()
         adapter.assert_not_called()
+
+    def test_absent_published_v2_config_blocks_first_cutover(self):
+        flags = self.config()
+        with mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+             mock.patch.object(auto.kodi_idle, "is_playback_idle", return_value=True), \
+             mock.patch.object(publication, "available", return_value=False), \
+             mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no samples")), \
+             mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
+             mock.patch.object(auto.live, "LocalAdapter") as adapter, \
+             flags[0], flags[1], flags[2], flags[3], flags[4], flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "BLOCKED_V2_CONFIG_NOT_PUBLISHED")
+        adapter.assert_not_called()
+        cut.assert_not_called()
 
     def test_no_rpc_blocks_before_any_adapter(self):
         flags = self.config()
