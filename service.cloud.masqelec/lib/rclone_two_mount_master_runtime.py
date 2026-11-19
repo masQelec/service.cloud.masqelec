@@ -157,3 +157,46 @@ def run_once(*, release_authorized=False, request=None,
             master_attested=True)
     except (OSError, ValueError, KeyError, TypeError, RuntimeError):
         return "blocked_master_runtime"
+
+def publish_from_legacy_before_cutover(*, authorized=False, request=None,
+                                      probe=None, key=None, token=None):
+    """MASTER-only: publish authenticated MQC2 v2 while four FUSE remain on.
+
+    Uses read-only snapshots of the existing, verified local canonical
+    config and legacy service definitions; does not install a mount.
+    The master_sync engine probes OAuth and does GitHub CAS/readback.
+    """
+    if authorized is not True:
+        return "blocked_not_authorized"
+    if (constants.CLOUD_BRANCH != BRANCH
+            or getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                       False) is not True
+            or getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
+                       False) is not True
+            or _get_role() != "MASTER"
+            or rollout.mode(True) != "legacy"):
+        return "blocked_master_not_ready"
+    try:
+        secret = _get_device_key() if key is None else key
+        github_token = _get_gh_token() if token is None else token
+        if not secret or not github_token:
+            return "blocked_missing_credentials"
+        gh = GitHubV2Transport(github_token, request=request)
+
+        def local_sources():
+            canonical, legacy_units, _ = stage._read_sources(
+                stage.LOCAL_CONF, stage.LEGACY_UNIT_DIR)
+            # Validate both existing service configurations BEFORE publish.
+            plan.generate(canonical[0], legacy_units)
+            return canonical[0], (
+                plan.account_snapshot(canonical[0], 0),
+                plan.account_snapshot(canonical[0], 1),
+            )
+
+        return master.sync_once(
+            local_sources, gh.head, gh.get, gh.put,
+            probe if probe is not None else _probe_candidate,
+            secret, github_token, release_authorized=True,
+            master_attested=True)
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError):
+        return "blocked_master_runtime"
