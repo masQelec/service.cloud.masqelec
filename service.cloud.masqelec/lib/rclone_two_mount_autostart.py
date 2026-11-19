@@ -105,16 +105,12 @@ def tick(rpc_call, *, adapter_factory=None):
                 adapter, authorized=True, verified_rollback=True)
             return recovered if recovered in _STATUSES else (
                 "BLOCKED_MANUAL_RECOVERY_REQUIRED")
-        # Localizar muestras en los .strm LOCALES, sin tocar FUSE/OneDrive.
-        # Configuración explícita errónea no cae a autodetección silenciosa.
-        known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
-        if known == ():
-            known = media_samples.discover()
-        if not _valid_media_paths(known):
-            return "BLOCKED_MEDIA_FIXTURES"
-        adapter = maker(rpc_call=rpc_call, live_enabled=True,
-                        known_media_files=known)
         if mode == "active":
+            # Existing v2 is self-managed even if the local .strm catalog
+            # currently has no two known samples. Only first cutover and
+            # irreversible legacy retirement require media sample reads.
+            adapter = maker(rpc_call=rpc_call, live_enabled=True,
+                            known_media_files=())
             maintained = maintenance.ensure_active(adapter, authorized=True)
             if maintained not in ("ACTIVE_HEALTHY", "ACTIVE_REPAIRED"):
                 return maintained if maintained in _STATUSES else (
@@ -122,6 +118,12 @@ def tick(rpc_call, *, adapter_factory=None):
             if (getattr(constants, "RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED",
                         False) is not True):
                 return "ACTIVE_PENDING_CLEANUP"
+            known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
+            if known == ():
+                known = media_samples.discover()
+            if not _valid_media_paths(known):
+                return "ACTIVE_PENDING_CLEANUP"
+            adapter.known_media_files = tuple(known)
             result = cleanup.retire_after_active(
                 adapter, authorized=True)
             return {
@@ -129,6 +131,15 @@ def tick(rpc_call, *, adapter_factory=None):
                 "ALREADY_CLEAN": "ACTIVE_CLEAN_ALREADY",
             }.get(result, result if result in _STATUSES
                   else "BLOCKED_LOCAL_ERROR")
+        # First migration demands two independent, locally discoverable
+        # media fixtures before disabling a single legacy FUSE.
+        known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
+        if known == ():
+            known = media_samples.discover()
+        if not _valid_media_paths(known):
+            return "BLOCKED_MEDIA_FIXTURES"
+        adapter = maker(rpc_call=rpc_call, live_enabled=True,
+                        known_media_files=known)
         boot_ready = boot_install.ensure_installed(adapter, authorized=True)
         if boot_ready != "READY":
             return boot_ready if boot_ready in _STATUSES else (
