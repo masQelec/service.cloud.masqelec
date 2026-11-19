@@ -19,6 +19,11 @@ from lib import rclone_two_mount_boot_guard as guard
 from lib import rclone_two_mount_kodi_idle as kodi_idle
 
 
+def _is_root():
+    """Isolated privilege gate; does not alter filesystem ownership checks."""
+    return os.geteuid() == 0
+
+
 def apply_verified(prepared, *, authorized=False, verified_probe=False,
                    rpc_call=None, media_check=None, adapter_factory=None,
                    account_path=None, journal_dir=None):
@@ -36,7 +41,7 @@ def apply_verified(prepared, *, authorized=False, verified_probe=False,
             is not True or
             rollout.mode(True) != "active"):
         return "BLOCKED_RELEASE_GATES"
-    if os.geteuid() != 0:
+    if not _is_root():
         return "BLOCKED_NOT_ROOT"
     if not isinstance(prepared, dict):
         return "BLOCKED_CANDIDATE"
