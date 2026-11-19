@@ -25,7 +25,7 @@ Before=kodi.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 """ + ADDON_SCRIPT + """
+ExecStart=/usr/bin/python3 """ + ADDON_SCRIPT + """ --recover
 TimeoutStartSec=45
 RemainAfterExit=no
 """).encode("ascii")
