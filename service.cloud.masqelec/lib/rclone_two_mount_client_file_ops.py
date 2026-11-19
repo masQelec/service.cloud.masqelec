@@ -225,10 +225,12 @@ class AccountFileOps:
         _atomic(self.account_path, prior)
         if self._start(index) is not True:
             return False
-        self._phase("rolled_back")
         return True
 
     def rollback_healthy(self, index):
         self._require(index)
-        return (self._healthy(index) is True and
-                _read(self.account_path)[0] == self._baseline)
+        if (self._healthy(index) is not True or
+                _read(self.account_path)[0] != self._baseline):
+            return False
+        self._phase("rolled_back")
+        return True
