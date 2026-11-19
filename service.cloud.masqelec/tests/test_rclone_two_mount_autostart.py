@@ -110,6 +110,34 @@ class FirstRunTests(unittest.TestCase):
         adapter.assert_not_called()
         cut.assert_not_called()
 
+    def test_master_publishes_before_cutover_not_after(self):
+        flags = self.config(retire=True)
+        from lib import rclone_two_mount_master_runtime as master_runtime
+        actions = []
+        with mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+             mock.patch.object(auto.kodi_idle, "is_playback_idle",
+                               return_value=True), \
+             mock.patch.object(publication, "available",
+                               side_effect=[False, True]), \
+             mock.patch.object(master_runtime, "_get_role", return_value="MASTER"), \
+             mock.patch.object(
+                 master_runtime, "publish_from_legacy_before_cutover",
+                 side_effect=lambda **kw: (
+                     actions.append("publish") or "created_verified")), \
+             mock.patch.object(auto.boot_install, "ensure_installed",
+                               return_value="READY"), \
+             mock.patch.object(auto.live, "execute_with_local_lock",
+                               side_effect=lambda *a, **kw: (
+                                   actions.append("cutover") or "ACTIVE")), \
+             mock.patch.object(auto.cleanup, "retire_after_active",
+                               side_effect=lambda *a, **kw: (
+                                   actions.append("cleanup") or "CLEANED")), \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "ACTIVE_VERIFIED_LEGACY_RETIRED")
+        self.assertEqual(actions, ["publish", "cutover", "cleanup"])
+
     def test_no_rpc_blocks_before_any_adapter(self):
         flags = self.config()
         with mock.patch.object(auto.live, "LocalAdapter") as adapter, \
