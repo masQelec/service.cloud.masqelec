@@ -94,6 +94,10 @@ def recover_one(*, account_index, auth_status, read_sources, head, get,
         return "BLOCKED_NOT_CLIENT"
     if rollout.mode(True) != "active":
         return "BLOCKED_NOT_ACTIVE"
+    if not callable(media_check) or not kodi_idle.is_playback_idle(rpc_call):
+        return "BLOCKED_PLAYBACK_OR_MEDIA"
+    if guard.client_recovery_pending():
+        return "BLOCKED_UNFINISHED_RECOVERY"
     result = runtime.verify_once(
         account_index=account_index, auth_status=auth_status,
         read_sources=read_sources, head=head, get=get, probe=probe,
