@@ -38,7 +38,7 @@ class MasterReadinessTests(unittest.TestCase):
             mock.patch.object(gate, "TXN_PARENT", str(self.parent / "transaction")),
             mock.patch.object(gate, "ISOLATED_PARENT", str(self.parent / "isolated")),
             mock.patch.object(gate, "STATE", str(self.parent / "state.json")),
-            mock.patch.object(gate.os, "geteuid", return_value=os.geteuid()),
+            mock.patch.object(gate, "_is_root", return_value=True),
         ]
         for p in patchers:
             p.start()
@@ -46,6 +46,10 @@ class MasterReadinessTests(unittest.TestCase):
 
     def test_fixture_readiness(self):
         self.assertTrue(all(gate.assess().values()))
+
+    def test_non_root_blocks_cutover_readiness(self):
+        with mock.patch.object(gate, "_is_root", return_value=False):
+            self.assertFalse(gate.assess()["ROOT"])
 
     def test_group_writable_systemd_denied(self):
         self.system.chmod(0o775)
