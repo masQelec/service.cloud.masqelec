@@ -46,6 +46,12 @@ _STATUSES = frozenset({
     "BLOCKED_BOOT_SCRIPT_MISSING", "BLOCKED_BOOT_INSTALL_FAILED",
     "BLOCKED_BOOT_RECOVERY_NOT_ARMED",
     "BLOCKED_V2_CONFIG_NOT_PUBLISHED",
+    "BLOCKED_V2_PUBLISH_MISSING_CREDENTIALS",
+    "BLOCKED_V2_PUBLISH_LOCAL_SOURCES",
+    "BLOCKED_V2_PUBLISH_OAUTH",
+    "BLOCKED_V2_PUBLISH_GITHUB",
+    "BLOCKED_V2_PUBLISH_LOCAL_CHANGED",
+    "BLOCKED_V2_PUBLISH_UNAVAILABLE",
 })
 
 
@@ -155,7 +161,46 @@ def tick(rpc_call, *, adapter_factory=None):
                     authorized=True)
                 if publish not in ("created_verified", "unchanged",
                                    "updated_verified"):
-                    return "BLOCKED_V2_CONFIG_NOT_PUBLISHED"
+                    # Only predefined non-secret diagnostic categories; never
+                    # print GitHub response bodies, remote names or tokens.
+                    statuses = {
+                        "blocked_missing_credentials":
+                            "BLOCKED_V2_PUBLISH_MISSING_CREDENTIALS",
+                        "blocked_local_sources":
+                            "BLOCKED_V2_PUBLISH_LOCAL_SOURCES",
+                        "blocked_local_health":
+                            "BLOCKED_V2_PUBLISH_OAUTH",
+                        "blocked_repository_unverified":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "blocked_repository_changed":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "blocked_remote_unavailable":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "blocked_remote_invalid":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "conflict_no_retry":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "put_failed":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "put_unconfirmed":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "blocked_readback_branch_drift":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "blocked_readback_remote_invalid":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "blocked_readback_mismatch":
+                            "BLOCKED_V2_PUBLISH_GITHUB",
+                        "blocked_local_changed":
+                            "BLOCKED_V2_PUBLISH_LOCAL_CHANGED",
+                        "published_local_changed_requires_recheck":
+                            "BLOCKED_V2_PUBLISH_LOCAL_CHANGED",
+                        "blocked_master_runtime":
+                            "BLOCKED_V2_PUBLISH_UNAVAILABLE",
+                        "blocked_sync_failure":
+                            "BLOCKED_V2_PUBLISH_UNAVAILABLE",
+                    }
+                    return statuses.get(
+                        publish, "BLOCKED_V2_PUBLISH_UNAVAILABLE")
             if not publication.available():
                 return "BLOCKED_V2_CONFIG_NOT_PUBLISHED"
         # First migration demands two independent, locally discoverable
