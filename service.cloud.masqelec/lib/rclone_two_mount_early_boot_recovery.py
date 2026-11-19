@@ -6,7 +6,6 @@ unit must run this *before* Kodi starts and only on an approved release.
 Do not use the Kodi JSON-RPC idle shortcut while Kodi is alive.
 """
 import os
-import stat
 
 from lib import constants
 from lib import rclone_two_mount_journal as journal
@@ -76,6 +75,8 @@ def execute(*, authorized=False, rollback_verified=False, proc_root=_PROC,
     if authorized is not True or rollback_verified is not True:
         return "BLOCKED_NOT_AUTHORIZED"
     if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is not True or
+            getattr(constants, "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED", False)
             is not True):
         return "BLOCKED_FEATURE_DISABLED"
     if os.geteuid() != 0:
