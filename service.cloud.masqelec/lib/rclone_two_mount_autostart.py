@@ -14,6 +14,7 @@ from lib import rclone_two_mount_legacy_cleanup as cleanup
 from lib import rclone_two_mount_media_samples as media_samples
 from lib import rclone_two_mount_plan as plan
 from lib import rclone_two_mount_active_maintenance as maintenance
+from lib import rclone_two_mount_boot_install as boot_install
 
 _STATUSES = frozenset({
     "DISABLED", "BLOCKED_RELEASE_GATES", "BLOCKED_NOT_ROOT",
@@ -38,6 +39,10 @@ _STATUSES = frozenset({
     "BLOCKED_LEGACY_MOUNT", "BLOCKED_ROOT_ACTIVE_UNMOUNTED",
     "BLOCKED_ROOT_OCCUPIED", "BLOCKED_ROOT_NOT_READY",
     "BLOCKED_BIND_ACTIVE_UNMOUNTED", "BLOCKED_BIND_OCCUPIED",
+    "BLOCKED_BOOT_INSTALL_NOT_AUTHORIZED",
+    "BLOCKED_BOOT_INSTALL_UNVERIFIED",
+    "BLOCKED_BOOT_INSTALL_CONFLICT",
+    "BLOCKED_BOOT_SCRIPT_MISSING", "BLOCKED_BOOT_INSTALL_FAILED",
 })
 
 
@@ -124,6 +129,10 @@ def tick(rpc_call, *, adapter_factory=None):
                 "ALREADY_CLEAN": "ACTIVE_CLEAN_ALREADY",
             }.get(result, result if result in _STATUSES
                   else "BLOCKED_LOCAL_ERROR")
+        boot_ready = boot_install.ensure_installed(adapter, authorized=True)
+        if boot_ready != "READY":
+            return boot_ready if boot_ready in _STATUSES else (
+                "BLOCKED_BOOT_INSTALL_UNVERIFIED")
         outcome = live.execute_with_local_lock(
             adapter, authorized=True, verified_rollback=True)
         if outcome == "ACTIVE":
