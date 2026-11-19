@@ -28,7 +28,7 @@ class SystemdTests(unittest.TestCase):
         self.writer = False
         self.media = True
 
-    def run(self, args):
+    def run_command(self, args):
         self.actions.append(tuple(args))
         if args[1] == "is-active":
             return self.active
@@ -36,7 +36,7 @@ class SystemdTests(unittest.TestCase):
 
     def adapter(self, **kwargs):
         return systemd.AccountSystemd(
-            0, enabled=True, run=self.run,
+            0, enabled=True, run=self.run_command,
             mountinfo=lambda: self.mounts,
             writer_present=lambda _: self.writer,
             media_check=lambda _: self.media,
@@ -90,7 +90,7 @@ class SystemdTests(unittest.TestCase):
         a = self.adapter()
         with self.assertRaises(PermissionError):
             a.stop(1)
-        b = systemd.AccountSystemd(0, enabled=False, run=self.run)
+        b = systemd.AccountSystemd(0, enabled=False, run=self.run_command)
         with self.assertRaises(PermissionError):
             b.start(0)
         self.assertEqual(self.actions, [])
@@ -102,7 +102,7 @@ class SystemdTests(unittest.TestCase):
 
     def test_no_media_callback_health_fails(self):
         a = systemd.AccountSystemd(
-            0, enabled=True, run=self.run, mountinfo=lambda: self.mounts)
+            0, enabled=True, run=self.run_command, mountinfo=lambda: self.mounts)
         self.assertFalse(a.healthy(0))
 
     def test_writer_probe_unknown_is_busy(self):
