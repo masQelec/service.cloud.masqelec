@@ -87,7 +87,7 @@ def _state_path(folder):
     return os.path.join(folder, "state.json")
 
 
-def recovery_pending(folder):
+def recovery_pending(folder, account_index=None):
     """Fail closed on incomplete/corrupt state, never autorestart writers."""
     if not os.path.lexists(folder):
         return False
@@ -104,6 +104,7 @@ def recovery_pending(folder):
                 state.get("version") != 1 or
                 type(state.get("account")) is not int or
                 state["account"] not in (0, 1) or
+                (account_index is not None and state["account"] != account_index) or
                 state.get("phase") not in ("committed", "rolled_back"))
     except (OSError, ValueError, TypeError, UnicodeError):
         return True
