@@ -360,8 +360,69 @@ def _service_diagnostic(unit, root):
     return values
 
 
+
+def _bind_preflight_diagnostic(unit, root):
+    """Sólo estados seguros del montaje local, sin rutas ni datos remotos."""
+    names = _unit_names(root)
+    if unit not in names["bind"]:
+        return {}
+    position = names["bind"].index(unit)
+    fuse, binds, _ = _layout(root)
+    index, folder, target = binds[position]
+    parent = names["fuse"][index]
+    data = {
+        "BIND_PRE_TARGET_FREE": "UNKNOWN",
+        "BIND_PRE_FUSE_MOUNTED": "UNKNOWN",
+        "BIND_PRE_SOURCE_DIR": "UNKNOWN",
+        "BIND_PARENT_ACTIVE": "UNKNOWN",
+        "BIND_PARENT_RESULT": "UNKNOWN",
+        "BIND_PRE_LIKELY_STEP": "UNDETERMINED",
+    }
+    try:
+        mounts = _mount_records(_read_mountinfo())
+        target_free = target not in mounts
+        fuse_present = any(
+            entry["fstype"] == "fuse.rclone"
+            for entry in mounts.get(fuse[index], ()))
+        data["BIND_PRE_TARGET_FREE"] = "YES" if target_free else "NO"
+        data["BIND_PRE_FUSE_MOUNTED"] = "YES" if fuse_present else "NO"
+        # Evitar acceso al FUSE si no aparece realmente en mountinfo.
+        if fuse_present:
+            data["BIND_PRE_SOURCE_DIR"] = (
+                "YES" if os.path.isdir(fuse[index] + "/" + folder)
+                else "NO")
+        if not target_free:
+            data["BIND_PRE_LIKELY_STEP"] = "TARGET_ALREADY_MOUNTED"
+        elif not fuse_present:
+            data["BIND_PRE_LIKELY_STEP"] = "FUSE_NOT_MOUNTED"
+        elif data["BIND_PRE_SOURCE_DIR"] == "NO":
+            data["BIND_PRE_LIKELY_STEP"] = "SOURCE_DIR_NOT_READY"
+        elif data["BIND_PRE_SOURCE_DIR"] == "YES":
+            data["BIND_PRE_LIKELY_STEP"] = "CHECK_PASSED_AT_DIAG_TIME"
+    except (OSError, ValueError, UnicodeError):
+        pass
+    try:
+        ok, raw = _run([
+            "systemctl", "show", parent, "--no-pager",
+            "--property=ActiveState", "--property=Result"
+        ], timeout=9, output=True)
+        if ok and isinstance(raw, bytes) and len(raw) < 4096:
+            for line in raw.decode("utf-8", "replace").splitlines():
+                key, sep, value = line.partition("=")
+                if not sep or not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", value):
+                    continue
+                if key == "ActiveState":
+                    data["BIND_PARENT_ACTIVE"] = value
+                elif key == "Result":
+                    data["BIND_PARENT_RESULT"] = value
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return data
+
+
 def _emit_service_diagnostic(unit, root):
     data = _service_diagnostic(unit, root)
+    data.update(_bind_preflight_diagnostic(unit, root))
     # Evitar que un fallo de inspección impida limpiar recursos temporales.
     for name, value in data.items():
         print(name + "=" + value)
