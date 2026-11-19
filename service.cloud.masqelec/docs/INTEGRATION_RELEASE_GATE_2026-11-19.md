@@ -365,3 +365,7 @@ El operador ha confirmado que el equipo MASTER es de desarrollo y puede ejercer 
 El operador ejecutó `Ran 957 tests in 1.417s` con un fallo: `test_remove_only_exact_owned_files` esperaba `REMOVED_OWN_UNIT_AND_DROPIN` pero recibió `BLOCKED_REMOVE_FAILED`. La prueba creaba `kodi.service.d` con `mkdir()` sin fijar modo, haciendo que una umask permisiva dejara el directorio con bit de escritura al grupo; `atomic.remove_if_identical` rechaza por diseño directorios con `0o022`. La fixture se ha actualizado con `chmod(0o755)`, también en el test de configuración ajena. Se añadió una prueba específica que asegura que con `0o775` la retirada queda bloqueada y conserva los archivos. **No se ha relajado ninguna validación de seguridad en producción.**
 
 Nueva ejecución de la regresión pendiente. Hasta entonces no instalar la unidad real ni ejecutar reboot del MASTER de desarrollo. `RELEASE_AUTHORIZED=NO`.
+
+## Confirmación operador: regresión dev boot installer 958/958 PASS
+
+Tras corregir fixtures umask de permisos `kodi.service.d` y añadir test de rechazo 0775, el operador ejecutó la suite completa: `Ran 958 tests in 1.430s` / `OK`. `TEST_GATE=PASS_958`. **Aún no hay evidencia de instalación de unidad pre-Kodi** en CoreELEC. Proceder solamente tras preflight de addon realmente actualizado y con flags de migración/recuperación desactivados. El MASTER de desarrollo no implica habilitación de OAuth. `RELEASE_AUTHORIZED=NO`.
