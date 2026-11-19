@@ -48,6 +48,38 @@ class ExclusiveInstallTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             install.install_exclusive(str(self.path), b"secret", 0o600)
 
+    def test_coreelec_systemd_root_group_0775_accepted_only_exact_path(self):
+        # Real device uses root:root 0775; temporary directories must stay
+        # strict. No changes to actual /storage are made by this test.
+        import types
+        real_lstat = install.os.lstat
+        def lstat(path):
+            if str(path) == "/storage/.config/system.d":
+                return types.SimpleNamespace(
+                    st_mode=stat.S_IFDIR | 0o775,
+                    st_uid=0, st_gid=0)
+            return real_lstat(path)
+        with mock.patch.object(install.os, "lstat", side_effect=lstat), \
+             mock.patch.object(install.os, "geteuid", return_value=0):
+            install._trusted_folder("/storage/.config/system.d")
+        self.root.chmod(0o775)
+        with self.assertRaises(ValueError):
+            install._trusted_folder(str(self.root))
+
+    def test_coreelec_systemd_0775_requires_root_group_and_owner(self):
+        import types
+        for uid, gid, mode in ((0, 100, 0o775),
+                               (100, 0, 0o775),
+                               (0, 0, 0o777)):
+            with self.subTest(uid=uid, gid=gid, mode=mode), \
+                 mock.patch.object(install.os, "lstat", return_value=(
+                     types.SimpleNamespace(
+                         st_mode=stat.S_IFDIR | mode,
+                         st_uid=uid, st_gid=gid))), \
+                 mock.patch.object(install.os, "geteuid", return_value=0):
+                with self.assertRaises(ValueError):
+                    install._trusted_folder("/storage/.config/system.d")
+
     def test_rejects_symlink_parent(self):
         alias = Path(self.tmp.name) / "alias"
         alias.symlink_to(self.root)
