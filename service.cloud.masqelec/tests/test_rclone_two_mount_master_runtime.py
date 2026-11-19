@@ -145,6 +145,43 @@ class MasterV2RuntimeTests(unittest.TestCase):
             self.assertTrue(sync.called)
             self.assertEqual(self.calls, [])
 
+    def test_master_prepublication_uses_existing_legacy_sources(self):
+        source = (b"canonical", (1, 2, 3))
+        with mock.patch.object(runtime, "_get_role", return_value="MASTER"), \
+             mock.patch.object(runtime.rollout, "mode", return_value="legacy"), \
+             mock.patch.object(runtime.stage, "_read_sources",
+                               return_value=(source, {"legacy": b"unit"}, {})), \
+             mock.patch.object(runtime.plan, "generate",
+                               return_value={}) as generated, \
+             mock.patch.object(runtime.plan, "account_snapshot",
+                               side_effect=[b"account1", b"account2"]), \
+             mock.patch.object(runtime.master, "sync_once") as sync:
+            def verify(sources, *_args, **kwargs):
+                self.assertEqual(sources(), (b"canonical",
+                                            (b"account1", b"account2")))
+                self.assertTrue(kwargs["release_authorized"])
+                self.assertTrue(kwargs["master_attested"])
+                return "created_verified"
+            sync.side_effect = verify
+            self.assertEqual(runtime.publish_from_legacy_before_cutover(
+                authorized=True, key=b"K" * 32, token="TEST",
+                request=self.request), "created_verified")
+        generated.assert_called_once()
+        self.assertEqual(self.calls, [])
+
+    def test_client_does_not_publish_before_cutover(self):
+        with mock.patch.object(runtime, "_get_role", return_value="CLIENT"), \
+             mock.patch.object(runtime.master, "sync_once",
+                               side_effect=AssertionError("cannot publish")):
+            self.assertEqual(runtime.publish_from_legacy_before_cutover(
+                authorized=True), "blocked_master_not_ready")
+
+    def test_legacy_prepublication_requires_explicit_authorization(self):
+        with mock.patch.object(runtime, "_get_role",
+                               side_effect=AssertionError("cannot check role")):
+            self.assertEqual(runtime.publish_from_legacy_before_cutover(),
+                             "blocked_not_authorized")
+
     def test_probe_callback_is_not_called_with_release_false(self):
         with mock.patch.object(runtime, "_probe_candidate",
                                side_effect=AssertionError("oauth")):
