@@ -172,3 +172,24 @@ python3 service.cloud.masqelec/tools/rclone_two_mount_systemd_local_lab.py --cyc
 Resultado esperado: `LAB_RESULT=PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED` y `CLEANUP=COMPLETE`; no declarar PASS si falta cualquiera. Se han añadido tests `test_rclone_two_mount_systemd_account_cycle.py`.
 
 **Límite:** este ensayo verifica stop/start real de las unidades efímeras y aislamiento de cuenta, pero no recupera tokens OAuth, no prueba las rutas reales y no implementa aún restauración automática del journal tras apagón. Por eso `RELEASE_AUTHORIZED=NO`.
+
+## Resultado físico confirmado por operador — ciclo aislado cuenta 1, 19/11/2026
+
+El operador ejecutó en KodiELEC el laboratorio real con `--preflight` y `--cycle-account1-isolated --confirm-isolated-only`. El preflight informó todas las dependencias `YES` y `LAB_RESULT=READY_FOR_ISOLATED_SYSTEMD`. La ejecución informó:
+
+```text
+LAB_MODE=RCLONE_2FUSE_4BIND_REAL_SYSTEMD_ISOLATED
+ONEDRIVE_ACCESSED=NO
+LIVE_RCLONE_CONFIG_READ=NO
+KODI_MOUNT_PATHS_CHANGED=NO
+LEGACY_SERVICE_START_STOP=NO
+LEGACY_UNIT_FILES_CHANGED=NO
+SYSTEMD_DAEMON_RELOAD=ISOLATED_RUN_ONLY
+SYSTEMD_RUNTIME_UNITS_ONLY=YES
+PERMANENT_UNITS_ENABLED=NO
+GITHUB_UPLOAD=NO
+CLEANUP=COMPLETE
+LAB_RESULT=PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED
+```
+
+**PASS físico aislado:** las seis unidades efímeras montaron 2 FUSE + 4 bind; se detuvieron/reiniciaron exclusivamente FUSE y dos bind de cuenta 1, con comprobación de lectura de archivos locales de cuenta 2 durante el corte y de ambas tras reiniciar. No prueba tokens OAuth, OneDrive real ni recuperación por apagón. No se modificaron montajes ni servicios de producción. La suite de regresión posterior al script nuevo no se ha comunicado todavía. `RELEASE_AUTHORIZED=NO`.
