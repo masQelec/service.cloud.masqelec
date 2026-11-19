@@ -23,11 +23,51 @@ _ALLOWED = frozenset({
 })
 
 
+
+def _dev_fake_boot_lab():
+    """Optional opt-in fake-journal rollback by this REAL pre-Kodi unit.
+
+    No real account/config paths are passed to the lab and OAuth feature
+    flags remain OFF. No marker means NO filesystem access to lab fixtures.
+    """
+    if getattr(constants, "RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED",
+               False) is not True:
+        return "DISABLED"
+    if any(getattr(constants, name, False) is True for name in (
+            "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+            "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
+            "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+            "RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED")):
+        return "BLOCKED_REAL_RECOVERY_ENABLED"
+    try:
+        from tools import rclone_two_mount_reboot_journal_lab as lab
+        if not os.path.lexists(lab.ROOT):
+            return "NO_PENDING"
+        # The lab validates the earlier boot_id, exact data, permissions,
+        # mountinfo and that only its own private files may be deleted.
+        result = lab.verify()
+        return (result if result in (
+            "PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK",
+            "BLOCKED_REBOOT_NOT_OBSERVED",
+            "BLOCKED_INCOMPLETE_JOURNAL",
+            "BLOCKED_INVALID_JOURNAL",
+            "BLOCKED_LAB_PATH_MOUNTED",
+            "BLOCKED_NOT_ROOT") else "MANUAL_RECOVERY_REQUIRED")
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError,
+            UnicodeError):
+        return "MANUAL_RECOVERY_REQUIRED"
+
+
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     if args != ["--recover"]:
         print("MASQELEC_EARLY_BOOT=INVALID_MODE")
         return 0  # Kodi must never be blocked by this optional component.
+    # Independent, explicitly opted-in fake data rehearsal. The real
+    # migration remains gated off and cannot be authorized by this hook.
+    dev_status = _dev_fake_boot_lab()
+    if dev_status != "DISABLED":
+        print("MASQELEC_DEV_FAKE_BOOT_LAB=" + dev_status)
     # Rollback gate and feature gates are independent of systemd installation.
     try:
         if getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
