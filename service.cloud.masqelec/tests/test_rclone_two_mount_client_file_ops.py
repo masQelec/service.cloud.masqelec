@@ -75,8 +75,24 @@ class AccountFileOpsTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(
             (self.journal / "account1.bak").stat().st_mode), 0o600)
         self.assertFalse(files.recovery_pending(str(self.journal)))
-        # Idempotence must block, not overwrite backed-up credentials.
+        # A stale candidate cannot remove the previous backup.
         self.assertEqual(self.execute(self.ops()), "BLOCKED_SNAPSHOT")
+        self.assertEqual((self.journal / "account1.bak").read_bytes(),
+                         b"old-oauth")
+        # A later AUTH incident can start a fresh transaction.
+        refreshed = {"status": "candidate_requires_probe",
+                     "account_index": 0,
+                     "baseline_account": b"new-oauth",
+                     "candidate_account": b"newer-oauth"}
+        with files.locked(str(self.journal)):
+            outcome = tx.execute(
+                refreshed, authorized=True, verified_probe=True,
+                playback_idle=True, operations=self.ops())
+        self.assertEqual(outcome, "RECOVERED_VERIFIED")
+        self.assertEqual(self.account.read_bytes(), b"newer-oauth")
+        self.assertEqual((self.journal / "account1.bak").read_bytes(),
+                         b"new-oauth")
+        self.assertEqual(self.other.read_bytes(), b"unrelated-account")
 
     def test_failure_after_install_rolls_back(self):
         self.fail = "healthy"
@@ -151,6 +167,25 @@ class AccountFileOpsTests(unittest.TestCase):
         (root / "client-recovery").symlink_to(self.journal)
         with self.assertRaises(ValueError):
             files.provision_private_journal(str(child))
+
+    def test_unknown_journal_state_never_retired(self):
+        path = self.journal / "state.json"
+        path.write_text('{"version":1,"account":0,"phase":"install_requested"}')
+        path.chmod(0o600)
+        with files.locked(str(self.journal)):
+            self.assertFalse(files.retire_finalized(str(self.journal), 0))
+        self.assertTrue(files.recovery_pending(str(self.journal), 0))
+
+    def test_finalized_journal_with_symlink_backup_cannot_be_retired(self):
+        state = self.journal / "state.json"
+        state.write_text('{"version":1,"account":0,"phase":"committed"}')
+        state.chmod(0o600)
+        (self.journal / "account1.bak").symlink_to(self.other)
+        with files.locked(str(self.journal)):
+            with self.assertRaises(ValueError):
+                files.retire_finalized(str(self.journal), 0)
+        self.assertTrue(state.exists())
+        self.assertEqual(self.other.read_bytes(), b"unrelated-account")
 
     def test_lock_rejects_symlink(self):
         (self.journal / ".lock").symlink_to(self.account)
