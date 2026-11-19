@@ -69,8 +69,8 @@ class DevBootInstallerTests(unittest.TestCase):
             (folder / cli.boot.UNIT_NAME).write_bytes(cli.boot.UNIT)
             drop = dropdir / cli.boot.DROPIN_NAME
             drop.write_bytes(cli.boot.DROPIN)
-            with mock.patch.object(cli, "_preflight", return_value="READY_DISABLED_ONLY"), \\
-                 mock.patch.object(cli, "SYSTEMD", tmp), \\
+            with mock.patch.object(cli, "_preflight", return_value="READY_DISABLED_ONLY"), \
+                 mock.patch.object(cli, "SYSTEMD", tmp), \
                  mock.patch.object(cli, "_command", return_value=True):
                 self.assertEqual(cli._remove(), "BLOCKED_REMOVE_FAILED")
             self.assertTrue(drop.exists())
