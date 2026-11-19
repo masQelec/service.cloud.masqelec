@@ -67,8 +67,8 @@ def apply_verified(prepared, *, authorized=False, verified_probe=False,
             stop=machine.stop, quiescent=machine.quiescent,
             start=machine.start, healthy=machine.healthy,
             enabled=True)
-        # Secure parent/journal directories are *not* created automatically.
-        # A separate authorized installer must provision them at 0700.
+        # In production the parent is prepared only after release gates;
+        # in injected tests the caller supplies an already private folder.
         with files.locked(folder):
             if not kodi_idle.is_playback_idle(rpc_call):
                 return "BLOCKED_PLAYBACK_OR_MEDIA"
