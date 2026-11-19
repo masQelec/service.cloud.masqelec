@@ -310,3 +310,13 @@ El operador ejecutó en el equipo CoreELEC 21.2.5-Omega_devel (Amlogic-ng.arm) l
 Marcadores declarados por el laboratorio: `REAL_OAUTH_ACCESSED=NO`, `SYSTEMD_UNITS_CHANGED=NO`, `KODI_MOUNTS_CHANGED=NO`, `REBOOT_TRIGGERED=NO`. El programa verifica cambio del `boot_id`, integridad exacta del journal y bytes ficticios, restaura la cuenta 1, comprueba que la cuenta 2 ficticia no cambia y limpia exclusivamente su ruta persistente privada.
 
 **GATE_REAL_REBOOT_FAKE_JOURNAL_PERSISTENCE=PASS**. Este resultado **NO prueba** la ejecución automática de la recuperación previa a Kodi, systemd productivo ni OAuth/MQC2 real. La última suite Python confirmada por operador fue 941/941 PASS antes de incorporar los seis tests de este laboratorio; sigue pendiente la regresión de los últimos commits. `RELEASE_AUTHORIZED=NO`.
+
+## Gate agrupado de cierre, solo lectura (19/11/2026)
+
+Disponible `tools/rclone_two_mount_final_gate.py`, con dos modos independientes y sin escritura de configuración, systemd, OneDrive ni Kodi:
+
+**Ubuntu:** `python3 service.cloud.masqelec/tools/rclone_two_mount_final_gate.py --ubuntu-regression`. Ejecuta toda la suite Python y exige retorno `FINAL_GATE=PASS_REGRESSION`.
+
+**KodiELEC:** descargar el fichero RAW a `/tmp/masqelec_final_gate.py` y ejecutar `python3 /tmp/masqelec_final_gate.py --coreelec-readonly`. Inspecciona `systemctl show` de `kodi.service` y `masqelec-v2-recovery.service`; verifica `Wants`, `After`, `Before` y que el `ExecStart` real incluya `--recover`. Si todavía no existe la unidad o no está ordenada, devuelve `FINAL_GATE=BLOCKED_AUTOMATIC_BOOT_ORDER_NOT_VERIFIED`, resultado correcto y seguro para un despliegue aún no realizado. **No instala ni activa unidades**.
+
+**Limitación:** incluso `PASS_INSTALLED_ORDERING_READONLY` demostraría la topología de dependencias, no que un journal real se haya recuperado automáticamente en pre-Kodi. La puesta en marcha del recuperador CLIENTE y OAuth/MQC2 reales continúan pendientes. `PRODUCTION_RELEASE_AUTHORIZED=NO`.
