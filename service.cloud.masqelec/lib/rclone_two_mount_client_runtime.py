@@ -10,7 +10,7 @@ from lib import rclone_two_mount_config_routes as routes
 
 
 def verify_once(*, account_index, auth_status, read_sources, head, get,
-                probe, key, release_authorized=False):
+                probe, key, release_authorized=False, return_candidate=False):
     """Obtiene y verifica un candidato; nunca devuelve bytes en logs.
 
     read_sources(): (canonical, (account1, account2))
@@ -54,6 +54,10 @@ def verify_once(*, account_index, auth_status, read_sources, head, get,
         decision = recovery.confirm_probe(
             planned, result, baseline_unchanged=same_local,
             remote_head_unchanged=same_remote)
+        if (return_candidate is True and
+                decision == "probe_verified_requires_transactional_install"):
+            return {"status": "candidate_probe_verified",
+                    "prepared": planned}
         return decision
     except (OSError, ValueError, TypeError, KeyError, RuntimeError,
             UnicodeError, OverflowError):
