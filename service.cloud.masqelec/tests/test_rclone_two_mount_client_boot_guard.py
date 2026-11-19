@@ -46,6 +46,15 @@ class ClientBootGuardTests(unittest.TestCase):
         f.chmod(0o600)
         self.assertFalse(guard.client_recovery_pending(str(self.parent)))
 
+    def test_world_writable_recovery_parent_blocks(self):
+        self.parent.chmod(0o777)
+        self.assertTrue(guard.client_recovery_pending(str(self.parent)))
+
+    def test_symlink_recovery_parent_blocks(self):
+        link = Path(self.t.name) / "shortcut"
+        link.symlink_to(self.parent)
+        self.assertTrue(guard.client_recovery_pending(str(link)))
+
     def test_symlink_journal_blocks(self):
         (self.parent / "account1").symlink_to(self.parent)
         self.assertTrue(guard.client_recovery_pending(str(self.parent)))
