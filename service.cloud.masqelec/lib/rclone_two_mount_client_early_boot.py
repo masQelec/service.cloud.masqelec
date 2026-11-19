@@ -19,6 +19,15 @@ from lib import rclone_two_mount_plan as plan
 from lib import rclone_two_mount_rollout as rollout
 
 
+def _is_root():
+    return os.geteuid() == 0
+
+
+def _get_role():
+    from lib import device_utils
+    return device_utils.get_device_role()
+
+
 def execute(*, authorized=False, proc_root="/proc", adapter_factory=None,
             media_paths=None, parent=None):
     """Restore pending CLIENT journals after root/Kodi/role/active checks.
@@ -34,10 +43,9 @@ def execute(*, authorized=False, proc_root="/proc", adapter_factory=None,
             getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
                     False) is not True):
         return "BLOCKED_FEATURE_DISABLED"
-    if os.geteuid() != 0:
+    if not _is_root():
         return "BLOCKED_NOT_ROOT"
-    from lib import device_utils
-    if device_utils.get_device_role() != "CLIENT":
+    if _get_role() != "CLIENT":
         return "BLOCKED_NOT_CLIENT"
     if rollout.mode(True) != "active":
         return "BLOCKED_NOT_ACTIVE"
