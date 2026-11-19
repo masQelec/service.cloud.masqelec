@@ -532,3 +532,22 @@ Sin nuevas modificaciones del motor, no volver a pedir regresiones en bucle. Pen
 Tras la revisión de la ruta operativa: `service.py` invoca `rclone_two_mount_autostart.tick(xbmc.executeJSONRPC)` **dentro de Kodi**; para la primera migración exige `RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED`, `FEATURE_ALLOWED`, `ROLLBACK_GATE_PASSED` y `AUTO_RECOVERY_ENABLED`, todos codificados hoy como `False` en `lib/constants.py`. En el arranque **anterior** a Kodi, `tools/rclone_two_mount_early_boot_run.py` / `lib/rclone_two_mount_early_boot_recovery.py` verifican los mismos flags desde un proceso Python nuevo. Por ello no basta con habilitar un booleano en memoria durante un único ciclo de Kodi: la recuperación tras reinicio necesita autorización persistente. Tampoco es aceptable cambiar estas constantes a `True` en `develop`, porque el addon se distribuye automáticamente a CLIENTES.
 
 **Conclusión de auditoría:** desarrollar antes del primer corte un mecanismo local de autorización de ensayo **limitado al MASTER**, con registro privado y comprobación idéntica en el proceso Kodi y en el recuperador systemd, tolerante a reinicio; separarlo de los flags de publicación general. Al validar ensayo, comprobar ambos `oauth` físicos, dos FUSE/4 bind y rollback real; no se ha ejecutado nada sobre los montajes. No declarar 'no se puede romper nada': `.strm` pueden estar protegidos, pero la disponibilidad FUSE y renovación OAuth no lo están. Hasta tener mecanismo de autorización probado y herramienta operativa en Kodi, evitar editar `constants.py` localmente a mano, inventar RPC `idle` o pasar `authorized=True` por shell. `CUTOVER_EXECUTED=NO`, `RELEASE_AUTHORIZED=NO`.
+
+
+## Candidato de actualización directa automática (4 FUSE a 2 FUSE + 4 bind)
+
+El operador autoriza la sustitución automática de las cuatro unidades legacy por dos servicios rclone_library y cuatro unidades bind en cada dispositivo, sin convivencia de arquitecturas. Se preserva la biblioteca STRM y el canónico rclone.conf (también contiene remotos Google Drive); la limpieza elimina exclusivamente los cuatro archivos de unidades systemd antiguos tras verificar estado ACTIVE, seis unidades y una lectura real por cuenta.
+
+Cambios de candidato en develop:
+- constants.py: ENABLED feature, first_run, rollback_gate, auto_recovery, legacy_retire, master_sync y client_recovery; tests fake y sincronizador legacy apagados.
+- MASTER: publish_from_legacy_before_cutover genera los snapshots de cuentas desde rclone.conf y unidades legacy, valida OAuth real, publica MQC2 v2 con HEAD/CAS/readback, antes del corte.
+- CLIENT: si falta rclone/rclone-v2.conf.crypt no toca sus montajes. Reintenta al siguiente ciclo; no hay fallback a configuración legacy cuando ya está ACTIVE.
+- Kodi: autostart ejecuta transacción y rollback con bloqueo exclusivo cuando no hay reproducción. Retira unidades legacy solo después de salud v2 completa y lecturas de ambas cuentas. Pre-Kodi intenta recuperación de corte interrumpido.
+- Worker horario MASTER/CLIENT: publicación token v2 del MASTER y reparación OAuth por cuenta CLIENT, solo en ACTIVE.
+- Nuevas pruebas para publicación v2 (404, redirect, red, tamaño), orden MASTER publicar/cortar/limpiar, permisos y pruebas fake-boot aisladas.
+
+**Pendiente de validar con nueva regresión completa y prueba física MASTER:** los 996 tests PASS son de la versión anterior. Este commit contiene flags activados, pero no se ha empaquetado/publicado el ZIP ni ejecutado el corte físico por el asistente. No publicar en el repositorio de addons hasta superar regresión y prueba física MASTER. El operador gestiona publicación. La existencia de un archivo cifrado remoto no reemplaza comprobación real de OAuth, ni la aprobación del gate por sí sola certifica los dispositivos.
+
+RELEASE_CANDIDATE_FLAGS=ON
+PHYSICAL_CUTOVER_VERIFIED=NO
+ZIP_PUBLISHED_BY_OPERATOR=NO
