@@ -369,3 +369,9 @@ Nueva ejecución de la regresión pendiente. Hasta entonces no instalar la unida
 ## Confirmación operador: regresión dev boot installer 958/958 PASS
 
 Tras corregir fixtures umask de permisos `kodi.service.d` y añadir test de rechazo 0775, el operador ejecutó la suite completa: `Ran 958 tests in 1.430s` / `OK`. `TEST_GATE=PASS_958`. **Aún no hay evidencia de instalación de unidad pre-Kodi** en CoreELEC. Proceder solamente tras preflight de addon realmente actualizado y con flags de migración/recuperación desactivados. El MASTER de desarrollo no implica habilitación de OAuth. `RELEASE_AUTHORIZED=NO`.
+
+## Instalación directa de la unidad pre-Kodi en CoreELEC de desarrollo — PASS
+
+El operador inspeccionó `/storage/.config/system.d`: directorio `root:root`, inicialmente `0775`; las rutas de unidad y drop-in no existían. Se aplicó `chmod 755 /storage/.config/system.d` y el preflight del addon instalado devolvió `BOOT_DEV_RESULT=READY_DISABLED_ONLY`. La ejecución autorizada del instalador real `rclone_two_mount_dev_boot_install.py --install-real-boot-unit --confirm-dev-device` devolvió `BOOT_DEV_RESULT=READY_REAL_BOOT_ORDER_INSTALLED`. El instalador usa `boot_install.ensure_installed` con `systemctl daemon-reload` y verificación `kodi.service Wants/After`. Marcadores reportados: `OAUTH_OR_CREDENTIALS_CHANGED=NO`, `RCLONE_MOUNT_UNITS_CHANGED=NO`, `KODI_LIBRARY_CHANGED=NO`.
+
+**GATE_DEV_BOOT_INSTALL=PASS**. Pendiente comprobación independiente `--coreelec-readonly`, reinicio real y observación `journalctl -b -u masqelec-v2-recovery.service`. La instalación no demuestra recuperación automática de una transacción interrumpida. Flags de OAuth/migración continúan desactivados. `RELEASE_AUTHORIZED=NO`.
