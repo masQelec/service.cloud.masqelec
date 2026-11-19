@@ -102,7 +102,17 @@ def locked(parent):
             raise ValueError("Unsafe journal ancestor")
         os.mkdir(base, 0o700)
         _sync(ancestor)
-    _private_dir(base)
+    # /storage/.config/masqelec is shared with other addon state and may
+    # already exist as root-owned 0755 on CoreELEC. Never chmod it: only
+    # the dedicated transaction directory may contain private credentials.
+    if base == "/storage/.config/masqelec" and os.geteuid() == 0:
+        info = os.lstat(base)
+        if (not stat.S_ISDIR(info.st_mode)
+                or info.st_uid != 0
+                or stat.S_IMODE(info.st_mode) not in (0o700, 0o755)):
+            raise ValueError("Unsafe journal base directory")
+    else:
+        _private_dir(base)
     os.makedirs(parent, mode=0o700, exist_ok=True)
     _private_dir(parent)
     lock = os.path.join(parent, ".lock")
