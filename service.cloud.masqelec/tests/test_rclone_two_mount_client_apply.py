@@ -102,6 +102,61 @@ class ClientApplyTests(unittest.TestCase):
         self.assertEqual(self.invoke(), "BLOCKED_SNAPSHOT")
         self.assertEqual(self.account.read_bytes(), b"old")
 
+    def test_recover_one_default_cannot_read_sources(self):
+        source = mock.Mock(side_effect=AssertionError("no access permitted"))
+        self.assertEqual(apply.recover_one(
+            account_index=0, auth_status="auth", read_sources=source,
+            head=source, get=source, probe=source, key=b"key",
+            rpc_call=self.rpc, media_check=lambda _: True),
+            "BLOCKED_NOT_AUTHORIZED")
+        source.assert_not_called()
+
+    def test_recover_one_success_handoff_mocked_transport(self):
+        with mock.patch.object(
+                apply.constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                True), mock.patch.object(
+                apply.constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                True), mock.patch.object(
+                apply.rollout, "mode", return_value="active"), mock.patch.object(
+                apply.os, "geteuid", return_value=0), mock.patch.object(
+                apply.guard, "client_recovery_pending", return_value=False), mock.patch(
+                "lib.device_utils.get_device_role", return_value="CLIENT"), mock.patch.object(
+                apply.runtime, "verify_once",
+                return_value={"status": "candidate_probe_verified",
+                              "prepared": self.prepared}) as verified:
+            result = apply.recover_one(
+                account_index=0, auth_status="auth",
+                read_sources=lambda: None,
+                head=lambda: None, get=lambda path: None,
+                probe=lambda i, candidate: None, key=b"key",
+                rpc_call=self.rpc, media_check=lambda _: True,
+                authorized=True, adapter_factory=self.factory,
+                account_path=str(self.account), journal_dir=str(self.journal))
+        self.assertEqual(result, "RECOVERED_VERIFIED")
+        self.assertTrue(verified.call_args.kwargs["return_candidate"])
+        self.assertEqual(self.account.read_bytes(), b"new")
+        self.assertEqual(self.other.read_bytes(), b"second-unchanged")
+
+    def test_recover_one_blocks_busy_playback_before_network(self):
+        busy = lambda request: (
+            '{"jsonrpc":"2.0","id":1,"result":[{"playerid":1,"type":"video"}]}')
+        source = mock.Mock(side_effect=AssertionError("network prohibited"))
+        with mock.patch.object(
+                apply.constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                True), mock.patch.object(
+                apply.constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                True), mock.patch.object(
+                apply.rollout, "mode", return_value="active"), mock.patch(
+                "lib.device_utils.get_device_role", return_value="CLIENT"):
+            result = apply.recover_one(
+                account_index=0, auth_status="auth",
+                read_sources=source, head=source, get=source,
+                probe=source, key=b"key",
+                rpc_call=busy, media_check=lambda _: True,
+                authorized=True)
+        self.assertEqual(result, "BLOCKED_PLAYBACK_OR_MEDIA")
+        source.assert_not_called()
+
     def test_bad_index_no_write(self):
         bad = dict(self.prepared, account_index=True)
         with mock.patch.object(
