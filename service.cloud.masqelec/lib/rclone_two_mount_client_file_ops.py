@@ -133,6 +133,39 @@ def recovery_pending(folder, account_index=None):
         return True
 
 
+def retire_finalized(folder, index):
+    """Retire a *completed* prior journal under locked(folder).
+
+    Crash-safe because no active transaction exists in these two phases.
+    An incomplete/corrupt state or unexpected entry is NEVER discarded.
+    Remove prior backup first, state last, syncing directory each time.
+    """
+    _dir(folder)
+    path = _state_path(folder)
+    if not os.path.lexists(path):
+        return False
+    raw, _ = _read(path)
+    obj = json.loads(raw)
+    if (type(obj) is not dict or
+            set(obj) != {"version", "account", "phase"} or
+            obj["version"] != 1 or type(obj["account"]) is not int or
+            obj["account"] != index or
+            obj["phase"] not in ("committed", "rolled_back")):
+        return False
+    name = "account{}.bak".format(index + 1)
+    allowed = {".lock", "state.json", name}
+    if set(os.listdir(folder)) - allowed:
+        return False
+    backup = os.path.join(folder, name)
+    if os.path.lexists(backup):
+        _read(backup)  # confirm mode, owner, regular file, no symlink
+        os.unlink(backup)
+        _sync(folder)
+    os.unlink(path)
+    _sync(folder)
+    return True
+
+
 class AccountFileOps:
     """Concrete durable file operations + explicit service callbacks.
 
@@ -171,11 +204,14 @@ class AccountFileOps:
 
     def snapshot(self, index, expected):
         self._require(index)
-        if recovery_pending(self.journal_dir):
+        if recovery_pending(self.journal_dir, index):
             return False
-        # Never overwrite any earlier recovery attempt, even completed.
+        # A completed earlier transaction cannot permanently prevent later
+        # OAuth token rotations. Under the same exclusive lock, safely
+        # retire it; never discard an incomplete/unknown journal.
         if os.path.lexists(_state_path(self.journal_dir)):
-            return False
+            if not retire_finalized(self.journal_dir, index):
+                return False
         raw, gen = _read(self.account_path)
         if raw != expected:
             return False
