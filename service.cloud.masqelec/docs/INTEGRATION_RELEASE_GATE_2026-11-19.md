@@ -153,3 +153,22 @@ Tras los commits `3962c60` y `2796965`, se ejecutó en Ubuntu la suite completa 
 `CLIENT_V2_UBUNTU_REGRESSION=PASS_902`
 `CLIENT_V2_REAL_SYSTEMD_OAUTH_RECOVERY=NOT_VERIFIED`
 `RELEASE_AUTHORIZED=NO`
+
+## Nuevo ensayo físico aislado: ciclo de una cuenta (19/11/2026)
+
+Se ha ampliado `tools/rclone_two_mount_systemd_local_lab.py` con `--cycle-account1-isolated --confirm-isolated-only`. Mantiene su entorno local previo: **2 rclone FUSE y 4 bind con backend y archivos locales en /tmp**, seis unidades de nombre aleatorio exclusivamente en `/run/systemd/system`, sin leer configuración rclone real, sin OneDrive y sin modificar Kodi. Tras comprobar el layout inicial:
+1. Detiene exclusivamente los dos bind de la cuenta 1 y su raíz FUSE.
+2. Verifica que sus tres montajes han desaparecido.
+3. Comprueba que la cuenta 2 continúa con sus servicios y sus archivos de prueba accesibles.
+4. Reinicia exclusivamente raíz FUSE 1 y sus dos bind; revalida 2 FUSE + 4 bind y lectura de las cuatro muestras.
+5. Retira todas las unidades y los montajes temporales en `finally`. Si la limpieza queda incompleta, la prueba falla y conserva evidencias para diagnóstico.
+
+Comando **en dispositivo KodiELEC** desde copia local del script actualizado, con permisos de root:
+```bash
+python3 service.cloud.masqelec/tools/rclone_two_mount_systemd_local_lab.py --preflight
+python3 service.cloud.masqelec/tools/rclone_two_mount_systemd_local_lab.py --cycle-account1-isolated --confirm-isolated-only
+```
+
+Resultado esperado: `LAB_RESULT=PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED` y `CLEANUP=COMPLETE`; no declarar PASS si falta cualquiera. Se han añadido tests `test_rclone_two_mount_systemd_account_cycle.py`.
+
+**Límite:** este ensayo verifica stop/start real de las unidades efímeras y aislamiento de cuenta, pero no recupera tokens OAuth, no prueba las rutas reales y no implementa aún restauración automática del journal tras apagón. Por eso `RELEASE_AUTHORIZED=NO`.
