@@ -19,6 +19,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 TMP = "/tmp"
@@ -583,7 +584,114 @@ def _cycle_first_account(root):
         return "FAIL_ACCOUNT_CYCLE_RUNTIME"
 
 
-def run_isolated(*, cycle_account=False):
+
+def _transaction_account1(root):
+    """Real systemd cycle + fake credential atomic replacement and rollback.
+
+    Test credentials NEVER reach a rclone config or provider. Deliberately
+    reject post-install health so original bytes must be restored.
+    """
+    names = _unit_names(root)
+    fuse, binds, _ = _layout(root)
+    a1 = (names["bind"][0], names["bind"][2])
+    a2_targets = [dest for idx, _, dest in binds if idx == 1]
+    work = Path(root) / "oauth-lab"
+    work.mkdir(mode=0o700)
+    conf = work / "account1.conf"
+    backup = work / "account1.bak"
+    state = work / "state"
+    original = b"LAB_FAKE_TOKEN_OLD_NO_OAUTH\\n"
+    candidate = b"LAB_FAKE_TOKEN_NEW_NO_OAUTH\\n"
+
+    def write_file(path, data, *, exclusive=False):
+        if exclusive:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            fd = os.open(str(path), flags, 0o600)
+            with os.fdopen(fd, "wb") as output:
+                output.write(data)
+                output.flush()
+                os.fsync(output.fileno())
+        else:
+            fd, tmp = tempfile.mkstemp(prefix=".swap-", dir=str(work))
+            try:
+                os.fchmod(fd, 0o600)
+                with os.fdopen(fd, "wb") as output:
+                    output.write(data)
+                    output.flush()
+                    os.fsync(output.fileno())
+                os.replace(tmp, path)
+            finally:
+                if os.path.lexists(tmp):
+                    os.unlink(tmp)
+        dfd = os.open(str(work), os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
+
+    def other_healthy():
+        return (_is_active(names["fuse"][1]) and
+                all(_is_active(names["bind"][i]) for i in (1, 3)) and
+                all(_read_sample(os.path.join(dest, "sample.bin"))
+                    for dest in a2_targets))
+
+    def stop_one():
+        return (all(_control("stop", unit) for unit in reversed(a1)) and
+                _control("stop", names["fuse"][0]))
+
+    def start_one():
+        return (_control("start", names["fuse"][0]) and
+                all(_control("start", unit) for unit in a1))
+
+    try:
+        write_file(conf, original, exclusive=True)
+        write_file(backup, original, exclusive=True)
+        write_file(state, b"prepared")
+        if conf.read_bytes() != original or backup.read_bytes() != original:
+            return "FAIL_FAKE_SNAPSHOT"
+        if not stop_one():
+            return "FAIL_FAKE_STOP"
+        entries = _mount_records(_read_mountinfo())
+        if any(path in entries for path in [fuse[0]] +
+               [dest for idx, _, dest in binds if idx == 0]):
+            return "FAIL_FAKE_NOT_QUIESCENT"
+        if not other_healthy():
+            return "FAIL_FAKE_OTHER_INTERRUPTED"
+        write_file(state, b"install_requested")
+        write_file(conf, candidate)
+        if conf.read_bytes() != candidate:
+            return "FAIL_FAKE_INSTALL"
+        if not start_one():
+            return "FAIL_FAKE_START"
+        # Fault injection: verified health is deliberately rejected.
+        write_file(state, b"rollback_required")
+        if not stop_one():
+            return "FAIL_FAKE_ROLLBACK_STOP"
+        entries = _mount_records(_read_mountinfo())
+        if any(path in entries for path in [fuse[0]] +
+               [dest for idx, _, dest in binds if idx == 0]):
+            return "FAIL_FAKE_ROLLBACK_NOT_QUIESCENT"
+        if not other_healthy():
+            return "FAIL_FAKE_OTHER_INTERRUPTED"
+        write_file(conf, backup.read_bytes())
+        if conf.read_bytes() != original or not start_one():
+            return "FAIL_FAKE_ROLLBACK"
+        if not _check_mounts(_read_mountinfo(), root):
+            return "FAIL_FAKE_RECOVERED_MOUNTS"
+        if not all(_read_sample(os.path.join(dest, "sample.bin"))
+                   for _, _, dest in binds):
+            return "FAIL_FAKE_RECOVERED_MEDIA"
+        if not other_healthy():
+            return "FAIL_FAKE_OTHER_INTERRUPTED"
+        if conf.read_bytes() != original or backup.read_bytes() != original:
+            return "FAIL_FAKE_RESTORED_BYTES"
+        write_file(state, b"rolled_back_verified")
+        return "PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED"
+    except (OSError, ValueError, UnicodeError, subprocess.SubprocessError):
+        return "FAIL_FAKE_TRANSACTION_RUNTIME"
+
+
+def run_isolated(*, cycle_account=False, fake_rollback=False):
     requirements = prerequisites()
     if not all(requirements.values()):
         return "BLOCKED_MISSING_PREREQUISITE"
@@ -623,7 +731,9 @@ def run_isolated(*, cycle_account=False):
                             _, binds, _ = _layout(root)
                             if all(_read_sample(os.path.join(dest, "sample.bin"))
                                    for _, _, dest in binds):
-                                status = (_cycle_first_account(root)
+                                status = (_transaction_account1(root)
+                                          if fake_rollback else
+                                          _cycle_first_account(root)
                                           if cycle_account else
                                           "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL")
                             else:
@@ -651,7 +761,8 @@ def main(argv=None):
     if args not in (
             ["--preflight"],
             ["--run-isolated-systemd", "--confirm-isolated-only"],
-            ["--cycle-account1-isolated", "--confirm-isolated-only"]):
+            ["--cycle-account1-isolated", "--confirm-isolated-only"],
+            ["--fake-oauth-rollback-isolated", "--confirm-isolated-only"]):
         print("LAB_RESULT=BLOCKED_INVALID_MODE")
         return 2
     print("LAB_MODE=RCLONE_2FUSE_4BIND_REAL_SYSTEMD_ISOLATED")
@@ -673,11 +784,14 @@ def main(argv=None):
                                if allowed else "BLOCKED_MISSING_PREREQUISITE"))
         return 0 if allowed else 2
     cycle = args[0] == "--cycle-account1-isolated"
-    result = run_isolated(cycle_account=cycle)
+    result = run_isolated(
+        cycle_account=cycle,
+        fake_rollback=args[0] == "--fake-oauth-rollback-isolated")
     print("LAB_RESULT=" + result)
     return 0 if result in (
         "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL",
-        "PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED") else 2
+        "PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED",
+        "PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED") else 2
 
 
 if __name__ == "__main__":
