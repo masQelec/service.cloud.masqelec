@@ -93,3 +93,7 @@ Nuevos archivos:
 `CLIENT_V2_CRASH_RECOVERY=NOT_VERIFIED`
 `CI_NEW_COMMITS=NOT_VERIFIED`
 `RELEASE_AUTHORIZED=NO`
+
+## Regresión Ubuntu confirmada por operador — 19/11/2026
+
+Tras corregir el test de permisos `kodi.service.d` en el commit `50ca2b6d1a8c6b1724050c21a249aec3bcf2094f`, el operador ejecutó en Ubuntu `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'` y obtuvo **Ran 864 tests in 1.540s — OK**. Esto confirma regresión local, no GitHub Actions ni un cutover físico. El test de conflicto usa un directorio 0755 explícito y hay un caso adicional que conserva el bloqueo para 0775. `RELEASE_AUTHORIZED=NO`.
