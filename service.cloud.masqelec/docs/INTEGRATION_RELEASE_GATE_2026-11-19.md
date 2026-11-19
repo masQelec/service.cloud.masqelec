@@ -290,3 +290,15 @@ Desde la regresión confirmada por el operador `938/938 OK` se incorporó:
 ## Confirmación del operador — regresión 941/941 PASS (19/11/2026)
 
 El operador ejecutó `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q` tras los cambios de persistencia entre procesos y retiro controlado de journals finalizados: `Ran 941 tests in 1.395s` / `OK`. Los marcadores `MASQELEC_EARLY_BOOT=INVALID_MODE`, `MASQELEC_EARLY_BOOT=ROLLED_BACK`, `LAB_RESULT=BLOCKED_INVALID_MODE` y `CLEANUP=COMPLETE` proceden de tests. Se confirma la regresión automatizada, **no** el reinicio físico ni OAuth de Microsoft. `RELEASE_AUTHORIZED=NO`.
+
+## Laboratorio de persistencia tras reinicio REAL — dos fases, pendientes de operador
+
+En `develop` se añade `tools/rclone_two_mount_reboot_journal_lab.py`, autocontenido para KodiELEC y ejecutable desde `/tmp`. No importa los módulos del addon instalado. El script escribe **únicamente** en `/storage/.config/masqelec-v2-reboot-journal-lab`, directorio privado 0700 exclusivo; genera cuenta 1 ficticia, respaldo y cuenta 2 ficticia (0600), deja journal fase `install_requested` con fsync y almacena `/proc/sys/kernel/random/boot_id`. No toca configuraciones OAuth ni montajes reales, unidades systemd o biblioteca Kodi. No lanza reboot.
+
+**Antes del reinicio**: descargar el script de `raw.githubusercontent.com/masQelec/service.cloud.masqelec/develop/service.cloud.masqelec/tools/rclone_two_mount_reboot_journal_lab.py` en `/tmp/masqelec_reboot_lab.py` y ejecutar `python3 /tmp/masqelec_reboot_lab.py --prepare --confirm-isolated-only`. Requiere `REBOOT_LAB_RESULT=PREPARED_REBOOT_REQUIRED`. Si hay un directorio existente o una condición insegura, bloqueará sin reemplazarlo.
+
+**Reiniciar KodiELEC manualmente** sin ejecutar ningún comando del script durante el proceso de apagado. Tras iniciar, descargar otra vez el script si `/tmp` se ha limpiado y ejecutar `python3 /tmp/masqelec_reboot_lab.py --verify-after-reboot --confirm-isolated-only`. Requiere cambio de boot_id real, journal idéntico, credenciales ficticias intactas y cuenta 2 intacta; restaura cuenta 1 original, sincroniza y elimina solo los archivos exactos del laboratorio, retornando `REBOOT_LAB_RESULT=PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK`.
+
+Se incorpora `tests/test_rclone_two_mount_reboot_journal_lab.py` (6 escenarios) para fail-closed, reinicio requerido, persistencia y rechazo de contenido ajeno/corrupto. **Regresión y ensayo físico pendientes de resultados**. Última suite confirmada previamente: 941/941 OK.
+
+**Límite fundamental**: prueba persistencia del journal y restauración de bytes ficticios tras boot_id diferente, NO valida orden de unidad systemd antes de Kodi, recuperación automáticamente ejecutada por el addon, continuidad de FUSE real ni OAuth Microsoft. Por tanto `RELEASE_AUTHORIZED=NO`.
