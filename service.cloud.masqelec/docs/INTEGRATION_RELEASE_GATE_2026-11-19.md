@@ -116,3 +116,32 @@ Las operaciones systemd, exclusión de procesos rclone y salud FUSE se reciben c
 ## Regresión Ubuntu confirmada por operador — 874/874 (19/11/2026)
 
 El operador ha ejecutado `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'` tras sincronizar `develop` y ha comunicado `Ran 874 tests in 1.394s` seguido de `OK`. Queda validada la suite local, incluidas las pruebas con archivos temporales del adaptador CLIENTE v2. No demuestra integración systemd real, exclusión de escritores rclone físicos ni recuperación tras reinicio. `RELEASE_AUTHORIZED=NO`.
+
+## Integración CLIENTE OAuth v2 con systemd por cuenta — 19/11/2026
+
+**Código en `develop`, NO desplegado ni validado físicamente.** Desde la suite 874/874 anterior se han añadido:
+
+- `lib/rclone_two_mount_client_systemd.py`: adaptador systemd de **una** cuenta: detener dos bind y su FUSE, verificar quiescencia de mountinfo, systemd y procesos rclone con `--config` correspondiente; iniciar primero FUSE y luego los dos bind; health de montaje (incluido rechazo de overmount) y `media_check` obligatorio. No contiene autorización OAuth ni operación automática al importar.
+- `lib/rclone_two_mount_client_apply.py`: composición de verificación MQC2/sondeo remoto → transacción de archivos 0600 → callbacks systemd, bloqueo `flock`, Kodi idle, estado v2 `active`, rol `CLIENT`, root y bandera `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED`. No está conectada a `service.py`.
+- `lib/rclone_two_mount_client_runtime.py`: devolución del candidato con bytes únicamente mediante `return_candidate=True` **después** de verificación de probe y generaciones. La API de solo estado se conserva.
+- `lib/rclone_two_mount_boot_guard.py`: vigilancia de `/storage/.config/masqelec/rclone-v2-client-recovery/account{1,2}`, rechaza journal corrupto, interrumpido, symlink o perteneciente a otra cuenta al arrancar/consultar montajes.
+- `lib/constants.py`: `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED = False`, separado de los otros gates; no se activa.
+- Nuevas pruebas `test_rclone_two_mount_client_systemd.py`, `test_rclone_two_mount_client_boot_guard.py`, `test_rclone_two_mount_client_apply.py` y nuevas variantes de `test_rclone_two_mount_client_runtime.py`. Los callbacks de systemd son **simulados** y los archivos se escriben solo en directorios temporales.
+- En `recover_one` se comprueba Kodi idle y ausencia de recovery pendiente **antes de GET/sondeo OAuth**; se vuelve a comprobar antes de parar la cuenta.
+
+### Puertas abiertas — NO autorizar release
+
+1. **CI local tras estos commits NO CONFIRMADO**. Ejecutar `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'` en Ubuntu con `git pull --ff-only origin develop`; resolver fallos antes de cualquier otra prueba.
+2. Falta un proveedor operativo confiable de `AUTH` por cuenta; `get/head` autenticados y callback `probe` en copia temporal 0600 **no están conectados al worker**. Los callbacks simulados no prueban Microsoft OAuth real.
+3. Falta provisionar idempotentemente el journal `account1/account2` en 0700 y verificar su recuperación explícita tras apagón. El guard bloquea, pero **no restaura automáticamente** ese journal.
+4. Falta ensayo de systemd REAL por cuenta con FUSE y binds bajo rutas y unidades aisladas y prueba de rollback en puntos de fallo. El anterior PASS de laboratorio 2+4 no cubre este circuito OAuth.
+5. Falta verificar en MASTER la publicación real cifrada del nuevo `rclone-v2.conf.crypt` bajo CAS y readback; validar CLIENTE actualizado tarde, y equipo legacy que arranca tras el MASTER.
+6. Publicación del ZIP y sincronización de repositorio Kodi, responsabilidad del operador. Mantener `main`, `cloud.masqelec` y producción intactos.
+
+`CLIENT_V2_SYSTEMD_ADAPTER=IMPLEMENTED_GATED`
+`CLIENT_V2_END_TO_END_CODE=COMPOSED_NOT_CONNECTED`
+`CLIENT_V2_REAL_SYSTEMD_RECOVERY=NOT_TESTED`
+`CLIENT_V2_REAL_OAUTH_PROBE=NOT_TESTED`
+`CLIENT_V2_CRASH_RECOVERY=MANUAL_GUARD_ONLY`
+`LATEST_CI_RESULT=NOT_CONFIRMED`
+`RELEASE_AUTHORIZED=NO`
