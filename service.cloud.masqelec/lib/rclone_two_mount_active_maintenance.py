@@ -57,6 +57,13 @@ def ensure_active(adapter, *, authorized=False):
                 elif mounted:
                     return "BLOCKED_ROOT_OCCUPIED"
                 else:
+                    # If the root disappeared but a bind is still mounted,
+                    # a new FUSE could expose a different superblock while
+                    # Kodi keeps a stale one. Require manual reconciliation.
+                    if any(destination in adapter._mounts()
+                           for _name, idx, _folder, destination in plan.BIND_MAP
+                           if idx == plan.FUSE_ROOTS.index(root)):
+                        return "BLOCKED_ORPHAN_BIND"
                     adapter._systemctl("start", unit)
                     changed = True
             entries = adapter._mounts()
