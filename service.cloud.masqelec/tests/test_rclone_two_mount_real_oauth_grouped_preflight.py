@@ -25,9 +25,9 @@ class GroupedPilotTests(unittest.TestCase):
         patch(pilot, "_regular_private", lambda path: True)
         patch(pilot, "_systemd_value", lambda unit, prop: "active"
               if prop == "ActiveState" else "loaded")
-        patch(pilot, "_mount_targets", lambda: set(
-            pilot.plan.FUSE_ROOTS +
-            tuple(item[3] for item in pilot.plan.BIND_MAP)))
+        patch(pilot, "_mount_topology", lambda: (
+            set(pilot.plan.FUSE_ROOTS +
+                tuple(item[3] for item in pilot.plan.BIND_MAP)), True))
         patch(pilot.rollout, "mode", lambda allowed: "active")
         patch(pilot.guard, "client_recovery_pending", lambda: False)
         for flag in pilot.REAL_FLAGS:
@@ -90,10 +90,27 @@ class GroupedPilotTests(unittest.TestCase):
 
     def test_missing_bind_blocks(self):
         self._base()
-        with mock.patch.object(pilot, "_mount_targets",
-                               return_value=set(pilot.plan.FUSE_ROOTS)):
+        with mock.patch.object(pilot, "_mount_topology",
+                               return_value=(set(pilot.plan.FUSE_ROOTS), False)):
             self.assertEqual(pilot.inspect(role="MASTER")["PILOT_GATE"],
                              "BLOCKED_V2_LAYOUT_NOT_VERIFIED")
+
+    def test_legacy_fuse_destinations_are_not_called_v2_binds(self):
+        self._base()
+        old_targets = set(item[3] for item in pilot.plan.BIND_MAP)
+        with mock.patch.object(pilot, "_mount_topology",
+                               return_value=(old_targets, False)):
+            report = pilot.inspect(role="MASTER")
+        self.assertEqual(report["V2_MOUNT_TOPOLOGY"], "NOT_VERIFIED")
+        self.assertTrue(all(
+            report["BIND_{}".format(i)] == "LEGACY_OR_UNVERIFIED"
+            for i in range(1, 5)))
+        self.assertEqual(report["PILOT_GATE"],
+                         "BLOCKED_V2_LAYOUT_NOT_VERIFIED")
+
+    def test_corrupt_mountinfo_fails_closed(self):
+        with mock.patch("builtins.open", mock.mock_open(read_data="garbage")):
+            self.assertEqual(pilot._mount_topology(), (None, False))
 
     def test_standalone_role_does_not_import_kodi(self):
         with mock.patch.object(pilot, "_read_role_standalone",
