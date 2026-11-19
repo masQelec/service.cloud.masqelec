@@ -12,6 +12,7 @@ no se ha ejecutado.
 - [Sistema de archivos KodiELEC/CoreELEC y rutas persistentes](KODIELEC_COREELEC_FILESYSTEM_AND_PATHS.md).
 - [Auditoría userdata frente a journal persistente](USERDATA_VS_RECOVERY_STORAGE_AUDIT_2026-11-19.md).
 - [Recuperación temprana previa a Kodi — candidato sin instalar](EARLY_BOOT_RECOVERY_KODIELEC_2026-11-19.md).
+- [**Handoff 19-11-2026: cutover automático de addon**](HANDOFF_AUTO_CUTOVER_2026-11-19.md) — código, riesgos, gates y comandos de prueba.
 
 **No confundir nuevo código en `develop` con gates PASS de hardware**:
 el coordinador de recuperación temprana exige un orden systemd de arranque
