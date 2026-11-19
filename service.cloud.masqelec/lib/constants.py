@@ -21,29 +21,29 @@ TG_CHATID = "952051424"
 # Recuperación OAuth: preparado en develop, inicialmente inactivo hasta validación real.
 RCLONE_TOKEN_SYNC_ENABLED = False
 
-# La arquitectura dos FUSE/cuatro bind exige activación EXPLÍCITA por
-# dispositivo y un coordinador OAuth v2. Mantener False en develop.
-# Con False, un CLIENTE ya activo en v2 es bloqueado para evitar
-# reactivar accidentalmente los cuatro servicios legacy.
-RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
+# Release de reemplazo directo en la siguiente actualización del addon:
+# primero publicar MQC2 v2 desde MASTER y verificar su presencia; después
+# corte local indivisible con Kodi idle; limpieza de unidades legacy al final.
+# Los clientes que actualicen antes de MASTER esperan SIN desmontar legacy.
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED = True
 # Preparación privada local al arrancar (NO instala montajes/unidades).
 RCLONE_TWO_MOUNT_STAGING_ENABLED = False
 
 
-# Publicación automática MASTER del MQC2 v2 (requiere gates físicos de release).
-RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED = False
+# MASTER crea el MQC2 v2 verificado antes del corte y lo mantiene después.
+RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED = True
 
-# Activación automática en el primer arranque tras actualizar el addon.
-# Desactivado hasta validación física de corte/reboot y rollback en KodiELEC.
-RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED = False
-RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED = False
-RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED = False
-RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED = False
+# Primera ejecución directa en cada dispositivo tras actualización de addon.
+# El motor exige journal privado, Kodi idle, 2 FUSE y 4 bind saludables.
+RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED = True
+RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED = True
+RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED = True
+RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED = True
 # Dos rutas públicas de medios conocidas: una por cuenta, solo para prueba.
 RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES = ()
 
-# CLIENT v2 OAuth transactional installer. NEVER enable without physical gates.
-RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED = False
+# Recuperación OAuth individual CLIENT en la arquitectura nueva.
+RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED = True
 
 # Laboratorio: permite ejercer SOLO el flujo CLIENT v2 OAuth en un MASTER.
 # No altera rol global ni publica MQC2. Permanece desactivado por defecto.
