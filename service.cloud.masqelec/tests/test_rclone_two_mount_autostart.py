@@ -96,6 +96,8 @@ class FirstRunTests(unittest.TestCase):
         with mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
              mock.patch.object(auto.kodi_idle, "is_playback_idle", return_value=True), \
              mock.patch.object(publication, "available", return_value=False), \
+             mock.patch("lib.rclone_two_mount_master_runtime._get_role",
+                        return_value="CLIENT"), \
              mock.patch.object(auto.media_samples, "discover",
                                side_effect=AssertionError("no samples")), \
              mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
