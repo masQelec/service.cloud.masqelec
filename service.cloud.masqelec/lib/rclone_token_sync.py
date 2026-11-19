@@ -20,6 +20,7 @@ from lib import constants
 from lib import device_utils
 from lib import log_utils
 from lib import rclone_token_policy as policy
+from lib import rclone_two_mount_client_role as client_role
 from lib import rclone_two_mount_rollout
 from lib import rclone_utils
 
@@ -657,7 +658,7 @@ def tick():
         # False; no Kodi import or network traffic in the default build.
         if (getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
                     False) is True and
-                device_utils.get_device_role() == "CLIENT"):
+                client_role.allowed(device_utils.get_device_role())):
             try:
                 import xbmc
                 from lib import rclone_two_mount_client_worker as client_v2
