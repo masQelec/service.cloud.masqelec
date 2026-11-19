@@ -48,7 +48,8 @@ class DevBootInstallerTests(unittest.TestCase):
     def test_remove_only_exact_owned_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
-            (folder / "kodi.service.d").mkdir()
+            (folder / "kodi.service.d").mkdir(mode=0o755)
+            (folder / "kodi.service.d").chmod(0o755)
             (folder / cli.boot.UNIT_NAME).write_bytes(cli.boot.UNIT)
             (folder / "kodi.service.d" / cli.boot.DROPIN_NAME).write_bytes(
                 cli.boot.DROPIN)
@@ -62,7 +63,8 @@ class DevBootInstallerTests(unittest.TestCase):
     def test_operator_modified_dropin_never_removed(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
-            (folder / "kodi.service.d").mkdir()
+            (folder / "kodi.service.d").mkdir(mode=0o755)
+            (folder / "kodi.service.d").chmod(0o755)
             (folder / cli.boot.UNIT_NAME).write_bytes(cli.boot.UNIT)
             path = folder / "kodi.service.d" / cli.boot.DROPIN_NAME
             path.write_bytes(b"operator custom")
