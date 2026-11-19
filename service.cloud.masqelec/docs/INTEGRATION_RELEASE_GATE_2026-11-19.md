@@ -97,3 +97,18 @@ Nuevos archivos:
 ## Regresión Ubuntu confirmada por operador — 19/11/2026
 
 Tras corregir el test de permisos `kodi.service.d` en el commit `50ca2b6d1a8c6b1724050c21a249aec3bcf2094f`, el operador ejecutó en Ubuntu `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'` y obtuvo **Ran 864 tests in 1.540s — OK**. Esto confirma regresión local, no GitHub Actions ni un cutover físico. El test de conflicto usa un directorio 0755 explícito y hay un caso adicional que conserva el bloqueo para 0775. `RELEASE_AUTHORIZED=NO`.
+
+## CLIENTE v2 — adaptador de archivos durable en laboratorio (19/11/2026)
+
+Implementado `lib/rclone_two_mount_client_file_ops.py`: operaciones de archivos **reales** sobre un par `account1.conf` / `account2.conf` y journal privado con lock `flock`, backup O_EXCL 0600, `fsync`, escritura mediante rename atómico, estado fail-closed ante crash y rollback comprobado. Sólo accede a la cuenta seleccionada. `recovery_pending` mantiene el bloqueo hasta salud confirmada tras rollback; una transacción previa completada tampoco se sobrescribe silenciosamente.
+
+Las operaciones systemd, exclusión de procesos rclone y salud FUSE se reciben como callbacks, **sin adaptador productivo ni conexión a Kodi**. Los tests `test_rclone_two_mount_client_file_ops.py` usan /tmp, dos ficheros ficticios y callbacks; verifican identidad por cuenta, permisos, idempotencia, interrupción y rollback.
+
+**Límite de seguridad:** pasar `enabled=True` a la clase no constituye autorización de despliegue. Falta implementar y validar un adaptador systemd que detenga los dos binds y una raíz FUSE de la cuenta escogida, confirme ausencia de escritor y montajes dependientes, restaure sus dos binds tras iniciar rclone y pruebe medios reales. El writer rclone no respeta automáticamente los locks de Python; se necesita una barrera independiente sobre procesos y generaciones. Falta ensayo de reinicio con corte de energía y recuperación de journal incompleto.
+
+**CI de los nuevos cambios: pendiente de ejecución por el operador.** Estado de release sigue NO.
+
+`CLIENT_V2_DURABLE_FILE_OPS=IMPLEMENTED_GATED`
+`CLIENT_V2_SYSTEMD_ADAPTER=NOT_IMPLEMENTED`
+`CLIENT_V2_KODIELEC_REAL_TEST=NOT_RUN`
+`RELEASE_AUTHORIZED=NO`
