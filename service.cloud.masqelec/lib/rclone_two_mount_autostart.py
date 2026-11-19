@@ -44,6 +44,7 @@ _STATUSES = frozenset({
     "BLOCKED_BOOT_INSTALL_UNVERIFIED",
     "BLOCKED_BOOT_INSTALL_CONFLICT",
     "BLOCKED_BOOT_SCRIPT_MISSING", "BLOCKED_BOOT_INSTALL_FAILED",
+    "BLOCKED_BOOT_RECOVERY_NOT_ARMED",
 })
 
 
@@ -132,6 +133,12 @@ def tick(rpc_call, *, adapter_factory=None):
                 "ALREADY_CLEAN": "ACTIVE_CLEAN_ALREADY",
             }.get(result, result if result in _STATUSES
                   else "BLOCKED_LOCAL_ERROR")
+        # Starting the cutover without crash/reboot recovery enabled could
+        # leave all four legacy FUSE disabled after power loss. Fail before
+        # media discovery, journal, systemd changes, or mount operations.
+        if (getattr(constants, "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
+                    False) is not True):
+            return "BLOCKED_BOOT_RECOVERY_NOT_ARMED"
         # First migration demands two independent, locally discoverable
         # media fixtures before disabling a single legacy FUSE.
         known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
