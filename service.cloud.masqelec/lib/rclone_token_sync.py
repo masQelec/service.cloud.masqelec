@@ -653,6 +653,38 @@ def tick():
     if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
             is True and rclone_two_mount_rollout.mode(True) == "active"):
         _v2_master_tick()
+        # Independently gated CLIENT v2. The addon ships with this flag
+        # False; no Kodi import or network traffic in the default build.
+        if (getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                    False) is True and
+                device_utils.get_device_role() == "CLIENT"):
+            try:
+                import xbmc
+                from lib import rclone_two_mount_client_worker as client_v2
+                status = client_v2.tick(xbmc.executeJSONRPC,
+                                        authorized=True)
+                allowed = frozenset({
+                    "BLOCKED_NOT_AUTHORIZED", "BLOCKED_RELEASE_GATES",
+                    "BLOCKED_NOT_CLIENT", "BLOCKED_NOT_ACTIVE_OR_RECOVERY",
+                    "DEFERRED_PLAYBACK", "DEFERRED_INTERVAL",
+                    "BLOCKED_SOURCES", "BLOCKED_MEDIA",
+                    "BLOCKED_GITHUB_AUTH", "HEALTHY_OR_UNAVAILABLE",
+                    "BLOCKED_WORKER_ERROR", "BLOCKED_CANDIDATE",
+                    "BLOCKED_PLAYBACK_OR_MEDIA", "BLOCKED_UNFINISHED_RECOVERY",
+                    "BLOCKED_NOT_ROOT", "BLOCKED_OPERATIONS",
+                    "BLOCKED_SNAPSHOT", "MANUAL_RECOVERY_REQUIRED",
+                    "RECOVERED_VERIFIED", "ROLLED_BACK_VERIFIED",
+                })
+                if status not in allowed:
+                    status = "BLOCKED_WORKER_ERROR"
+                if status not in ("HEALTHY_OR_UNAVAILABLE",
+                                  "DEFERRED_INTERVAL"):
+                    log_utils.write_log("[rclone_sync_v2_client] " + status,
+                                        "WARNING")
+            except Exception:
+                log_utils.write_log(
+                    "[rclone_sync_v2_client] BLOCKED_WORKER_ERROR",
+                    "WARNING")
         return
     if not _legacy_sync_permitted():
         return
