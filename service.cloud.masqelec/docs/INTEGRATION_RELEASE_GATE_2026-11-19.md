@@ -232,3 +232,35 @@ LAB_RESULT=PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED
 **Gates superados**: regresión automatizada 911/911 en Ubuntu y ensayo físico aislado de rollback de bytes ficticios con systemd en KodiELEC, preservando los montajes reales.
 
 **No cubre**: sonda OAuth Microsoft real; validación real del paquete MQC2 MASTER/CLIENT; crash/reinicio durante transición; conexión del worker a `recover_one` y garantía de mismo candidato probado y aplicado. `RELEASE_AUTHORIZED=NO`, gates de producción `False`.
+
+## Integración CLIENTE v2 funcional con puertas cerradas — revisión final de código (19/11/2026)
+
+Desde los 911 tests confirmados y el ensayo KodiELEC ficticio PASS, se incorporaron los siguientes módulos y enlaces en `develop`:
+
+1. `lib/rclone_two_mount_client_worker.py`: activo solo si `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED`, rama `develop`, rol `CLIENT`, layout `active` y Kodi idle. Consulta por hora, detecta `auth` **solo mediante sonda rclone en config temporal privada**, nunca confunde errores de red o límites de tasa con AUTH. Recupera únicamente la cuenta seleccionada.
+2. `lib/rclone_two_mount_client_runtime.py`: la sonda de candidato puede devolver `("ok", bytes_renovados)`; compara opciones no-token con el candidato y transporta **el token realmente probado**, manteniendo comparación de fuentes locales y HEAD remoto posteriores. No acepta renovación sin éxito inequívoco.
+3. `lib/rclone_two_mount_client_apply.py`: integra autenticación/sonda a `AccountFileOps` + `AccountSystemd` mediante `recover_one`, comprobación Kodi idle antes y después del sondeo, lock + backup 0600 + journal y rollback por cuenta. Inicializa journal de forma limitada bajo un directorio privado ya confiable, solo con gates activos.
+4. `lib/rclone_token_sync.py`: llama al worker CLIENTE v2 en el tick existente de un layout activo y solo si la nueva bandera se habilita. El CLIENTE no publica MQC2 ni vuelve a la URL legacy. El MASTER v2 conserva su ruta previa.
+5. `lib/rclone_two_mount_client_crash_recovery.py` y `lib/rclone_two_mount_client_early_boot.py`: reinicio con journal pendiente → detener solo la cuenta afectada, verificar ausencia de montajes/escritores, restaurar backup 0600 mediante rename+fsync, reiniciar solo la cuenta afectada, comprobar medio y marcar `rolled_back` únicamente tras salud confirmada. Journal corrupto o recuperación incompleta permanece bloqueada.
+6. `tools/rclone_two_mount_early_boot_run.py`: runner opcional bifurcado según bandera y rol. `lib/rclone_two_mount_boot_install.py` **corregido** para pasar el argumento exigido `--recover` en `ExecStart` (antes faltaba, y habría impedido la recuperación).
+7. Pruebas nuevas `test_rclone_two_mount_client_crash_recovery.py`, `test_rclone_two_mount_client_early_boot.py`, `test_rclone_two_mount_client_worker.py` y regresiones adicionales para token renovado, identidad, permisos del journal y el nuevo `ExecStart`.
+
+**Todas las banderas permanecen `False` por defecto.** Ni este desarrollo ni los tests nuevos han tocado remotos, OneDrive o montajes de producción.
+
+### Validación pendiente antes de considerar release
+
+- **Suite Python tras los últimos commits: NO EJECUTADA/NO CONFIRMADA.** Última confirmación anterior: 911/911 OK. El siguiente comando en Ubuntu es `git pull --ff-only origin develop && python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q`. Resolver cualquier fallo sin tocar producción.
+- **Ensayo físico de fallo real de proceso/reinicio** del journal CLIENTE y del orden early-boot con unidades aisladas y validación de que el segundo FUSE/los otros dos bind no sufren interrupción: PENDIENTE.
+- **OAuth Microsoft auténtico**: sonda de cuenta con estado AUTH demostrado y candidato v2 con refresh válido, sin exponer tokens; PENDIENTE.
+- **MQC2 v2 MASTER**: publicación real CAS/readback en `masQelec/cloud.masqelec/develop` y compatibilidad de CLIENTES desfasados: PENDIENTE, sin writes a remoto autorizados.
+- **Release de addon Kodi** y activación de flags: NO AUTORIZADAS. El usuario se ocupa de publicar el ZIP una vez superados los gates.
+
+`CLIENT_V2_WORKER_CODE=CONNECTED_GATED_OFF`
+`CLIENT_V2_RESTART_RECOVERY_CODE=CONNECTED_GATED_OFF`
+`EARLY_BOOT_RECOVER_ARG=FIXED`
+`LATEST_OPERATOR_TESTS=911_PASS_PRIOR_COMMITS`
+`NEW_TESTS=AWAITING_OPERATOR`
+`REAL_OAUTH_END_TO_END=NOT_VERIFIED`
+`REAL_REBOOT_RECOVERY=NOT_VERIFIED`
+`MASTER_V2_PUBLISH=NOT_VERIFIED`
+`RELEASE_AUTHORIZED=NO`
