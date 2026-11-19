@@ -286,3 +286,7 @@ Desde la regresión confirmada por el operador `938/938 OK` se incorporó:
 **NUEVA REGRESIÓN pendiente de ejecución por operador**: `git pull --ff-only origin develop && python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q`. Última ejecución conocida: 938/938 OK **anterior** a estos commits.
 
 **No cerrar release aún**: falta validar el apagón/reboot físico de KodiELEC y recuperación productiva de journal bajo systemd, validar OAuth Microsoft auténtico y publicar/probar MQC2 MASTER con CAS/readback. Los ensayos ficticios no acreditan esos hechos. Todas las banderas de release siguen desactivadas. `RELEASE_AUTHORIZED=NO`.
+
+## Confirmación del operador — regresión 941/941 PASS (19/11/2026)
+
+El operador ejecutó `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q` tras los cambios de persistencia entre procesos y retiro controlado de journals finalizados: `Ran 941 tests in 1.395s` / `OK`. Los marcadores `MASQELEC_EARLY_BOOT=INVALID_MODE`, `MASQELEC_EARLY_BOOT=ROLLED_BACK`, `LAB_RESULT=BLOCKED_INVALID_MODE` y `CLEANUP=COMPLETE` proceden de tests. Se confirma la regresión automatizada, **no** el reinicio físico ni OAuth de Microsoft. `RELEASE_AUTHORIZED=NO`.
