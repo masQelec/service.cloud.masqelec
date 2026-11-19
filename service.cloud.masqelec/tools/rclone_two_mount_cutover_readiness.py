@@ -71,8 +71,17 @@ def _staged_exact():
 
 
 def _boot_order():
-    """Verify both merged systemd dependencies; don't change systemd."""
-    return boot.verify_dependency(boot.UNIT_NAME)
+    """Verify Kodi Wants/After AND recovery unit Before/ExecStart."""
+    if not boot.verify_dependency(boot.UNIT_NAME):
+        return False
+    return (preflight._systemd_value(
+        boot.UNIT_NAME, "LoadState") == "loaded"
+        and "kodi.service" in preflight._systemd_value(
+            boot.UNIT_NAME, "Before").split()
+        and boot.ADDON_SCRIPT in preflight._systemd_value(
+            boot.UNIT_NAME, "ExecStart")
+        and "--recover" in preflight._systemd_value(
+            boot.UNIT_NAME, "ExecStart"))
 
 
 def inspect():
