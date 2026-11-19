@@ -15,6 +15,7 @@ class AccountFileOpsTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
+        self.root = root
         self.conf = root / "configs"
         self.conf.mkdir(mode=0o700)
         self.conf.chmod(0o700)
