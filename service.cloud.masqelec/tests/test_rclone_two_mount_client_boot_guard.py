@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 from lib import rclone_two_mount_boot_guard as guard
 
 
@@ -57,7 +58,7 @@ class ClientBootGuardTests(unittest.TestCase):
             f = partial / "account2.bak"
             f.write_bytes(b"backup")
             f.chmod(0o600)
-            with unittest.mock.patch.object(
+            with mock.patch.object(
                     guard, "CLIENT_TXN_PARENT", str(self.parent)):
                 self.assertTrue(guard.recovery_required(
                     parent=base, state_path=os.path.join(base, "missing")))
