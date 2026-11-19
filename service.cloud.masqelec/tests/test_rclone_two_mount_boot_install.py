@@ -41,6 +41,7 @@ class BootInstallerTests(unittest.TestCase):
         drop = (self.units / "kodi.service.d" / installer.DROPIN_NAME)
         self.assertEqual(drop.read_bytes(), installer.DROPIN)
         self.assertIn(b"Before=kodi.service", unit)
+        self.assertIn(b"rclone_two_mount_early_boot_run.py --recover", unit)
         self.assertIn(b"TimeoutStartSec=45", unit)
         self.assertIn(b"Wants=masqelec-v2-recovery.service", drop.read_bytes())
         self.assertNotIn(b"Requires=", drop.read_bytes())
