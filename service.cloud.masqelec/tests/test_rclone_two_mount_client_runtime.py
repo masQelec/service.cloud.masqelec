@@ -84,6 +84,22 @@ class ClientRuntimeGates(unittest.TestCase):
         self.assertEqual(self.run_case(probe=lambda i, candidate: "auth"),
                          "blocked_probe_or_generation")
 
+    @patch.object(runtime.recovery, "prepare")
+    @patch.object(runtime.recovery, "confirm_probe")
+    def test_verified_candidate_handoff_only_on_explicit_request(
+            self, gate, prepare):
+        prepared = {"status": "candidate_requires_probe",
+                    "candidate_account": b"secret-candidate",
+                    "account_index": 0}
+        prepare.return_value = prepared
+        gate.return_value = "probe_verified_requires_transactional_install"
+        outcome = self.run_case(return_candidate=True)
+        self.assertEqual(outcome["status"], "candidate_probe_verified")
+        self.assertIs(outcome["prepared"], prepared)
+        gate.return_value = "blocked_probe_or_generation"
+        self.assertEqual(self.run_case(return_candidate=True),
+                         "blocked_probe_or_generation")
+
     def test_transport_error_is_not_auth(self):
         def crash(path):
             raise OSError("unavailable")
