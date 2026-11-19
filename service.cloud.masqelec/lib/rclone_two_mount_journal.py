@@ -89,6 +89,20 @@ def _state_bytes(phase):
 @contextmanager
 def locked(parent):
     """Bloqueo exclusivo por dispositivo, sin seguir .lock symlink."""
+    # First install on CoreELEC: /storage/.config/masqelec may be absent.
+    # Create exactly one private intermediate directory, never following a
+    # symlink or silently trusting an existing group-writable ancestor.
+    base = os.path.dirname(parent)
+    if not os.path.lexists(base):
+        ancestor = os.path.dirname(base)
+        info = os.lstat(ancestor)
+        if (not stat.S_ISDIR(info.st_mode)
+                or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) & 0o022):
+            raise ValueError("Unsafe journal ancestor")
+        os.mkdir(base, 0o700)
+        _sync(ancestor)
+    _private_dir(base)
     os.makedirs(parent, mode=0o700, exist_ok=True)
     _private_dir(parent)
     lock = os.path.join(parent, ".lock")
