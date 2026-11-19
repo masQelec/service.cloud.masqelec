@@ -119,8 +119,8 @@ class ClientApplyTests(unittest.TestCase):
                 True), mock.patch.object(
                 apply.rollout, "mode", return_value="active"), mock.patch.object(
                 apply.os, "geteuid", return_value=0), mock.patch.object(
-                apply.guard, "client_recovery_pending", return_value=False), mock.patch(
-                "lib.device_utils.get_device_role", return_value="CLIENT"), mock.patch.object(
+                apply.guard, "client_recovery_pending", return_value=False), mock.patch.object(
+                apply, "_get_role", return_value="CLIENT"), mock.patch.object(
                 apply.runtime, "verify_once",
                 return_value={"status": "candidate_probe_verified",
                               "prepared": self.prepared}) as verified:
@@ -146,8 +146,8 @@ class ClientApplyTests(unittest.TestCase):
                 True), mock.patch.object(
                 apply.constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
                 True), mock.patch.object(
-                apply.rollout, "mode", return_value="active"), mock.patch(
-                "lib.device_utils.get_device_role", return_value="CLIENT"):
+                apply.rollout, "mode", return_value="active"), mock.patch.object(
+                apply, "_get_role", return_value="CLIENT"):
             result = apply.recover_one(
                 account_index=0, auth_status="auth",
                 read_sources=source, head=source, get=source,
