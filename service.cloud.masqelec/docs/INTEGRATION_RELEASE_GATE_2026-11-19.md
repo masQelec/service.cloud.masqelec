@@ -320,3 +320,22 @@ Disponible `tools/rclone_two_mount_final_gate.py`, con dos modos independientes 
 **KodiELEC:** descargar el fichero RAW a `/tmp/masqelec_final_gate.py` y ejecutar `python3 /tmp/masqelec_final_gate.py --coreelec-readonly`. Inspecciona `systemctl show` de `kodi.service` y `masqelec-v2-recovery.service`; verifica `Wants`, `After`, `Before` y que el `ExecStart` real incluya `--recover`. Si todavía no existe la unidad o no está ordenada, devuelve `FINAL_GATE=BLOCKED_AUTOMATIC_BOOT_ORDER_NOT_VERIFIED`, resultado correcto y seguro para un despliegue aún no realizado. **No instala ni activa unidades**.
 
 **Limitación:** incluso `PASS_INSTALLED_ORDERING_READONLY` demostraría la topología de dependencias, no que un journal real se haya recuperado automáticamente en pre-Kodi. La puesta en marcha del recuperador CLIENTE y OAuth/MQC2 reales continúan pendientes. `PRODUCTION_RELEASE_AUTHORIZED=NO`.
+
+## Auditoría CoreELEC solo lectura — unidad pre-Kodi ausente (operador)
+
+Ejecutado `tools/rclone_two_mount_final_gate.py --coreelec-readonly`. Resultado:
+```text
+CORE_ELEC_HOST_ROOT=YES
+KODI_SYSTEMD_LOADED=YES
+EARLY_BOOT_UNIT_LOADED=NO
+KODI_WANTS_RECOVERY=NO
+KODI_AFTER_RECOVERY=NO
+RECOVERY_BEFORE_KODI=NO
+RECOVERY_EXEC_RECOVER_ARG=NO
+OAUTH_OR_CONFIG_READ=NO
+SYSTEMD_MODIFICATIONS=NO
+KODI_MOUNTS_MODIFIED=NO
+FINAL_GATE=BLOCKED_AUTOMATIC_BOOT_ORDER_NOT_VERIFIED
+PRODUCTION_RELEASE_AUTHORIZED=NO
+```
+Diagnóstico preciso: la unidad `masqelec-v2-recovery.service` no está instalada en CoreELEC; por tanto tampoco hay dependencia `Wants/After` ni un `ExecStart` verificable. **Esto no demuestra fallo del código de recuperación** y tampoco prueba la ejecución automática. No instalarla sobre `kodi.service` productivo sin autorización de release y ensayo aislado. Falta comunicar resultado del modo `--ubuntu-regression`.
