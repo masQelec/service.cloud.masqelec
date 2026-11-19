@@ -60,6 +60,22 @@ class DevBootInstallerTests(unittest.TestCase):
             self.assertFalse((folder / cli.boot.UNIT_NAME).exists())
             self.assertFalse((folder / "kodi.service.d" / cli.boot.DROPIN_NAME).exists())
 
+    def test_group_writable_dropin_not_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            dropdir = folder / "kodi.service.d"
+            dropdir.mkdir(mode=0o755)
+            dropdir.chmod(0o775)
+            (folder / cli.boot.UNIT_NAME).write_bytes(cli.boot.UNIT)
+            drop = dropdir / cli.boot.DROPIN_NAME
+            drop.write_bytes(cli.boot.DROPIN)
+            with mock.patch.object(cli, "_preflight", return_value="READY_DISABLED_ONLY"), \\
+                 mock.patch.object(cli, "SYSTEMD", tmp), \\
+                 mock.patch.object(cli, "_command", return_value=True):
+                self.assertEqual(cli._remove(), "BLOCKED_REMOVE_FAILED")
+            self.assertTrue(drop.exists())
+            self.assertTrue((folder / cli.boot.UNIT_NAME).exists())
+
     def test_operator_modified_dropin_never_removed(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
