@@ -653,7 +653,11 @@ def tick():
         return
     if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
             is True and rclone_two_mount_rollout.mode(True) == "active"):
-        _v2_master_tick()
+        # On the dev MASTER exercising CLIENT OAuth, never publish a
+        # MASTER MQC2 v2 update in the same periodic iteration.
+        if not getattr(constants,
+                       "RCLONE_TWO_MOUNT_DEV_CLIENT_OAUTH_ON_MASTER", False):
+            _v2_master_tick()
         # Independently gated CLIENT v2. The addon ships with this flag
         # False; no Kodi import or network traffic in the default build.
         if (getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
