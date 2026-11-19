@@ -139,6 +139,18 @@ class RunnerTests(unittest.TestCase):
         recover.assert_called_once_with(authorized=True)
         self.assertIn("MASQELEC_EARLY_BOOT=NO_PENDING", output.getvalue())
 
+    def test_verified_client_rollback_is_reported_as_success(self):
+        from lib import rclone_two_mount_client_early_boot as client
+        with mock.patch.object(
+                runner.constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                True), mock.patch.object(
+                client, "_get_role", return_value="CLIENT"), mock.patch.object(
+                client, "execute", return_value="ROLLED_BACK_VERIFIED"), mock.patch.object(
+                runner, "_dev_fake_boot_lab", return_value="DISABLED"), contextlib.redirect_stdout(
+                io.StringIO()) as output:
+            self.assertEqual(runner.main(["--recover"]), 0)
+        self.assertIn("MASQELEC_EARLY_BOOT=ROLLED_BACK_VERIFIED", output.getvalue())
+
     def test_unknown_role_never_invokes_any_real_recovery(self):
         from lib import rclone_two_mount_client_early_boot as client
         with mock.patch.object(
