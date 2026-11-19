@@ -2,7 +2,7 @@
 
 **Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.1` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** laboratorios en `develop`; arquitectura de montajes y OAuth v2 **no desplegada**.
 
-> **Estado actualizado: 18-11-2026.** GitHub Actions **588/588 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+> **Estado revisado: 19-11-2026.** Última ejecución CI documentada: **773/773 OK** (Python 3.11; código anterior a esta revisión documental). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
 ## Validación KodiELEC real — 19/11/2026 (laboratorio aislado)
 
@@ -14,6 +14,8 @@
 - La limpieza terminó correctamente. Se había observado antes un `EXECSTARTPRE_FAILURE` en `BIND_VIDEOS_1`, pero no se pudo demostrar su causa; el ensayo posterior pasó sin cambiar la lógica de montaje.
 - **Alcance limitado:** no certifica OAuth, remotos OneDrive reales, recuperación tras reinicio/corte, comportamiento bajo carga, configuración MASTER/CLIENT ni migración productiva.
 - **Despliegue NO autorizado**: `main` y `cloud.masqelec` permanecen fuera de este ensayo. La publicación en el repositorio de addons sigue siendo responsabilidad del operador.
+
+**Gate integrado antes de release:** [Auditoría y bloqueos de migración v2 (19/11/2026)](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md). El laboratorio aislado pasó; faltan recuperación OAuth CLIENTE v2 y validación física de cutover/rollback/reboot. No publicar ni activar flags todavía.
 
 ## ¿Qué es?
 
