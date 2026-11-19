@@ -95,6 +95,58 @@ class GroupedPilotTests(unittest.TestCase):
             self.assertEqual(pilot.inspect(role="MASTER")["PILOT_GATE"],
                              "BLOCKED_V2_LAYOUT_NOT_VERIFIED")
 
+    def test_standalone_role_does_not_import_kodi(self):
+        with mock.patch.object(pilot, "_read_role_standalone",
+                               return_value="MASTER") as get_role, \
+             mock.patch.object(pilot.os, "geteuid", return_value=0), \
+             mock.patch.object(pilot, "ADDON",
+                               Path("/storage/.kodi/addons/service.cloud.masqelec")), \
+             mock.patch.object(pilot.constants,
+                               "RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED",
+                               True):
+            # The role accessor should not be reached if earlier gates fail.
+            self.assertEqual(pilot.inspect()["PILOT_GATE"],
+                             "BLOCKED_FAKE_LAB_ENABLED")
+            get_role.assert_not_called()
+
+    def test_role_reader_fails_closed_without_identity(self):
+        with mock.patch.object(pilot, "_literal_master_identity",
+                               return_value=("aabbccddeeff", "node")), \
+             mock.patch.object(pilot.Path, "read_text",
+                               side_effect=OSError("missing eth0")):
+            with self.assertRaises(OSError):
+                pilot._read_role_standalone()
+
+    def test_importless_role_matches_mac_and_zerotier_node(self):
+        with mock.patch.object(pilot, "_literal_master_identity",
+                               return_value=("aabbccddeeff", "node-master")), \
+             mock.patch.object(pilot.Path, "read_text",
+                               return_value="aa:bb:cc:dd:ee:ff"), \
+             mock.patch.object(pilot.os.path, "isdir", return_value=True), \
+             mock.patch.object(pilot.glob, "glob",
+                               return_value=["/tmp/zerotier.conf"]), \
+             mock.patch.object(pilot.os.path, "getmtime",
+                               return_value=1), \
+             mock.patch.object(pilot.os.path, "islink", return_value=False), \
+             mock.patch.object(pilot.os.path, "getsize", return_value=48), \
+             mock.patch("builtins.open", mock.mock_open(read_data=b"n=node-master\n")):
+            self.assertEqual(pilot._read_role_standalone(), "MASTER")
+
+    def test_role_reader_rejects_other_zerotier_node(self):
+        with mock.patch.object(pilot, "_literal_master_identity",
+                               return_value=("aabbccddeeff", "node-master")), \
+             mock.patch.object(pilot.Path, "read_text",
+                               return_value="aa:bb:cc:dd:ee:ff"), \
+             mock.patch.object(pilot.os.path, "isdir", return_value=True), \
+             mock.patch.object(pilot.glob, "glob",
+                               return_value=["/tmp/zerotier.conf"]), \
+             mock.patch.object(pilot.os.path, "getmtime",
+                               return_value=1), \
+             mock.patch.object(pilot.os.path, "islink", return_value=False), \
+             mock.patch.object(pilot.os.path, "getsize", return_value=48), \
+             mock.patch("builtins.open", mock.mock_open(read_data=b"n=other-node\n")):
+            self.assertEqual(pilot._read_role_standalone(), "CLIENT")
+
     def test_role_mismatch_blocks(self):
         self._base()
         self.assertEqual(pilot.inspect(role="CLIENT")["PILOT_GATE"],
