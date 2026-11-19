@@ -30,7 +30,7 @@ class BootInstallerTests(unittest.TestCase):
 
     def install(self, **changes):
         with mock.patch.object(installer, "ADDON_SCRIPT", str(self.script)), \
-             mock.patch.object(installer.os, "geteuid", return_value=os.geteuid()):
+             mock.patch.object(installer, "_is_root", return_value=True):
             return installer.ensure_installed(
                 self.adapter, authorized=True,
                 verify=lambda name: name == installer.UNIT_NAME, **changes)
