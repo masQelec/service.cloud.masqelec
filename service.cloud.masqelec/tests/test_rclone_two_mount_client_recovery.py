@@ -55,16 +55,14 @@ class ClientRecoveryGates(unittest.TestCase):
 
     @patch.object(client.policy, "validate_master_layout")
     @patch.object(client.plan, "account_snapshot")
-    @patch.object(client.policy, "sections")
-    @patch.object(client.policy, "oauth_tokens")
+    @patch.object(client.oauth, "_account")
     @patch.object(client.mqc2, "decode_remote_contents")
     @patch.object(client.policy, "tokens_from_master")
     @patch("lib.rclone_conf_merge.same_non_token_settings")
-    def test_candidate_never_applied(self, same, merge, decode, tokens,
-                                     sections, account_snapshot, layout):
+    def test_candidate_never_applied(self, same, merge, decode, account,
+                                     account_snapshot, layout):
         same.return_value = True
-        sections.return_value = {"onedrive": {"type": "onedrive"}}
-        tokens.return_value = {"onedrive": {"refresh_token": "old"}}
+        account.return_value = ("onedrive", {"refresh_token": "old"})
         decode.return_value = {"sha": "b"*40, "canonical": b"remote"}
         merge.return_value = b"merged"
         account_snapshot.side_effect = [b"account", b"newaccount"]
