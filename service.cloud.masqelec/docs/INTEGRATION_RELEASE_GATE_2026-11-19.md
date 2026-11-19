@@ -444,3 +444,25 @@ El operador informó `PILOT_GATE=BLOCKED_ROLE_UNAVAILABLE` al ejecutar el nuevo 
 Corrección en `tools/rclone_two_mount_real_oauth_grouped_preflight.py`: detección MASTER independiente de Kodi, exclusivamente de lectura, que extrae mediante AST los dos literales de identidad originales de `lib/device_utils.py`, lee la MAC eth0 de sysfs, comprueba su inclusión en la lista permitida y exige también el `n=` del fichero ZeroTier escogido con la misma prioridad de directorios. Ante fuente inaccesible/ilegible devuelve bloqueo o rol desconocido, nunca eleva a MASTER. No altera `device_utils.get_device_role()`, servicio Kodi, configuración ZeroTier ni banderas OAuth. Se incorporaron pruebas nuevas de identidad positiva, negativa y fail-closed.
 
 **Acción del operador:** `git pull --ff-only origin develop`, ejecutar regresión `unittest discover`, actualizar addon instalado en CoreELEC, repetir `tools/rclone_two_mount_real_oauth_grouped_preflight.py --read-only`. El modo legacy activo debe seguir dando `BLOCKED_V2_LAYOUT_NOT_VERIFIED`; es resultado diagnóstico y no autoriza falsificar marcador. `RELEASE_AUTHORIZED=NO`.
+
+## Auditoría física agrupada MASTER — legado confirmado, NO activar OAuth v2
+
+Evidencia del equipo de desarrollo enviada por el operador:
+```text
+DEVICE_ROLE=MASTER
+DEV_CLIENT_OVERRIDE=OFF
+MODE=legacy
+LOCAL_CONFIG=PRIVATE
+ACCOUNT1_CONFIG=MISSING_OR_UNSAFE
+ACCOUNT2_CONFIG=MISSING_OR_UNSAFE
+CLIENT_JOURNAL_PENDING=NO
+EARLY_BOOT_UNIT=loaded
+UNIT_1..6=inactive
+FUSE_1..2=NOT_MOUNTED
+BIND_1..4=MOUNTED (etiqueta anterior imprecisa: solo punto de montaje)
+PILOT_GATE=BLOCKED_V2_LAYOUT_NOT_VERIFIED
+```
+
+**Diagnóstico:** el MASTER está en la arquitectura antigua 4 FUSE, sin configs aisladas de las dos cuentas ni los seis servicios v2 en producción. El preflight anterior rotuló `BIND_1..4=MOUNTED` únicamente por presencia de los destinos en mountinfo; esos cuatro destinos pueden ser los montajes FUSE legacy, NO bind. Se corrigió para usar `rclone_two_mount_health.check_two_fuse_four_bind(raw_mountinfo)`, que comprueba superblock, `fsroot`, `fstype`, origen, unicidad/no capas y correlación entre 2 FUSE y 4 binds. La nueva salida añade `V2_MOUNT_TOPOLOGY=NOT_VERIFIED|VERIFIED` y clasifica cada destino como `LEGACY_OR_UNVERIFIED`, `NOT_MOUNTED` o `VERIFIED_V2_BIND`. Nunca declarar la arquitectura v2 sana basándose solo en nombre de directorio. Tests regresión actualizados y ampliados; ejecución pendiente por operador.
+
+El siguiente paso **no** es habilitar `RCLONE_TWO_MOUNT_DEV_CLIENT_OAUTH_ON_MASTER` ni `RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED`: ambos necesitan primero el corte controlado con `LocalAdapter` real, journal seguro, rollback y dos muestras de medios, que exige preparación independiente de este preflight. No inventar marcador `active`, no crear archivos `accountN.conf` a mano, no sobrescribir el rclone canónico, no interrumpir los cuatro montajes legacy solo para pasar un gate. `RELEASE_AUTHORIZED=NO`.
