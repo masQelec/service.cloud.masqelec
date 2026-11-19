@@ -4,6 +4,40 @@
 La flota usa TX3 / X96 X4; el sistema es un fork CoreELEC, `/storage` ext4
 persistente y la arquitectura nueva es 2 FUSE + 4 bind.
 
+## Decisión de disponibilidad: recuperación NO crítica (operador, 19/11/2026)
+
+**La disponibilidad de KodiELEC y de los demás servicios tiene prioridad
+sobre los montajes OneDrive.** El operador confirma que si el journal
+está corrupto, la autenticación no permite recuperar o los montajes quedan
+ausentes, el sistema debe continuar arrancando; únicamente habrá
+indisponibilidad temporal de los archivos multimedia remotos.
+
+Requisitos:
+- Fallo de recuperación = **media no disponible**, NO fallo de arranque
+  del sistema, Kodi, Tvheadend, Docker, red o servicios independientes.
+- Nunca utilizar `Requires=masqelec-v2-recovery.service` en `kodi.service`.
+  Preferir `Wants=` y `After=` cuando el servicio se integre, validando
+  con `systemd-analyze verify` y `systemctl show` en laboratorio.
+- La espera de una recuperación debe tener límite acotado y cancelación
+  compatible con systemd. Los estados ilegibles deben abortar rápidamente,
+  sin intentar montar por adivinación.
+- No reactivar automáticamente legacy cuando v2 tenga montajes activos
+  o el estado sea desconocido: evitar rutas montadas simultáneamente.
+- La aplicación y otros servicios siguen disponibles aunque las rutas
+  de OneDrive carezcan de contenido. Informar de la incidencia en el
+  log y permitir un reintento posterior bajo condiciones verificadas.
+- Si se diseñan dependencias para esperar el intento de recuperación,
+  un fallo del recuperador NO se propagará como dependencia obligatoria.
+- Pre-Kodi no significa secuestrar el arranque completo: acotar tanto
+  `TimeoutStartSec=` como los timeouts de las operaciones de systemctl
+  y desmontajes que se invoquen. Una dependencia `After=` **espera**;
+  incluso con `Wants=` puede demorar Kodi hasta terminar/expirar.
+- El coordinador de recuperación existente es candidato; ninguna unidad
+  temprana está instalada, y no hay evidencia de pruebas de apagado real.
+
+**Esta decisión sustituye** cualquier recomendación anterior de bloquear
+el arranque de Kodi ante un journal corrupto o recuperación imposible.
+
 ## Problema
 
 En una interrupción después de `mark_cutover_started`, el addon habrá
@@ -139,9 +173,9 @@ Candidato de dependencia de recuperación, **no instalar** hasta integrar
 ejecutor temprano y validar su entorno:
 - `masqelec-v2-recovery.service`, `Type=oneshot`, `Before=kodi.service`,
   ordenado después de la inicialización del almacenamiento persistente.
-- Drop-in persistente para `kodi.service` que requiera y ordene
-  `masqelec-v2-recovery.service` (verificar semántica exacta de
-  `Requires=` + `After=` frente a `Wants=` y condiciones de reinicio).
+- Drop-in persistente para `kodi.service` que solicite sin imponer fallo y ordene
+  `masqelec-v2-recovery.service` (`Wants=` + `After=`; verificar
+  condiciones de reinicio y tiempos máximos, NO usar `Requires=`).
 - El ejecutor requiere ruta estable accesible pre-Kodi, código de salida
   que marque fallo cuando la recuperación sea insegura, y **no depender
   de un addon que únicamente se importe después de Kodi**.
