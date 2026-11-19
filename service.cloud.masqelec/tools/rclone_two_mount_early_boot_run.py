@@ -43,6 +43,8 @@ def _dev_fake_boot_lab():
         from tools import rclone_two_mount_reboot_journal_lab as lab
         if not os.path.lexists(lab.ROOT):
             return "NO_PENDING"
+        if not early.kodi_process_absent():
+            return "BLOCKED_KODI_RUNNING_OR_UNKNOWN"
         # The lab validates the earlier boot_id, exact data, permissions,
         # mountinfo and that only its own private files may be deleted.
         result = lab.verify()
