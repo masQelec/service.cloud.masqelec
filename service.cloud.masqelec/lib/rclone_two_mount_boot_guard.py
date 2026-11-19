@@ -9,10 +9,22 @@ import os
 import stat
 
 from lib import rclone_two_mount_journal as journal
+from lib import rclone_two_mount_client_file_ops as client_files
 from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_recovery_units as recovery_units
 
 TXN_PARENT = "/storage/.config/masqelec/rclone-v2-transaction"
+CLIENT_TXN_PARENT = "/storage/.config/masqelec/rclone-v2-client-recovery"
+
+
+def client_recovery_pending(parent=CLIENT_TXN_PARENT):
+    """A v2 CLIENT with a partial recovery must not resume normal tasks."""
+    try:
+        return any(client_files.recovery_pending(
+            os.path.join(parent, "account{}".format(i))) for i in (1, 2))
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return True
+
 
 
 def _safe_file(path, mode, *, max_size=1024 * 1024):
@@ -68,6 +80,8 @@ def recovery_required(*, parent=TXN_PARENT, state_path=rollout.STATE_PATH,
     El estado active solo es aceptable con feature_allowed=True y journal
     active. Su salud real se comprueba después mediante mountinfo.
     """
+    if client_recovery_pending():
+        return True
     target = os.path.join(parent, rollout.CANDIDATE_ID)
     try:
         present = os.path.lexists(target)
