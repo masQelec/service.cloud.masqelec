@@ -133,11 +133,15 @@ def _mounts_clear():
     return True
 
 
+def _is_root():
+    return os.geteuid() == 0
+
+
 def prepare():
     _check_parent()
     if os.path.lexists(ROOT):
         return "BLOCKED_EXISTING_LAB"
-    if os.geteuid() != 0:
+    if not _is_root():
         return "BLOCKED_NOT_ROOT"
     boot = _boot_id()
     ROOT.mkdir(mode=0o700)
@@ -157,7 +161,7 @@ def prepare():
 
 def verify():
     _check_parent()
-    if os.geteuid() != 0:
+    if not _is_root():
         return "BLOCKED_NOT_ROOT"
     if not os.path.lexists(ROOT):
         return "BLOCKED_NO_PREPARED_LAB"
