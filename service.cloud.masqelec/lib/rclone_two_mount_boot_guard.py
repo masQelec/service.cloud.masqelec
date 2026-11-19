@@ -17,8 +17,9 @@ TXN_PARENT = "/storage/.config/masqelec/rclone-v2-transaction"
 CLIENT_TXN_PARENT = "/storage/.config/masqelec/rclone-v2-client-recovery"
 
 
-def client_recovery_pending(parent=CLIENT_TXN_PARENT):
+def client_recovery_pending(parent=None):
     """A v2 CLIENT with a partial recovery must not resume normal tasks."""
+    parent = CLIENT_TXN_PARENT if parent is None else parent
     try:
         return any(client_files.recovery_pending(
             os.path.join(parent, "account{}".format(i)),
