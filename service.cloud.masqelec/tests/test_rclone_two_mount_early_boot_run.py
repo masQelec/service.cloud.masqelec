@@ -43,6 +43,49 @@ class RunnerTests(unittest.TestCase):
         self.assertNotIn("SECRET", output.getvalue())
         self.assertIn("MANUAL_RECOVERY_REQUIRED", output.getvalue())
 
+    def test_dev_fake_recovery_opt_in_disabled_by_default(self):
+        with mock.patch.object(
+                runner.constants,
+                "RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED", False):
+            self.assertEqual(runner._dev_fake_boot_lab(), "DISABLED")
+
+    def test_dev_fake_recovery_refuses_real_recovery_flags(self):
+        with mock.patch.object(
+                runner.constants,
+                "RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED", True), \
+             mock.patch.object(
+                runner.constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", True):
+            self.assertEqual(runner._dev_fake_boot_lab(),
+                             "BLOCKED_REAL_RECOVERY_ENABLED")
+
+    def test_dev_fake_recovery_invoked_only_in_real_recover_mode(self):
+        with mock.patch.object(runner, "_dev_fake_boot_lab",
+                               return_value="PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK") as lab, \
+             mock.patch.object(runner.early, "execute",
+                               return_value="BLOCKED_NOT_AUTHORIZED"), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(runner.main(["--recover"]), 0)
+        lab.assert_called_once_with()
+        self.assertIn("MASQELEC_DEV_FAKE_BOOT_LAB=PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK",
+                      output.getvalue())
+        self.assertIn("MASQELEC_EARLY_BOOT=BLOCKED_NOT_AUTHORIZED",
+                      output.getvalue())
+
+    def test_invalid_mode_never_runs_dev_fake_recovery(self):
+        with mock.patch.object(runner, "_dev_fake_boot_lab",
+                               side_effect=AssertionError("must not run")):
+            self.assertEqual(runner.main(["--apply"]), 0)
+
+    def test_dev_fake_recovery_failure_cannot_leak_exception_text(self):
+        with mock.patch.object(runner, "_dev_fake_boot_lab",
+                               return_value="MANUAL_RECOVERY_REQUIRED"), \
+             mock.patch.object(runner.early, "execute",
+                               return_value="BLOCKED_NOT_AUTHORIZED"), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(runner.main(["--recover"]), 0)
+        self.assertIn("MASQELEC_DEV_FAKE_BOOT_LAB=MANUAL_RECOVERY_REQUIRED",
+                      output.getvalue())
+
     def test_invalid_mode_never_attempts_recovery(self):
         with mock.patch.object(runner.early, "execute",
                                side_effect=AssertionError("no call")):
