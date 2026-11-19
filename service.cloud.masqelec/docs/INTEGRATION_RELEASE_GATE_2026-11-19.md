@@ -274,3 +274,15 @@ El operador ejecutó la suite y obtuvo `Ran 932 tests in 1.349s` / `FAILED (erro
 ## Regresión 938/938 PASS — confirmación operador (19/11/2026)
 
 El operador ejecutó la suite completa tras corregir la inicialización de `self.root` y la importación diferida de `rclone_token_sync` en el worker CLIENTE. Resultado: `Ran 938 tests in 1.430s` y `OK`. Las salidas `MASQELEC_EARLY_BOOT=INVALID_MODE`, `MASQELEC_EARLY_BOOT=ROLLED_BACK`, `LAB_RESULT=BLOCKED_INVALID_MODE` y `CLEANUP=COMPLETE` pertenecen a los ensayos automatizados. La suite confirma las regresiones Python actuales, pero NO demuestra reinicio/corte real, OAuth Microsoft ni publicación MASTER MQC2. `RELEASE_AUTHORIZED=NO`.
+
+## Cierre siguiente de integridad CLIENTE v2 — persistencia entre procesos y recuperación repetida (19/11/2026)
+
+Desde la regresión confirmada por el operador `938/938 OK` se incorporó:
+
+- `tests/test_rclone_two_mount_client_restart_process.py`: prueba durable **entre dos procesos Python independientes**: el primero efectúa snapshot 0600/0700, instala un token ficticio y finaliza sin commit; el segundo carga el journal real desde disco con `rclone_two_mount_client_crash_recovery.restore_interrupted`, restaura los bytes anteriores y comprueba la segunda cuenta intacta. No modifica Kodi, systemd, OneDrive o credenciales reales. No es un apagón/reboot físico.
+- `lib/rclone_two_mount_client_file_ops.py::retire_finalized`: corregido bloqueo funcional previo que rechazaba cualquier renovación OAuth posterior al primer journal completado. Solo bajo lock, tras verificar bytes/generación actual, se retira un journal explícitamente `committed` o `rolled_back`, verificando tipo, identidad y permisos 0600 de su backup, sin seguir symlinks ni borrar estados parciales; `fsync` de directorio entre borrados. Con nuevo incidente AUTH se crea snapshot nuevo y solo se modifica la cuenta objetivo.
+- Tests adicionales: segunda recuperación independiente por cuenta, rechazo de candidato obsoleto y de journal incompleto o backup enlazado.
+
+**NUEVA REGRESIÓN pendiente de ejecución por operador**: `git pull --ff-only origin develop && python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q`. Última ejecución conocida: 938/938 OK **anterior** a estos commits.
+
+**No cerrar release aún**: falta validar el apagón/reboot físico de KodiELEC y recuperación productiva de journal bajo systemd, validar OAuth Microsoft auténtico y publicar/probar MQC2 MASTER con CAS/readback. Los ensayos ficticios no acreditan esos hechos. Todas las banderas de release siguen desactivadas. `RELEASE_AUTHORIZED=NO`.
