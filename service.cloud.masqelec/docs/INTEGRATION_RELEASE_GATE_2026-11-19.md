@@ -61,3 +61,19 @@ No subir `rclone.conf`, refresh tokens, keys, secreto del MASTER, trazas HTTP ni
 `CLIENT_V2_OAUTH_RUNTIME=NOT_IMPLEMENTED`
 `CLIENT_V2_RECOVERY_TESTS_CI=NOT_CONFIRMED`
 `RELEASE_AUTHORIZED=NO`
+
+## Continuación: CLIENTE v2 — coordinador de verificación (19/11/2026)
+
+Añadido `lib/rclone_two_mount_client_runtime.py::verify_once`, con callbacks explícitos de lectura local, HEAD autenticado, GET del endpoint v2 y sondeo OAuth de candidato, **sin escritura de credenciales, montaje ni `systemctl`**. El procedimiento rechaza autorización falsa, falta de error `auth`, índice de cuenta inválido, dependencias ausentes, GET no exitoso, identidad incompatibile, cambio de HEAD, prueba fallida y cambios de fuentes locales. Relee las fuentes y HEAD tras el probe.
+
+Se ha endurecido `rclone_two_mount_client_recovery.prepare` con comparación de opciones no OAuth del canónico remoto y validación de cuenta aislada mediante `rclone_two_mount_oauth._account`. Pruebas regresivas en `test_rclone_two_mount_client_recovery.py` y `test_rclone_two_mount_client_runtime.py`.
+
+El estado `probe_verified_requires_transactional_install` **no autoriza escritura**. Falta implementar un ejecutor real protegido mediante lock local durable, snapshot, instalación atómica 0600 bajo control de escritor rclone, reinicio del FUSE de la cuenta afectada, verificación de medio y rollback físico. Los callbacks `head/get/probe` aún requieren integración operativa, configuración segura e inyección desde el worker.
+
+**CI no confirmado para los últimos commits**. No existe validación en KodiELEC real del nuevo coordinador. No activar las banderas. No crear todavía `rclone-v2.conf.crypt` en cloud sin pasar los gates MASTER.
+
+`CLIENT_V2_VERIFICATION_ORCHESTRATOR=IMPLEMENTED_GATED`
+`CLIENT_V2_TRANSACTIONAL_INSTALL=NOT_IMPLEMENTED`
+`CLIENT_V2_RUNTIME_CONNECTED_TO_ADDON=NO`
+`LATEST_CI_RESULT=NOT_CONFIRMED`
+`RELEASE_AUTHORIZED=NO`
