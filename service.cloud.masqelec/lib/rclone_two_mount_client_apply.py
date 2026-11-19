@@ -58,6 +58,8 @@ def apply_verified(prepared, *, authorized=False, verified_probe=False,
               else os.path.join(guard.CLIENT_TXN_PARENT,
                                 "account{}".format(index + 1)))
     try:
+        if journal_dir is None:
+            files.provision_private_journal(folder)
         constructor = adapter_factory or systemd.AccountSystemd
         machine = constructor(index, enabled=True, media_check=media_check)
         operations = files.AccountFileOps(
