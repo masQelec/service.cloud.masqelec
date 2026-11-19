@@ -7,6 +7,7 @@ Never overwrite an operator's custom unit or drop-in.
 """
 import os
 import stat
+import subprocess
 
 from lib import rclone_two_mount_atomic_install as atomic
 from lib import rclone_two_mount_startup_stage as stage
@@ -48,6 +49,25 @@ def _safe_dropin_dir(path):
             stat.S_IMODE(info.st_mode) & 0o022):
         raise ValueError("Unsafe Kodi systemd drop-in directory")
 
+def verify_dependency(name):
+    """Read merged systemd properties after daemon-reload, no pager."""
+    if name != UNIT_NAME:
+        return False
+    try:
+        result = subprocess.run(
+            ["systemctl", "show", "kodi.service",
+             "-p", "Wants", "-p", "After", "--no-pager"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=10, check=False)
+        if result.returncode != 0:
+            return False
+        lines = result.stdout.decode("ascii", "strict").splitlines()
+        entries = dict(line.split("=", 1) for line in lines if "=" in line)
+        return (name in entries.get("Wants", "").split() and
+                name in entries.get("After", "").split())
+    except (OSError, subprocess.SubprocessError, UnicodeError, ValueError):
+        return False
+
 
 def ensure_installed(adapter, *, authorized=False, verify=None):
     """Return READY only after daemon-reload and independent verification.
@@ -57,6 +77,8 @@ def ensure_installed(adapter, *, authorized=False, verify=None):
     """
     if authorized is not True or adapter.enabled is not True:
         return "BLOCKED_BOOT_INSTALL_NOT_AUTHORIZED"
+    if verify is None:
+        verify = verify_dependency
     if not callable(verify) or os.geteuid() != 0:
         return "BLOCKED_BOOT_INSTALL_UNVERIFIED"
     folder = adapter.unit_dir
