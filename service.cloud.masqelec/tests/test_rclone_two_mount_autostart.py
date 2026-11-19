@@ -51,6 +51,8 @@ class FirstRunTests(unittest.TestCase):
                                return_value=cleanup) as retire, \
              mock.patch.object(auto.maintenance, "ensure_active",
                                return_value="ACTIVE_HEALTHY"), \
+             mock.patch.object(auto.boot_install, "ensure_installed",
+                               return_value="READY"), \
              mock.patch.object(auto.live, "LocalAdapter") as adapter, \
              patches[0], patches[1], patches[2], patches[3], patches[4], \
              patches[5], patches[6]:
@@ -162,6 +164,21 @@ class FirstRunTests(unittest.TestCase):
             "legacy", outcome="ROLLED_BACK")
         self.assertEqual(result, "ROLLED_BACK")
         retire.assert_not_called()
+
+    def test_legacy_boot_recovery_install_failure_prevents_cutover(self):
+        flags = self.config()
+        with mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+             mock.patch.object(auto.kodi_idle, "is_playback_idle",
+                               return_value=True), \
+             mock.patch.object(auto.boot_install, "ensure_installed",
+                               return_value="BLOCKED_BOOT_INSTALL_UNVERIFIED"), \
+             mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], \
+             flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "BLOCKED_BOOT_INSTALL_UNVERIFIED")
+        cut.assert_not_called()
 
     def test_legacy_active_without_cleanup_flag_keeps_old_files(self):
         result, execute, recover, retire, _ = self.run_case(
