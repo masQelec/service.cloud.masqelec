@@ -9,6 +9,7 @@ caller. Production activation additionally requires a separate release gate.
 import os
 
 from lib import constants
+from lib import rclone_two_mount_client_role as client_role
 from lib import rclone_two_mount_client_file_ops as files
 from lib import rclone_two_mount_client_systemd as systemd
 from lib import rclone_two_mount_client_transaction as transaction
@@ -101,7 +102,7 @@ def recover_one(*, account_index, auth_status, read_sources, head, get,
             getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
             is not True):
         return "BLOCKED_RELEASE_GATES"
-    if _get_role() != "CLIENT":
+    if not client_role.allowed(_get_role()):
         return "BLOCKED_NOT_CLIENT"
     if rollout.mode(True) != "active":
         return "BLOCKED_NOT_ACTIVE"
