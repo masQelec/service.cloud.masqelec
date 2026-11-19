@@ -100,6 +100,33 @@ class ClientRuntimeGates(unittest.TestCase):
         self.assertEqual(self.run_case(return_candidate=True),
                          "blocked_probe_or_generation")
 
+    @patch.object(runtime.recovery, "prepare")
+    @patch.object(runtime.recovery, "confirm_probe")
+    @patch.object(runtime.conf, "same_non_token_settings", return_value=True)
+    def test_refreshed_private_probe_bytes_are_handed_off(
+            self, identity, gate, prepare):
+        prepare.return_value = {
+            "status": "candidate_requires_probe",
+            "account_index": 0, "baseline_account": b"old",
+            "candidate_account": b"before"}
+        gate.return_value = "probe_verified_requires_transactional_install"
+        result = self.run_case(
+            probe=lambda index, data: ("ok", b"after"),
+            return_candidate=True)
+        self.assertEqual(result["status"], "candidate_probe_verified")
+        self.assertEqual(result["prepared"]["candidate_account"], b"after")
+        identity.assert_called_once_with(b"before", b"after")
+
+    @patch.object(runtime.recovery, "prepare")
+    @patch.object(runtime.conf, "same_non_token_settings", return_value=False)
+    def test_private_probe_identity_changed_blocks_candidate(self, identity, prepare):
+        prepare.return_value = {
+            "status": "candidate_requires_probe",
+            "account_index": 0, "candidate_account": b"before"}
+        self.assertEqual(self.run_case(
+            probe=lambda index, data: ("ok", b"wrong-identity"),
+            return_candidate=True), "blocked_probe_or_generation")
+
     def test_transport_error_is_not_auth(self):
         def crash(path):
             raise OSError("unavailable")
