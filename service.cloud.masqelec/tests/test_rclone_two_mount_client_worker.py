@@ -22,14 +22,14 @@ class WorkerTests(unittest.TestCase):
         with mock.patch.object(
                 worker.policy, "oauth_tokens", return_value={"onedrive_1": "token"}), \
              mock.patch.object(
-                worker.tokens, "_probe", side_effect=simulated_rclone):
+                worker, "_token_probe", side_effect=simulated_rclone):
             outcome = worker._probe_private(0, b"old-private-oauth")
         self.assertEqual(outcome, ("ok", b"renewed-private-oauth"))
 
     def test_auth_failure_private_probe_never_returns_secret(self):
         with mock.patch.object(
                 worker.policy, "oauth_tokens", return_value={"onedrive_1": "token"}), \
-             mock.patch.object(worker.tokens, "_probe", return_value="auth"):
+             mock.patch.object(worker, "_token_probe", return_value="auth"):
             self.assertEqual(worker._probe_private(0, b"some-token"),
                              ("auth", b""))
 
