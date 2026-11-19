@@ -4,6 +4,17 @@
 
 > **Estado actualizado: 18-11-2026.** GitHub Actions **588/588 OK** (Python 3.11). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
 
+## Validación KodiELEC real — 19/11/2026 (laboratorio aislado)
+
+**Resultado comunicado por el operador:** `LAB_RESULT=PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL`, `CLEANUP=COMPLETE`.
+
+- Dos montajes rclone FUSE contra fixtures **locales** (sin OneDrive real) y cuatro bind mounts gestionados por seis unidades systemd temporales.
+- El script comprueba el árbol de montajes mediante `/proc/self/mountinfo` y lee los archivos de prueba en los cuatro destinos bind antes de devolver PASS.
+- Marcadores del ensayo: `ONEDRIVE_ACCESSED=NO`, `LIVE_RCLONE_CONFIG_READ=NO`, `KODI_MOUNT_PATHS_CHANGED=NO`, `LEGACY_SERVICE_START_STOP=NO`, `LEGACY_UNIT_FILES_CHANGED=NO`, `PERMANENT_UNITS_ENABLED=NO`.
+- La limpieza terminó correctamente. Se había observado antes un `EXECSTARTPRE_FAILURE` en `BIND_VIDEOS_1`, pero no se pudo demostrar su causa; el ensayo posterior pasó sin cambiar la lógica de montaje.
+- **Alcance limitado:** no certifica OAuth, remotos OneDrive reales, recuperación tras reinicio/corte, comportamiento bajo carga, configuración MASTER/CLIENT ni migración productiva.
+- **Despliegue NO autorizado**: `main` y `cloud.masqelec` permanecen fuera de este ensayo. La publicación en el repositorio de addons sigue siendo responsabilidad del operador.
+
 ## ¿Qué es?
 
 Addon de servicio para la distribución masQelec basada en Kodi/KodiELEC. Coordina al arrancar la configuración cifrada de rclone, los servicios de montajes, las actualizaciones del sistema, la biblioteca de Kodi, el catálogo, los procesos PVR/Tvheadend y tareas de mantenimiento. Dispone de roles **MASTER** y **CLIENT**, detectados localmente (código en `lib/device_utils.py`), y utiliza un repositorio de configuración separado: **[masQelec/cloud.masqelec](https://github.com/masQelec/cloud.masqelec)**.
