@@ -470,3 +470,9 @@ El siguiente paso **no** es habilitar `RCLONE_TWO_MOUNT_DEV_CLIENT_OAUTH_ON_MAST
 ## Regresión de 980 tests confirmada por operador (19/11/2026)
 
 Tras la corrección de detección de montajes legacy vs bind (V2_MOUNT_TOPOLOGY y clasificación LEGACY_OR_UNVERIFIED) y las pruebas adicionales, el operador confirmó: `Ran 980 tests in 1.421s` / `OK`. `GROUPED_PREFLIGHT_REGRESSION=PASS_980`. No equivale a un cutover físico del MASTER; la última inspección permanece `MODE=legacy`, `ACCOUNT1/2_CONFIG=MISSING_OR_UNSAFE`, unidades v2 inactivas. Próximo gate físico no intrusivo: `python3 /storage/.kodi/addons/service.cloud.masqelec/lib/rclone_two_mount_media_samples.py --inventory` en CoreELEC. No activar flags de primer arranque ni OAuth en esta fase. `RELEASE_AUTHORIZED=NO`.
+
+## Gate físico de catálogo local STRM — PASS (MASTER desarrollo)
+
+El operador ejecutó `rclone_two_mount_media_samples.py --inventory` en CoreELEC y obtuvo `ACCOUNT_1_SAMPLE=FOUND`, `ACCOUNT_2_SAMPLE=FOUND` y `MEDIA_DISCOVERY_RESULT=PASS_2_LOCAL_STRM_ACCOUNTS`. Marcadores adicionales: `ONEDRIVE_ACCESSED=NO`, `FUSE_OR_SYSTEMD_CHANGED=NO`, `OAUTH_CONFIG_READ=NO`, `STRM_FILES_CHANGED=NO`, `MEDIA_PATHS_PRINTED=NO`, `REAL_OAUTH_PROBE_ALLOWED=NO`, `CUTOVER_AUTHORIZED=NO`. `GATE_LOCAL_STRM_TWO_ACCOUNTS=PASS` acredita exclusivamente dos referencias locales .strm válidas, no lectura de medios de OneDrive ni OAuth real.
+
+Siguiente gate local: generar candidato mediante `rclone_two_mount_startup_stage.stage_on_startup(staging_enabled=True)` en un directorio privado de preparación. No instalar los seis servicios ni sustituir configuraciones canónicas. Si el resultado es `blocked_layout` o `blocked_local_sources`, detenerse y examinar estructura/permisos sin imprimir contenido de credenciales. `RELEASE_AUTHORIZED=NO`.
