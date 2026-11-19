@@ -118,3 +118,41 @@ Notas upstream: CoreELEC incluye ejemplos de servicios que usan
 - https://github.com/CoreELEC/CoreELEC/blob/coreelec-22/packages/sysutils/systemd/config/system.d/cifs.mount.sample
 - https://discourse.coreelec.org/t/stuck-on-startup-logo/13816
 - https://www.freedesktop.org/software/systemd/man/latest/systemd.unit
+
+## Evidencia de kodi.target (operador, 19/11/2026)
+
+La salida íntegra recibida para `systemctl show kodi.target`:
+
+```text
+Requires=multi-user.target network-online.target graphical.target
+Wants=kodi.service service.tvheadend43.service ledfix.service service.aml-vnc.service vfd-clock.service service.system.docker.service kodi-aml-hdmimonitor.service network-online.target
+After=graphical.target kodi.service multi-user.target service.tvheadend43.service ledfix.service service.aml-vnc.service vfd-clock.service service.system.docker.service kodi-aml-hdmimonitor.service network-online.target
+```
+
+Estas propiedades corresponden a **kodi.target**, no prueban por sí mismas
+las relaciones internas del propio **kodi.service**. No confundir la relación
+`Wants` (débil) con `Requires` (fallo de unidad requerido puede afectar
+al arranque de la solicitante), ni `Before/After` (solo orden) con inclusión
+en la transacción de arranque.
+
+Candidato de dependencia de recuperación, **no instalar** hasta integrar
+ejecutor temprano y validar su entorno:
+- `masqelec-v2-recovery.service`, `Type=oneshot`, `Before=kodi.service`,
+  ordenado después de la inicialización del almacenamiento persistente.
+- Drop-in persistente para `kodi.service` que requiera y ordene
+  `masqelec-v2-recovery.service` (verificar semántica exacta de
+  `Requires=` + `After=` frente a `Wants=` y condiciones de reinicio).
+- El ejecutor requiere ruta estable accesible pre-Kodi, código de salida
+  que marque fallo cuando la recuperación sea insegura, y **no depender
+  de un addon que únicamente se importe después de Kodi**.
+- `kodi.target` incluye Tvheadend, Docker y VNC: no modificar estas
+  dependencias durante la intervención de recuperación.
+- Ensayar fallos y recuperación en entorno aislado; no habilitar en MASTER
+  con pruebas únicamente de mocks.
+
+Comprobación pendiente, sin paginador y solo lectura:
+
+```sh
+SYSTEMD_PAGER=cat systemctl cat kodi.service --no-pager
+SYSTEMD_PAGER=cat systemctl show kodi.service -p Wants -p Requires -p After -p Before -p DropInPaths -p UnitFileState --no-pager
+```
