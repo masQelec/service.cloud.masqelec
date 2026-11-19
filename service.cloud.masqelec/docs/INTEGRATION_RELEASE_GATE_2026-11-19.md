@@ -264,3 +264,9 @@ Desde los 911 tests confirmados y el ensayo KodiELEC ficticio PASS, se incorpora
 `REAL_REBOOT_RECOVERY=NOT_VERIFIED`
 `MASTER_V2_PUBLISH=NOT_VERIFIED`
 `RELEASE_AUTHORIZED=NO`
+
+## Corrección de regresión tras integración CLIENTE (19/11/2026)
+
+El operador ejecutó la suite y obtuvo `Ran 932 tests in 1.349s` / `FAILED (errors=3)`. Las causas observadas: dos pruebas de journal invocaban `self.root` sin inicializar en `setUp`; el nuevo worker importaba `rclone_token_sync` en el nivel módulo, arrastrando `log_utils`/Kodi `xbmc` no disponible en Ubuntu. Correcciones publicadas en `develop`: `self.root=root`, carga tardía de `rclone_token_sync` mediante `_token_probe` sólo en la sonda y tests mockeando esa función aislada. Commits `77b4a6e5`, `402e811b`, `362a19f1`.
+
+**La suite corregida aún no se ha ejecutado por el operador.** No declarar PASS ni habilitar producción hasta confirmar ejecución y gates físicos/OAuth. `RELEASE_AUTHORIZED=NO`.
