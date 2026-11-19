@@ -27,6 +27,30 @@ class JournalTests(unittest.TestCase):
         with journal.locked(self.parent):
             return journal.prepare(self.parent, self.conf, self.units)
 
+    def test_first_install_bootstraps_private_base(self):
+        base = Path(self.tmp.name, "masqelec")
+        txn = base / "transaction"
+        self.assertFalse(base.exists())
+        with journal.locked(str(txn)):
+            self.assertEqual(stat.S_IMODE(base.stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE(txn.stat().st_mode), 0o700)
+        self.assertTrue((txn / ".lock").exists())
+
+    def test_symlink_bootstrap_base_is_rejected(self):
+        base = Path(self.tmp.name, "masqelec")
+        base.symlink_to(self.tmp.name)
+        with self.assertRaises(ValueError):
+            with journal.locked(str(base / "transaction")):
+                pass
+
+    def test_insecure_bootstrap_base_is_rejected(self):
+        base = Path(self.tmp.name, "masqelec")
+        base.mkdir(mode=0o700)
+        base.chmod(0o775)
+        with self.assertRaises(ValueError):
+            with journal.locked(str(base / "transaction")):
+                pass
+
     def test_prepare_creates_private_durable_inventory(self):
         target = self.prepared()
         self.assertEqual(journal.phase(target), "prepared")
