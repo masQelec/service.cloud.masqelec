@@ -200,6 +200,7 @@ class FirstRunTests(unittest.TestCase):
                                return_value=True), \
              mock.patch.object(auto.boot_install, "ensure_installed",
                                return_value="BLOCKED_BOOT_INSTALL_UNVERIFIED"), \
+             mock.patch.object(publication, "available", return_value=True), \
              mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
              mock.patch.object(auto.live, "LocalAdapter"), \
              flags[0], flags[1], flags[2], flags[3], flags[4], \
