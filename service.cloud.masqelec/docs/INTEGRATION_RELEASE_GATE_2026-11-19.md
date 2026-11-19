@@ -145,3 +145,11 @@ El operador ha ejecutado `python3 -m unittest discover -s service.cloud.masqelec
 `CLIENT_V2_CRASH_RECOVERY=MANUAL_GUARD_ONLY`
 `LATEST_CI_RESULT=NOT_CONFIRMED`
 `RELEASE_AUTHORIZED=NO`
+
+## Regresión integrada 902/902 — confirmación operador (19/11/2026)
+
+Tras los commits `3962c60` y `2796965`, se ejecutó en Ubuntu la suite completa `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q`, con resultado `Ran 902 tests in 1.318s` y `OK`. Los mensajes `MASQELEC_EARLY_BOOT=INVALID_MODE`, `MASQELEC_EARLY_BOOT=ROLLED_BACK` y `CLEANUP=COMPLETE` pertenecen a los casos de prueba. **902/902 PASS** verifica los escenarios automatizados, no un montaje real o OAuth Microsoft. 
+
+`CLIENT_V2_UBUNTU_REGRESSION=PASS_902`
+`CLIENT_V2_REAL_SYSTEMD_OAUTH_RECOVERY=NOT_VERIFIED`
+`RELEASE_AUTHORIZED=NO`
