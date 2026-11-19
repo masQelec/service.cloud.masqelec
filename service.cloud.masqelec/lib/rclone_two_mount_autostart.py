@@ -144,7 +144,21 @@ def tick(rpc_call, *, adapter_factory=None):
         # Once marked active, CLIENT never falls back to legacy MQC2.
         from lib import rclone_two_mount_v2_publication as publication
         if not publication.available():
-            return "BLOCKED_V2_CONFIG_NOT_PUBLISHED"
+            # Only MASTER may create v2 MQC2. If CLIENT updates before
+            # MASTER, leave its four FUSE and retry later on the same
+            # addon version: no partial per-device migration.
+            from lib import rclone_two_mount_master_runtime as master_runtime
+            from lib import device_utils
+            if (device_utils.get_device_role() == "MASTER"
+                    and getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
+                                False) is True):
+                publish = master_runtime.publish_from_legacy_before_cutover(
+                    authorized=True)
+                if publish not in ("created_verified", "unchanged",
+                                   "updated_verified"):
+                    return "BLOCKED_V2_CONFIG_NOT_PUBLISHED"
+            if not publication.available():
+                return "BLOCKED_V2_CONFIG_NOT_PUBLISHED"
         # First migration demands two independent, locally discoverable
         # media fixtures before disabling a single legacy FUSE.
         known = getattr(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES", ())
