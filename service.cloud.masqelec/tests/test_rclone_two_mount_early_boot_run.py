@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import tempfile
 from pathlib import Path
 import unittest
 from unittest import mock
@@ -84,6 +85,28 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(runner._dev_fake_boot_lab(),
                              "BLOCKED_KODI_RUNNING_OR_UNKNOWN")
             verify.assert_not_called()
+
+    def test_real_runner_uses_fake_journal_verify_api(self):
+        from tools import rclone_two_mount_reboot_journal_lab as lab
+        boot_a = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        boot_b = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "journal"
+            with mock.patch.object(lab, "ROOT", root), \
+                 mock.patch.object(lab, "_is_root", return_value=True), \
+                 mock.patch.object(lab, "_mounts_clear", return_value=True), \
+                 mock.patch.object(lab, "_boot_id", return_value=boot_a):
+                self.assertEqual(lab.prepare(), "PREPARED_REBOOT_REQUIRED")
+                with mock.patch.object(
+                        runner.constants,
+                        "RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED", True), \
+                     mock.patch.object(runner.early, "kodi_process_absent",
+                                       return_value=True), \
+                     mock.patch.object(lab, "_boot_id", return_value=boot_b):
+                    self.assertEqual(
+                        runner._dev_fake_boot_lab(),
+                        "PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK")
+                self.assertFalse(root.exists())
 
     def test_invalid_mode_never_runs_dev_fake_recovery(self):
         with mock.patch.object(runner, "_dev_fake_boot_lab",
