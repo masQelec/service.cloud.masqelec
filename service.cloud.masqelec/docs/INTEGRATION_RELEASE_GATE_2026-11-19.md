@@ -193,3 +193,18 @@ LAB_RESULT=PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED
 ```
 
 **PASS físico aislado:** las seis unidades efímeras montaron 2 FUSE + 4 bind; se detuvieron/reiniciaron exclusivamente FUSE y dos bind de cuenta 1, con comprobación de lectura de archivos locales de cuenta 2 durante el corte y de ambas tras reiniciar. No prueba tokens OAuth, OneDrive real ni recuperación por apagón. No se modificaron montajes ni servicios de producción. La suite de regresión posterior al script nuevo no se ha comunicado todavía. `RELEASE_AUTHORIZED=NO`.
+
+## Ensayo siguiente (pendiente de ejecución): systemd real + rollback OAuth ficticio
+
+Añadido a `tools/rclone_two_mount_systemd_local_lab.py` el modo `--fake-oauth-rollback-isolated --confirm-isolated-only`, junto con `tests/test_rclone_two_mount_systemd_fake_rollback.py`. Usa únicamente un fichero falso `account1.conf` privado en el `/tmp/masqelec-sd-lab-*` aleatorio del ensayo, backup exclusivo 0600 y journal fsync. Una vez comprobados 2 FUSE + 4 bind temporales:
+- detiene dos bind + FUSE de cuenta 1; comprueba ausencia de montajes y lectura de cuenta 2;
+- reemplaza atómicamente los bytes de prueba de cuenta 1 y reinicia sus tres unidades;
+- inyecta un fallo de salud deliberado, registra `rollback_required`, detiene de nuevo cuenta 1, restaura los bytes anteriores desde backup y reinicia sus tres unidades;
+- exige lectura correcta de las cuatro muestras y credenciales restauradas; marca `rolled_back_verified` solo después;
+- desmonta y elimina todo el laboratorio temporal; cualquier limpieza incompleta exige revisión manual.
+
+**Esto NO es** una recuperación OAuth de Microsoft, ni una prueba de apagón, ni una prueba del flujo productivo. No accede a `/storage/.config/rclone`, no publica a GitHub ni toca servicios legacy. La suite anterior reportada por operador fue 902/902 PASS; los tests de este nuevo cambio están PENDIENTES de ejecutar.
+
+Comandos: `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q` en Ubuntu y en KodiELEC `python3 /tmp/rclone_two_mount_systemd_local_lab.py --fake-oauth-rollback-isolated --confirm-isolated-only` tras bajar la última versión del script en `develop`.
+
+Marcadores exigidos: `CLEANUP=COMPLETE` y `LAB_RESULT=PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED`. `RELEASE_AUTHORIZED=NO`.
