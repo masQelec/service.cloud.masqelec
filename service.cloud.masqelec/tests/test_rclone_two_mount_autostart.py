@@ -208,6 +208,22 @@ class FirstRunTests(unittest.TestCase):
                              "BLOCKED_ROOT_OCCUPIED")
         retire.assert_not_called()
 
+    def test_existing_v2_without_media_samples_still_supervises(self):
+        flags = self.config(known=())
+        with mock.patch.object(auto.rollout, "mode", return_value="active"), \
+             mock.patch.object(auto.media_samples, "discover",
+                               return_value=None), \
+             mock.patch.object(auto.maintenance, "ensure_active",
+                               return_value="ACTIVE_HEALTHY") as maintain, \
+             mock.patch.object(auto.cleanup, "retire_after_active") as retire, \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], \
+             flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "ACTIVE_PENDING_CLEANUP")
+        maintain.assert_called_once()
+        retire.assert_not_called()
+
     def test_active_resume_partial_cleanup(self):
         result, execute, _, retire, _ = self.run_case("active")
         self.assertEqual(result, "ACTIVE_VERIFIED_LEGACY_RETIRED")
