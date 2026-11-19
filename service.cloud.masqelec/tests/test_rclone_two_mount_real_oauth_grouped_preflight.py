@@ -113,6 +113,11 @@ class GroupedPilotTests(unittest.TestCase):
             self.assertEqual(pilot._mount_topology(), (None, False))
 
     def test_standalone_role_does_not_import_kodi(self):
+        real_flags = [mock.patch.object(pilot.constants, flag, False)
+                      for flag in pilot.REAL_FLAGS]
+        for patch in real_flags:
+            patch.start()
+        self.addCleanup(lambda: [patch.stop() for patch in reversed(real_flags)])
         with mock.patch.object(pilot, "_read_role_standalone",
                                return_value="MASTER") as get_role, \
              mock.patch.object(pilot.os, "geteuid", return_value=0), \
