@@ -404,3 +404,21 @@ El hook **rechaza** si las banderas `RCLONE_TWO_MOUNT_FEATURE_ALLOWED`, `RCLONE_
 6. Devolver `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=False` en el addon local de desarrollo; reiniciar o iniciar nueva instancia del runner para verificar que el hook está inactivo. No borrar manualmente un journal que haya fallado; conservar evidencia.
 
 **Este gate verifica la recuperación automática del journal ficticio por el servicio REAL pre-Kodi**, no un OAuth real, no la restauración de cuentas OneDrive productivas ni MQC2 de GitHub. No habilitar release/first-run/mount migration. `RELEASE_AUTHORIZED=NO`.
+
+## GATE: recuperación automática de journal ficticio mediante systemd REAL antes de Kodi — PASS
+
+Evidencia observada por el operador en CoreELEC tras reinicio, `journalctl -b -o short-monotonic -u masqelec-v2-recovery.service -u kodi.service --no-pager`:
+
+```text
+[6.065227] Starting masqelec-v2-recovery.service...
+[8.624102] MASQELEC_DEV_FAKE_BOOT_LAB=PASS_REAL_REBOOT_FAKE_JOURNAL_ROLLBACK
+[8.624102] MASQELEC_EARLY_BOOT=BLOCKED_NOT_AUTHORIZED
+[8.722882] Finished masqelec-v2-recovery.service.
+[15.994755] Starting kodi.service...
+[16.077740] Started kodi.service.
+JOURNAL_LAB_CLEAN=YES
+```
+
+La unidad real restauró automáticamente los bytes ficticios del primer archivo tras detectar nuevo `boot_id`, comprobó la segunda cuenta intacta y limpió exclusivamente el directorio privado del ensayo. Kodi arrancó normalmente, **7.271873 s** después de terminar el recuperador. El código REAL continúa bloqueado por `BLOCKED_NOT_AUTHORIZED`, como se pretendía. `GATE_DEV_REAL_SYSTEMD_AUTOMATIC_FAKE_JOURNAL=PASS`.
+
+**Acción necesaria tras ensayo:** devolver `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=False` en el addon instalado del MASTER de desarrollo; comprobar que no quedan journal de laboratorio ni activación de esa bandera. No activar automáticamente OAuth real ni migrar otros clientes. Siguen pendientes validación OAuth OneDrive real, publicación/lectura MQC2 MASTER-CLIENT, recuperación auténtica y autorización de release. `RELEASE_AUTHORIZED=NO`.
