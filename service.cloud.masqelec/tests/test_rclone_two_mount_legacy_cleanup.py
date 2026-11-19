@@ -63,6 +63,9 @@ class CleanupTests(unittest.TestCase):
         self.root = Path(tmp.name)
         self.a = DummyAdapter(self.root)
         Path(self.a.unit_dir).mkdir()
+        # Do not inherit a group-writable mode from the operator umask
+        # (e.g. umask 0002 -> 0775). Production rejects unsafe unit dirs.
+        Path(self.a.unit_dir).chmod(0o755)
         Path(self.a.txn_parent).mkdir(mode=0o700)
         self.txn = Path(self.a.txn_parent, rollout.CANDIDATE_ID)
         self.txn.mkdir(mode=0o700)
