@@ -77,3 +77,19 @@ El estado `probe_verified_requires_transactional_install` **no autoriza escritur
 `CLIENT_V2_RUNTIME_CONNECTED_TO_ADDON=NO`
 `LATEST_CI_RESULT=NOT_CONFIRMED`
 `RELEASE_AUTHORIZED=NO`
+
+## CLIENTE v2: protocolo transaccional inyectable (19/11/2026)
+
+Nuevos archivos:
+- `lib/rclone_two_mount_client_transaction.py`: motor por cuenta con autorización explícita, prueba validada, Kodi idle, snapshot durable exigido antes de detener la cuenta, fencing de escritor, revalidación local, instalación, arranque, salud, confirmación y rollback ante cualquier fallo. Rechaza adaptadores incompletos. Nunca toca por sí mismo filesystem, systemd ni OAuth.
+- `tests/test_rclone_two_mount_client_transaction.py`: casos de camino feliz simulado, autorización bloqueada, reproducción activa, snapshot fallido, cada etapa fallida, rollback incompleto y candidato manipulado.
+
+**Advertencia de alcance:** `RECOVERED_VERIFIED` significa que **callbacks inyectados devolvieron True**, no que haya un rclone real reiniciado. No existe todavía un adaptador que garantice exclusión de escritores de rclone, journal físico de CLIENTE, instalación 0600, recuperación tras apagón y prueba post-arranque. No conectar este módulo al worker ni permitir que un FakeOps pase a producción.
+
+**Validación no acreditada:** el proveedor de consulta GitHub no muestra workflow/status asociado al commit nuevo; un intento de clonación desde el entorno disponible falló por DNS. No afirmar que la suite pasó.
+
+`CLIENT_V2_TRANSACTION_PROTOCOL=IMPLEMENTED_GATED`
+`CLIENT_V2_PHYSICAL_ADAPTER=NOT_IMPLEMENTED`
+`CLIENT_V2_CRASH_RECOVERY=NOT_VERIFIED`
+`CI_NEW_COMMITS=NOT_VERIFIED`
+`RELEASE_AUTHORIZED=NO`
