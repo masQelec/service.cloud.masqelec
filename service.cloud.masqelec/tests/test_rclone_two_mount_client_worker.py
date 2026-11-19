@@ -13,6 +13,26 @@ class WorkerTests(unittest.TestCase):
         self.calls = []
         self.rpc = lambda _: '{"jsonrpc":"2.0","id":1,"result":[]}'
 
+    def test_private_probe_returns_refreshed_copy_not_original(self):
+        def simulated_rclone(name, path):
+            from pathlib import Path
+            p = Path(path)
+            p.write_bytes(b"renewed-private-oauth")
+            return "ok"
+        with mock.patch.object(
+                worker.policy, "oauth_tokens", return_value={"onedrive_1": "token"}), \
+             mock.patch.object(
+                worker.tokens, "_probe", side_effect=simulated_rclone):
+            outcome = worker._probe_private(0, b"old-private-oauth")
+        self.assertEqual(outcome, ("ok", b"renewed-private-oauth"))
+
+    def test_auth_failure_private_probe_never_returns_secret(self):
+        with mock.patch.object(
+                worker.policy, "oauth_tokens", return_value={"onedrive_1": "token"}), \
+             mock.patch.object(worker.tokens, "_probe", return_value="auth"):
+            self.assertEqual(worker._probe_private(0, b"some-token"),
+                             ("auth", b""))
+
     def test_default_disabled_does_not_read_sources(self):
         source = mock.Mock(side_effect=AssertionError("must not access secrets"))
         self.assertEqual(worker.tick(self.rpc, read_sources=source),
