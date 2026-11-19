@@ -128,6 +128,29 @@ class AccountFileOpsTests(unittest.TestCase):
                 start=self.callback("start"), healthy=self.callback("healthy"),
                 enabled=True)
 
+    def test_provision_only_private_account_journal(self):
+        root = self.root / "private-base"
+        root.mkdir(mode=0o700)
+        root.chmod(0o700)
+        child = root / "client-recovery" / "account1"
+        self.assertTrue(files.provision_private_journal(str(child)))
+        self.assertEqual(stat.S_IMODE(child.stat().st_mode), 0o700)
+        self.assertEqual(stat.S_IMODE(child.parent.stat().st_mode), 0o700)
+        self.assertTrue(files.provision_private_journal(str(child)))
+
+    def test_provision_rejects_untrusted_ancestor_or_symlink(self):
+        root = self.root / "untrusted-base"
+        root.mkdir(mode=0o700)
+        root.chmod(0o777)
+        child = root / "client-recovery" / "account1"
+        with self.assertRaises(ValueError):
+            files.provision_private_journal(str(child))
+        self.assertFalse(child.exists())
+        root.chmod(0o700)
+        (root / "client-recovery").symlink_to(self.journal)
+        with self.assertRaises(ValueError):
+            files.provision_private_journal(str(child))
+
     def test_lock_rejects_symlink(self):
         (self.journal / ".lock").symlink_to(self.account)
         with self.assertRaises(OSError):
