@@ -21,7 +21,8 @@ def client_recovery_pending(parent=CLIENT_TXN_PARENT):
     """A v2 CLIENT with a partial recovery must not resume normal tasks."""
     try:
         return any(client_files.recovery_pending(
-            os.path.join(parent, "account{}".format(i))) for i in (1, 2))
+            os.path.join(parent, "account{}".format(i)),
+            account_index=i-1) for i in (1, 2))
     except (OSError, ValueError, TypeError, UnicodeError):
         return True
 
