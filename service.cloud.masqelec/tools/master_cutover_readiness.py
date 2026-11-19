@@ -10,6 +10,7 @@ import sys
 UNIT_DIR = "/storage/.config/system.d"
 CANONICAL = "/storage/.config/rclone/rclone.conf"
 PARENT = "/storage/.config/masqelec"
+SPACE_ANCHOR = "/storage/.config"
 TXN_PARENT = PARENT + "/rclone-v2-transaction"
 ISOLATED_PARENT = "/storage/.config/rclone/isolated-mounts"
 STATE = PARENT + "/rclone-mount-mode.json"
@@ -66,12 +67,19 @@ def assess():
     # must be treated as unsafe rather than overwritten.
     report["NO_TRANSACTION"] = not os.path.lexists(TXN_PARENT)
     report["NO_ISOLATED_CONFIGS"] = not os.path.lexists(ISOLATED_PARENT)
+    # An absent journal base is normal on the first installation. Accept
+    # it only when its persistent parent is trusted; actual mkdir is deferred
+    # to the authorized cutover transaction, never performed by this tool.
     try:
-        report["JOURNAL_PARENT_SAFE"] = safe_dir(PARENT, private=True)
+        report["JOURNAL_PARENT_SAFE"] = (
+            safe_dir(PARENT, private=True) if os.path.lexists(PARENT)
+            else safe_dir(SPACE_ANCHOR))
     except OSError:
         report["JOURNAL_PARENT_SAFE"] = False
     try:
-        fs = os.statvfs(PARENT)
+        # statvfs on the future journal directory yields false negatives
+        # on a clean CoreELEC installation where that directory is absent.
+        fs = os.statvfs(SPACE_ANCHOR)
         report["FREE_SPACE"] = fs.f_bavail * fs.f_frsize >= MIN_FREE
     except OSError:
         report["FREE_SPACE"] = False
@@ -101,6 +109,7 @@ def main(argv=None):
         "NO_LEGACY_DROPINS", "NO_TRANSACTION", "NO_ISOLATED_CONFIGS",
         "JOURNAL_PARENT_SAFE", "FREE_SPACE",
     )
+    print("JOURNAL_PARENT=" + ("ABSENT_BOOTSTRAP_REQUIRED" if not os.path.lexists(PARENT)          else "EXISTS"))
     for name in fields:
         print(name + "=" + ("PASS" if result.get(name) is True
                             else "BLOCKED"))
