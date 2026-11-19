@@ -10,6 +10,7 @@ import tempfile
 import time
 
 from lib import constants
+from lib import rclone_two_mount_client_role as client_role
 from lib import rclone_two_mount_client_apply as apply
 from lib import rclone_two_mount_master_runtime as master
 from lib import rclone_two_mount_media_samples as media_samples
@@ -91,7 +92,7 @@ def tick(rpc_call, *, authorized=False, now=None,
             getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
             is not True or constants.CLOUD_BRANCH != "develop"):
         return "BLOCKED_RELEASE_GATES"
-    if (role if role is not None else apply._get_role()) != "CLIENT":
+    if not client_role.allowed(role if role is not None else apply._get_role()):
         return "BLOCKED_NOT_CLIENT"
     if rollout.mode(True) != "active" or guard.client_recovery_pending():
         return "BLOCKED_NOT_ACTIVE_OR_RECOVERY"
