@@ -10,6 +10,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lib import constants
+from lib import rclone_two_mount_client_role as client_role
 from lib import rclone_two_mount_early_boot_recovery as early
 
 _ALLOWED = frozenset({
@@ -32,7 +33,7 @@ def main(argv=None):
         if getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
                    False) is True:
             from lib import device_utils
-            if device_utils.get_device_role() == "CLIENT":
+            if client_role.allowed(device_utils.get_device_role()):
                 from lib import rclone_two_mount_client_early_boot as client
                 result = client.execute(authorized=True)
             else:
