@@ -110,6 +110,35 @@ class FirstRunTests(unittest.TestCase):
         adapter.assert_not_called()
         cut.assert_not_called()
 
+    def test_master_publication_error_reports_safe_category_without_cutover(self):
+        flags = self.config()
+        from lib import rclone_two_mount_master_runtime as master_runtime
+        for actual, expected in (
+                ("blocked_missing_credentials",
+                 "BLOCKED_V2_PUBLISH_MISSING_CREDENTIALS"),
+                ("blocked_local_health", "BLOCKED_V2_PUBLISH_OAUTH"),
+                ("blocked_repository_unverified", "BLOCKED_V2_PUBLISH_GITHUB"),
+                ("blocked_local_changed", "BLOCKED_V2_PUBLISH_LOCAL_CHANGED"),
+                ("blocked_master_runtime", "BLOCKED_V2_PUBLISH_UNAVAILABLE"),
+                ("refresh_token=SECRET", "BLOCKED_V2_PUBLISH_UNAVAILABLE")):
+            with self.subTest(actual=expected), \
+                 mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+                 mock.patch.object(auto.kodi_idle, "is_playback_idle",
+                                   return_value=True), \
+                 mock.patch.object(publication, "available", return_value=False), \
+                 mock.patch.object(master_runtime, "_get_role", return_value="MASTER"), \
+                 mock.patch.object(master_runtime,
+                                   "publish_from_legacy_before_cutover",
+                                   return_value=actual), \
+                 mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
+                 mock.patch.object(auto.live, "LocalAdapter") as adapter, \
+                 flags[0], flags[1], flags[2], flags[3], flags[4], flags[5], flags[6]:
+                result = auto.tick(lambda _: "{}")
+                self.assertEqual(result, expected)
+                self.assertNotIn("SECRET", result)
+                adapter.assert_not_called()
+                cut.assert_not_called()
+
     def test_master_publishes_before_cutover_not_after(self):
         flags = self.config(retire=True)
         from lib import rclone_two_mount_master_runtime as master_runtime
