@@ -49,6 +49,8 @@ class FirstRunTests(unittest.TestCase):
                                return_value="ROLLED_BACK") as recover, \
              mock.patch.object(auto.cleanup, "retire_after_active",
                                return_value=cleanup) as retire, \
+             mock.patch.object(auto.maintenance, "ensure_active",
+                               return_value="ACTIVE_HEALTHY"), \
              mock.patch.object(auto.live, "LocalAdapter") as adapter, \
              patches[0], patches[1], patches[2], patches[3], patches[4], \
              patches[5], patches[6]:
@@ -175,6 +177,19 @@ class FirstRunTests(unittest.TestCase):
         execute.assert_not_called()
         recover.assert_not_called()
         retire.assert_called_once()
+
+    def test_active_broken_mount_does_not_cleanup(self):
+        flags = self.config()
+        with mock.patch.object(auto.rollout, "mode", return_value="active"), \
+             mock.patch.object(auto.maintenance, "ensure_active",
+                               return_value="BLOCKED_ROOT_OCCUPIED"), \
+             mock.patch.object(auto.cleanup, "retire_after_active") as retire, \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], \
+             flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "BLOCKED_ROOT_OCCUPIED")
+        retire.assert_not_called()
 
     def test_active_resume_partial_cleanup(self):
         result, execute, _, retire, _ = self.run_case("active")
