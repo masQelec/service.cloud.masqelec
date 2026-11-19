@@ -84,6 +84,7 @@ class AccountFileOpsTests(unittest.TestCase):
         # cannot be attested, even when old bytes were restored.
         self.assertEqual(self.account.read_bytes(), b"old-oauth")
         self.assertEqual(self.other.read_bytes(), b"unrelated-account")
+        self.assertTrue(files.recovery_pending(str(self.journal)))
 
     def test_failure_before_install_rolls_back(self):
         self.fail = "quiescent"
