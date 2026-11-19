@@ -82,6 +82,12 @@ class ActiveMountMaintenanceTests(unittest.TestCase):
         self.assertEqual(self.run_gate(), "ACTIVE_REPAIRED")
         self.assertEqual(self.actions, [rootunit] + [a[0] for a in missing])
 
+    def test_orphan_bind_prevents_restarting_missing_root(self):
+        self.active.remove(rollout.NEW_SERVICES[0])
+        del self.mounts[plan.FUSE_ROOTS[0]]
+        self.assertEqual(self.run_gate(), "BLOCKED_ORPHAN_BIND")
+        self.assertEqual(self.actions, [])
+
     def test_occupied_root_never_started(self):
         self.active.remove(rollout.NEW_SERVICES[0])
         self.assertEqual(self.run_gate(), "BLOCKED_ROOT_OCCUPIED")
