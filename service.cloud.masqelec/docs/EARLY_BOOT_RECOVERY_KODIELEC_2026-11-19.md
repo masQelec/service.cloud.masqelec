@@ -190,3 +190,67 @@ Comprobación pendiente, sin paginador y solo lectura:
 SYSTEMD_PAGER=cat systemctl cat kodi.service --no-pager
 SYSTEMD_PAGER=cat systemctl show kodi.service -p Wants -p Requires -p After -p Before -p DropInPaths -p UnitFileState --no-pager
 ```
+
+## Integración de la versión automática (candidato develop, pendiente de prueba física)
+
+Componentes nuevos:
+
+- `lib/rclone_two_mount_boot_install.py`: antes del primer cutover,
+  instala exclusivamente `masqelec-v2-recovery.service` y el drop-in
+  `kodi.service.d/50-masqelec-v2-recovery.conf` bajo
+  `/storage/.config/system.d`, con comprobación de symlinks, propietario,
+  integridad de archivos preexistentes y verificación de las relaciones
+  `Wants` y `After` en el `systemctl show` fusionado tras daemon-reload.
+  No escribe sobre archivos de terceros. Si la integración de arranque
+  falla, se bloquea **el corte de montajes**, NO Kodi.
+- `tools/rclone_two_mount_early_boot_run.py`: devuelve 0 tanto si
+  logra recuperar como si el contenido remoto queda inaccesible. Emite
+  solo estados conocidos; no imprime rutas, tokens ni secretos.
+- `lib/rclone_two_mount_active_maintenance.py`: en cada ciclo habilitado,
+  distingue 2 FUSE + 4 bind sanos (no tocar) de unidades nuevas realmente
+  ausentes (arrancar solo las ausentes). Rechaza ruta ocupada, legacy
+  concurrente, journal inconsistente y configuraciones aisladas inseguras.
+  La verificación del layout continúa basada en mountinfo.
+- `lib/rclone_two_mount_autostart.py`: en estado legacy exige boot
+  installer `READY` antes de entrar al motor de cutover; en estado
+  activo ejecuta mantenimiento antes de retirar definitivamente los
+  cuatro unit files antiguos. El mantenimiento activo **no depende**
+  de encontrar dos muestras multimedia; el primer corte y la retirada
+  irreversible sí requieren las muestras de salud.
+- `lib/cloud_storage.py`: mantiene su guardia anterior: no descarga,
+  reinicia ni recrea legacy cuando el estado es `active` o `unsafe`.
+  Es indispensable mantenerla durante futuras versiones del addon.
+- `lib/rclone_two_mount_legacy_cleanup.py`: solo retira las cuatro
+  unidades antiguas cuando v2 está activo y sano, y legacy no está activo
+  ni habilitado; conserva respaldo privado para recuperación manual.
+  El corte original deshabilita legacy antes de detenerlo.
+
+**Política de disponibilidad:** el servicio usa `Before=kodi.service` y
+drop-in `Wants=masqelec-v2-recovery.service` +
+`After=masqelec-v2-recovery.service`, **nunca Requires**.
+`TimeoutStartSec=45`: el arranque puede esperar hasta ese límite,
+pero si se agota, Kodi seguirá arrancando y el multimedia puede faltar.
+El proceso de recuperación debe seguir siendo reiniciable y seguro
+tras corte del propio servicio.
+
+**Nota:** `Wants + After` solo funcionará si KodiELEC efectivamente
+importa el drop-in del directorio persistente. Lo verifica el instalador,
+pero falta prueba real en MASTER, prueba de reinicio y revisión de
+`systemd-analyze verify`. **No se han activado los flags de release.**
+
+### Gates que siguen en NO
+
+```text
+RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False
+RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED=False
+RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED=False
+RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED=False
+RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED=False
+PRODUCTION_CUTOVER_EXECUTED=NO
+SYSTEMD_UNIT_INSTALLED_ON_MASTER=NO
+```
+
+Activar todos a la vez antes de completar el ensayo con cortes
+simulados/rollback/OAuth real expondría a toda la flota cuando el usuario
+publique la actualización. El addon será automático **en la versión de
+release validada**, no en este candidato de `develop`.
