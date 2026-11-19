@@ -228,4 +228,8 @@ MASTER v2 está preparado para **crear `rclone/rclone-v2.conf.crypt` si el GET a
 
 ### 19/11/2026 — primer arranque y limpieza legacy preparados, desactivados
 
-El addon ya contiene el trabajador de primer arranque y reintento al quedar Kodi inactivo, con cutover local y borrado verificado de las cuatro unidades systemd antiguas **solo tras ACTIVE**. Las bibliotecas `.strm` siguen locales. **754/754 pruebas CI OK**, banderas False y pruebas reales pendientes; aún falta descubrir un archivo multimedia conocido por cuenta sin configuración manual por dispositivo. [Procedimiento y pendientes](service.cloud.masqelec/docs/AUTO_FIRST_RUN_CUTOVER_2026-11-19.md).
+El addon ya contiene el trabajador de primer arranque y reintento al quedar Kodi inactivo, con cutover local y borrado verificado de las cuatro unidades systemd antiguas **solo tras ACTIVE**. Las bibliotecas `.strm` siguen locales. **754/754 pruebas CI OK**, banderas False y pruebas reales pendientes; la selección automática desde .strm local ya está implementada, pero exige preflight real. [Procedimiento y pendientes](service.cloud.masqelec/docs/AUTO_FIRST_RUN_CUTOVER_2026-11-19.md).
+
+### 19/11/2026 — detección automática de muestras desde STRM local
+
+Sin configurar rutas por equipo, el addon buscará una referencia de película o episodio por cuenta desde `/storage/videos` y `/storage/tvshows`. No accede a OneDrive durante el descubrimiento; la lectura real se prueba tras montar v2. **773/773 pruebas OK**; falta ensayo físico. [CLI seguro y límites](service.cloud.masqelec/docs/AUTO_FIRST_RUN_CUTOVER_2026-11-19.md).
