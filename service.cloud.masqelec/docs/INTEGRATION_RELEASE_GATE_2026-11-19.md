@@ -270,3 +270,7 @@ Desde los 911 tests confirmados y el ensayo KodiELEC ficticio PASS, se incorpora
 El operador ejecutó la suite y obtuvo `Ran 932 tests in 1.349s` / `FAILED (errors=3)`. Las causas observadas: dos pruebas de journal invocaban `self.root` sin inicializar en `setUp`; el nuevo worker importaba `rclone_token_sync` en el nivel módulo, arrastrando `log_utils`/Kodi `xbmc` no disponible en Ubuntu. Correcciones publicadas en `develop`: `self.root=root`, carga tardía de `rclone_token_sync` mediante `_token_probe` sólo en la sonda y tests mockeando esa función aislada. Commits `77b4a6e5`, `402e811b`, `362a19f1`.
 
 **La suite corregida aún no se ha ejecutado por el operador.** No declarar PASS ni habilitar producción hasta confirmar ejecución y gates físicos/OAuth. `RELEASE_AUTHORIZED=NO`.
+
+## Regresión 938/938 PASS — confirmación operador (19/11/2026)
+
+El operador ejecutó la suite completa tras corregir la inicialización de `self.root` y la importación diferida de `rclone_token_sync` en el worker CLIENTE. Resultado: `Ran 938 tests in 1.430s` y `OK`. Las salidas `MASQELEC_EARLY_BOOT=INVALID_MODE`, `MASQELEC_EARLY_BOOT=ROLLED_BACK`, `LAB_RESULT=BLOCKED_INVALID_MODE` y `CLEANUP=COMPLETE` pertenecen a los ensayos automatizados. La suite confirma las regresiones Python actuales, pero NO demuestra reinicio/corte real, OAuth Microsoft ni publicación MASTER MQC2. `RELEASE_AUTHORIZED=NO`.
