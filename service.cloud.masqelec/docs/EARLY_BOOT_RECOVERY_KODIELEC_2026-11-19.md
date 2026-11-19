@@ -74,3 +74,47 @@ EARLY_BOOT_SYSTEMD_UNIT=NOT_INSTALLED
 EARLY_BOOT_REAL_REBOOT=NOT_VERIFIED
 CUTOVER_AUTHORIZED=NO
 ```
+
+## Evidencia MASTER recibida (19/11/2026)
+
+El operador confirma `Ran 811 tests ... OK` y `FULL_REGRESSION_RESULT=0` en Ubuntu.
+El equipo MASTER devuelve:
+
+```text
+Id=kodi.service
+FragmentPath=/usr/lib/systemd/system/kodi.service
+Requires=sysinit.target system.slice graphical.target
+Wants=kodi-cleanlogs.service network-online.target kodi-autostart.service ...
+Before=kodi-aml-hdmimonitor.service shutdown.target kodi.target
+After=locale.service basic.target opentee_linuxdriver.service graphical.target ...
+```
+
+**La salida de Wants/After estaba truncada por el terminal/paginador.** No inferir
+la totalidad de relaciones de systemd a partir del fragmento.
+
+La ubicación `/usr/lib/systemd/system/kodi.service` es del sistema de imagen
+(solo lectura); **nunca editarla**. Un servicio de recuperación futuro se
+instalará en `/storage/.config/system.d` y deberá añadirse expresamente
+a la transacción de arranque de `kodi.service`; `Before=kodi.service`
+por sí solo solo ordena unidades que ya estén en la misma transacción.
+Poner `WantedBy=multi-user.target` no garantiza por sí solo
+ninguna activación obligatoria si se reinicia Kodi manualmente.
+
+### Preflight de dependencias: exclusivamente lectura y sin paginador
+
+```sh
+export SYSTEMD_PAGER=cat
+systemctl show kodi.service -p Id -p FragmentPath -p DropInPaths -p UnitFileState -p Wants -p Requires -p Before -p After --no-pager
+systemctl cat kodi.service --no-pager
+systemctl show kodi.target -p Wants -p Requires -p After --no-pager
+```
+
+Los comandos no modifican el sistema y deben ejecutarse antes de diseñar y
+ensayar una dependencia persistente. **No instalar drop-in, no habilitar
+servicio, no reiniciar Kodi** sin un laboratorio controlado.
+
+Notas upstream: CoreELEC incluye ejemplos de servicios que usan
+`Before=kodi.service` y unidades en `/storage/.config/system.d`.
+- https://github.com/CoreELEC/CoreELEC/blob/coreelec-22/packages/sysutils/systemd/config/system.d/cifs.mount.sample
+- https://discourse.coreelec.org/t/stuck-on-startup-logo/13816
+- https://www.freedesktop.org/software/systemd/man/latest/systemd.unit
