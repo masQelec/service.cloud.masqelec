@@ -13,6 +13,7 @@ from lib import rclone_two_mount_live_adapter as live
 from lib import rclone_two_mount_legacy_cleanup as cleanup
 from lib import rclone_two_mount_media_samples as media_samples
 from lib import rclone_two_mount_plan as plan
+from lib import rclone_two_mount_active_maintenance as maintenance
 
 _STATUSES = frozenset({
     "DISABLED", "BLOCKED_RELEASE_GATES", "BLOCKED_NOT_ROOT",
@@ -33,6 +34,10 @@ _STATUSES = frozenset({
     "BLOCKED_LEGACY_ENABLED_OR_UNKNOWN",
     "BLOCKED_CLEANUP_INCOMPLETE", "BLOCKED_NOT_INTERRUPTED",
     "BLOCKED_ROLLBACK_NOT_READY", "BLOCKED_NOT_AUTHORIZED",
+    "ACTIVE_HEALTHY", "ACTIVE_REPAIRED", "BLOCKED_ACTIVE_MAINTENANCE",
+    "BLOCKED_LEGACY_MOUNT", "BLOCKED_ROOT_ACTIVE_UNMOUNTED",
+    "BLOCKED_ROOT_OCCUPIED", "BLOCKED_ROOT_NOT_READY",
+    "BLOCKED_BIND_ACTIVE_UNMOUNTED", "BLOCKED_BIND_OCCUPIED",
 })
 
 
@@ -105,6 +110,10 @@ def tick(rpc_call, *, adapter_factory=None):
         adapter = maker(rpc_call=rpc_call, live_enabled=True,
                         known_media_files=known)
         if mode == "active":
+            maintained = maintenance.ensure_active(adapter, authorized=True)
+            if maintained not in ("ACTIVE_HEALTHY", "ACTIVE_REPAIRED"):
+                return maintained if maintained in _STATUSES else (
+                    "BLOCKED_ACTIVE_MAINTENANCE")
             if (getattr(constants, "RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED",
                         False) is not True):
                 return "ACTIVE_PENDING_CLEANUP"
