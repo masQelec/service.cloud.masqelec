@@ -30,3 +30,26 @@ CUTOVER_AUTHORIZED=NO
 REAL_OAUTH_PROBE_ALLOWED=NO
 LEGACY_CLEANUP_AUTHORIZED=NO
 ```
+
+## Corrección tras confirmar /storage ext4 y separación aprobada
+
+`JOURNAL_PARENT_SAFE` admite que `/storage/.config/masqelec` aún **no exista**
+si el directorio persistente contenedor `/storage/.config` pertenece al UID de
+ejecución y no tiene permisos de escritura de grupo/otros. Se informa
+`JOURNAL_PARENT=ABSENT_BOOTSTRAP_REQUIRED`; el preflight **NO lo crea**.
+Si existe, el journal base debe ser directorio privado UID actual y `0700`.
+`FREE_SPACE` inspecciona `/storage/.config`, no el directorio aún inexistente.
+El operador confirmó en MASTER `/storage` en ext4 con 16,3 GiB libres.
+
+El journal `lib/rclone_two_mount_journal.py` puede inicializar el directorio
+base y el subdirectorio transaccional ambos en `0700` durante una **ejecución
+autorizada**; verifica propietario, modos y ausencia de enlaces en el último
+componente. No se ejecuta con los flags de activación deshabilitados.
+
+Si `UNIT_DIRECTORY_SAFE=BLOCKED` persiste, **no aplicar chmod automático**:
+hay que obtener `stat` del `/storage/.config/system.d` real y decidir si es
+modo/propiedad no segura o un supuesto inválido del addon.
+
+La ubicación de secretos y journal queda en `/storage/.config/masqelec`;
+`/storage/.kodi/userdata/addon_data/service.cloud.masqelec` conserva los
+datos ordinarios del addon.
