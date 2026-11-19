@@ -4,6 +4,8 @@
 No credential bytes, network, Kodi RPC, mount modifications or systemd writes.
 This command CANNOT authorize a migration or OAuth recovery.
 """
+import ast
+import glob
 import os
 from pathlib import Path
 import stat
@@ -68,6 +70,78 @@ def _mount_targets():
     return targets
 
 
+def _literal_master_identity():
+    """Read exact current constants from device_utils WITHOUT importing Kodi."""
+    path = ADDON / "lib" / "device_utils.py"
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 65536:
+        raise ValueError("Unsafe role definition")
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    values = {}
+    wanted = ("DEFAULT_MASTER_ETH0_MACS",
+              "DEFAULT_MASTER_NODE_NAME_ZEROTIER")
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in wanted:
+                    if not isinstance(node.value, ast.Constant) or not isinstance(
+                            node.value.value, str):
+                        raise ValueError("Nonliteral device identity")
+                    values[target.id] = node.value.value
+    if set(values) != set(wanted):
+        raise ValueError("Missing role definition")
+    return (values[wanted[0]], values[wanted[1]])
+
+
+def _read_role_standalone():
+    """Equivalent positive MASTER attestation without xbmcvfs/Kodi imports.
+
+    Missing identity data blocks the pilot instead of being treated as CLIENT.
+    """
+    macs, expected_name = _literal_master_identity()
+    if not expected_name.strip():
+        return "UNKNOWN"
+    mac_path = Path("/sys/class/net/eth0/address")
+    eth0 = mac_path.read_text(encoding="ascii").strip().lower().replace(
+        ":", "").replace("-", "")
+    allowed = set()
+    for candidate in macs.replace(",", " ").split():
+        normalized = candidate.strip().lower().replace(
+            ":", "").replace("-", "")
+        if len(normalized) == 12 and all(c in "0123456789abcdef"
+                                          for c in normalized):
+            allowed.add(normalized)
+    if len(eth0) != 12 or not all(c in "0123456789abcdef" for c in eth0):
+        return "UNKNOWN"
+    if eth0 not in allowed:
+        return "CLIENT"
+    zt_dirs = (
+        "/opt/var/lib/zerotier-one/networks.d",
+        "/var/lib/zerotier-one/networks.d",
+        "/storage/.cache/zerotier-one/networks.d",
+    )
+    for dirname in zt_dirs:
+        if not os.path.isdir(dirname):
+            continue
+        config_files = [
+            p for p in glob.glob(os.path.join(dirname, "*.conf"))
+            if not p.endswith(".local.conf")]
+        if not config_files:
+            return "UNKNOWN"
+        latest = max(config_files, key=os.path.getmtime)
+        if os.path.islink(latest) or os.path.getsize(latest) > 65536:
+            return "UNKNOWN"
+        node_name = None
+        with open(latest, "rb") as source:
+            for raw in source:
+                line = raw.strip()
+                if line.startswith((b"C=", b"COO=")):
+                    break
+                if line.startswith(b"n="):
+                    node_name = line[2:].decode("utf-8", "strict").strip()
+        return "MASTER" if node_name == expected_name else "CLIENT" if node_name else "UNKNOWN"
+    return "UNKNOWN"
+
+
 def inspect(role=None):
     """Closed, non-secret statuses; never calls GitHub, OneDrive or rclone."""
     output = {}
@@ -86,9 +160,9 @@ def inspect(role=None):
         return {"PILOT_GATE": "BLOCKED_FAKE_LAB_REMAINS"}
     if role is None:
         try:
-            from lib import device_utils
-            role = device_utils.get_device_role()
-        except (OSError, ValueError, RuntimeError, ImportError):
+            role = _read_role_standalone()
+        except (OSError, ValueError, RuntimeError, UnicodeError,
+                SyntaxError, TypeError):
             return {"PILOT_GATE": "BLOCKED_ROLE_UNAVAILABLE"}
     output["DEVICE_ROLE"] = role if role in ("MASTER", "CLIENT") else "UNKNOWN"
     if role != "MASTER":
