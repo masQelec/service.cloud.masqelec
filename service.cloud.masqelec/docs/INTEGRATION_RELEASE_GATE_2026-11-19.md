@@ -422,3 +422,7 @@ JOURNAL_LAB_CLEAN=YES
 La unidad real restauró automáticamente los bytes ficticios del primer archivo tras detectar nuevo `boot_id`, comprobó la segunda cuenta intacta y limpió exclusivamente el directorio privado del ensayo. Kodi arrancó normalmente, **7.271873 s** después de terminar el recuperador. El código REAL continúa bloqueado por `BLOCKED_NOT_AUTHORIZED`, como se pretendía. `GATE_DEV_REAL_SYSTEMD_AUTOMATIC_FAKE_JOURNAL=PASS`.
 
 **Acción necesaria tras ensayo:** devolver `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=False` en el addon instalado del MASTER de desarrollo; comprobar que no quedan journal de laboratorio ni activación de esa bandera. No activar automáticamente OAuth real ni migrar otros clientes. Siguen pendientes validación OAuth OneDrive real, publicación/lectura MQC2 MASTER-CLIENT, recuperación auténtica y autorización de release. `RELEASE_AUTHORIZED=NO`.
+
+## Cierre confirmado del laboratorio en dispositivo (operador)
+
+El operador confirmó `LAB_CLEAN=YES` (no existe el directorio de journal ficticio) y `RCLONE_TWO_MOUNT_DEV_FAKE_BOOT_LAB_ENABLED=False` en el addon instalado. `GATE_DEV_FAKE_BOOT_LAB_CLOSED=PASS`. El cierre no autoriza activar OAuth de producción, publicar MQC2, migrar servicios ni desplegar el addon. `RELEASE_AUTHORIZED=NO`.
