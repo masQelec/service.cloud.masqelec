@@ -69,6 +69,11 @@ def verify_dependency(name):
         return False
 
 
+def _is_root():
+    """Privilege check kept separate so synthetic tests do not alter UID ownership."""
+    return os.geteuid() == 0
+
+
 def ensure_installed(adapter, *, authorized=False, verify=None):
     """Return READY only after daemon-reload and independent verification.
 
@@ -79,7 +84,7 @@ def ensure_installed(adapter, *, authorized=False, verify=None):
         return "BLOCKED_BOOT_INSTALL_NOT_AUTHORIZED"
     if verify is None:
         verify = verify_dependency
-    if not callable(verify) or os.geteuid() != 0:
+    if not callable(verify) or not _is_root():
         return "BLOCKED_BOOT_INSTALL_UNVERIFIED"
     folder = adapter.unit_dir
     unit_path = os.path.join(folder, UNIT_NAME)
