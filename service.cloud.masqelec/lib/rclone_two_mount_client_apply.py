@@ -1,0 +1,72 @@
+# -*- coding: utf-8 -*-
+"""Opt-in CLIENT v2 recovery composition. Disabled and unconnected to Kodi.
+
+This module joins the durable file adapter with the exact-account systemd
+adapter. It never fetches OAuth or decides that an AUTH error occurred.
+The already-verified candidate must be supplied by an explicitly authorized
+caller. Production activation additionally requires a separate release gate.
+"""
+import os
+
+from lib import constants
+from lib import rclone_two_mount_client_file_ops as files
+from lib import rclone_two_mount_client_systemd as systemd
+from lib import rclone_two_mount_client_transaction as transaction
+from lib import rclone_two_mount_plan as plan
+from lib import rclone_two_mount_rollout as rollout
+from lib import rclone_two_mount_boot_guard as guard
+from lib import rclone_two_mount_kodi_idle as kodi_idle
+
+
+def apply_verified(prepared, *, authorized=False, verified_probe=False,
+                   rpc_call=None, media_check=None, adapter_factory=None,
+                   account_path=None, journal_dir=None):
+    """Apply one verified CLIENT candidate while holding its durable lock.
+
+    Default: BLOCKED_NOT_AUTHORIZED, zero filesystem/network/systemd IO.
+    Only intended as a controlled integration entrypoint, not a periodic
+    service worker. Kodi playback is checked again before STOP.
+    """
+    if authorized is not True or verified_probe is not True:
+        return "BLOCKED_NOT_AUTHORIZED"
+    if (getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED", False)
+            is not True or
+            getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is not True or
+            rollout.mode(True) != "active"):
+        return "BLOCKED_RELEASE_GATES"
+    if os.geteuid() != 0:
+        return "BLOCKED_NOT_ROOT"
+    if not isinstance(prepared, dict):
+        return "BLOCKED_CANDIDATE"
+    index = prepared.get("account_index")
+    if type(index) is not int or index not in (0, 1):
+        return "BLOCKED_CANDIDATE"
+    if not callable(media_check) or not kodi_idle.is_playback_idle(rpc_call):
+        return "BLOCKED_PLAYBACK_OR_MEDIA"
+    if guard.client_recovery_pending():
+        return "BLOCKED_UNFINISHED_RECOVERY"
+    location = (account_path if account_path is not None
+                else plan.ACCOUNT_CONFS[index])
+    folder = (journal_dir if journal_dir is not None
+              else os.path.join(guard.CLIENT_TXN_PARENT,
+                                "account{}".format(index + 1)))
+    try:
+        constructor = adapter_factory or systemd.AccountSystemd
+        machine = constructor(index, enabled=True, media_check=media_check)
+        operations = files.AccountFileOps(
+            index, account_path=location, journal_dir=folder,
+            stop=machine.stop, quiescent=machine.quiescent,
+            start=machine.start, healthy=machine.healthy,
+            enabled=True)
+        # Secure parent/journal directories are *not* created automatically.
+        # A separate authorized installer must provision them at 0700.
+        with files.locked(folder):
+            if not kodi_idle.is_playback_idle(rpc_call):
+                return "BLOCKED_PLAYBACK_OR_MEDIA"
+            return transaction.execute(
+                prepared, authorized=True, verified_probe=True,
+                playback_idle=True, operations=operations)
+    except (OSError, ValueError, TypeError, RuntimeError,
+            PermissionError, BlockingIOError):
+        return "MANUAL_RECOVERY_REQUIRED"
