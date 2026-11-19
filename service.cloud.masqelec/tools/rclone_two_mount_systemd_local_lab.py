@@ -547,7 +547,43 @@ def _cleanup(root, units):
         return False
 
 
-def run_isolated():
+def _cycle_first_account(root):
+    """One-account stop/start on isolated units; account 2 stays readable."""
+    names = _unit_names(root)
+    fuse, binds, _ = _layout(root)
+    # bind list: movies1, movies2, tvshows1, tvshows2.
+    account_one_binds = (names["bind"][0], names["bind"][2])
+    account_two_targets = [target for idx, _, target in binds if idx == 1]
+    account_one_targets = [target for idx, _, target in binds if idx == 0]
+    for unit in reversed(account_one_binds):
+        if not _control("stop", unit):
+            return "FAIL_ACCOUNT1_BIND_STOP"
+    if not _control("stop", names["fuse"][0]):
+        return "FAIL_ACCOUNT1_FUSE_STOP"
+    try:
+        entries = _mount_records(_read_mountinfo())
+        if any(path in entries for path in [fuse[0]] + account_one_targets):
+            return "FAIL_ACCOUNT1_NOT_UNMOUNTED"
+        if (not _is_active(names["fuse"][1]) or
+                not all(_is_active(names["bind"][i]) for i in (1, 3)) or
+                not all(_read_sample(os.path.join(dest, "sample.bin"))
+                        for dest in account_two_targets)):
+            return "FAIL_ACCOUNT2_INTERRUPTED"
+        if not _control("start", names["fuse"][0]):
+            return "FAIL_ACCOUNT1_FUSE_RESTART"
+        for unit in account_one_binds:
+            if not _control("start", unit):
+                return "FAIL_ACCOUNT1_BIND_RESTART"
+        if (not _check_mounts(_read_mountinfo(), root) or
+                not all(_read_sample(os.path.join(dest, "sample.bin"))
+                        for _, _, dest in binds)):
+            return "FAIL_ACCOUNT1_RECOVERY_HEALTH"
+        return "PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED"
+    except (OSError, ValueError, UnicodeError, subprocess.SubprocessError):
+        return "FAIL_ACCOUNT_CYCLE_RUNTIME"
+
+
+def run_isolated(*, cycle_account=False):
     requirements = prerequisites()
     if not all(requirements.values()):
         return "BLOCKED_MISSING_PREREQUISITE"
@@ -587,7 +623,9 @@ def run_isolated():
                             _, binds, _ = _layout(root)
                             if all(_read_sample(os.path.join(dest, "sample.bin"))
                                    for _, _, dest in binds):
-                                status = "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL"
+                                status = (_cycle_first_account(root)
+                                          if cycle_account else
+                                          "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL")
                             else:
                                 status = "FAIL_LOCAL_SAMPLE_READ"
                     except (OSError, ValueError, UnicodeError):
@@ -612,7 +650,8 @@ def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     if args not in (
             ["--preflight"],
-            ["--run-isolated-systemd", "--confirm-isolated-only"]):
+            ["--run-isolated-systemd", "--confirm-isolated-only"],
+            ["--cycle-account1-isolated", "--confirm-isolated-only"]):
         print("LAB_RESULT=BLOCKED_INVALID_MODE")
         return 2
     print("LAB_MODE=RCLONE_2FUSE_4BIND_REAL_SYSTEMD_ISOLATED")
@@ -633,9 +672,12 @@ def main(argv=None):
         print("LAB_RESULT=" + ("READY_FOR_ISOLATED_SYSTEMD"
                                if allowed else "BLOCKED_MISSING_PREREQUISITE"))
         return 0 if allowed else 2
-    result = run_isolated()
+    cycle = args[0] == "--cycle-account1-isolated"
+    result = run_isolated(cycle_account=cycle)
     print("LAB_RESULT=" + result)
-    return 0 if result == "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL" else 2
+    return 0 if result in (
+        "PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL",
+        "PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED") else 2
 
 
 if __name__ == "__main__":
