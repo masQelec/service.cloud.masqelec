@@ -41,3 +41,6 @@ RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED = False
 RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED = False
 # Dos rutas públicas de medios conocidas: una por cuenta, solo para prueba.
 RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES = ()
+
+# CLIENT v2 OAuth transactional installer. NEVER enable without physical gates.
+RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED = False
