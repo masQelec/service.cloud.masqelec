@@ -12,9 +12,21 @@ import tempfile
 
 def _trusted_folder(folder):
     meta = os.lstat(folder)
+    mode = stat.S_IMODE(meta.st_mode)
+    # CoreELEC ships /storage/.config/system.d as root:root 0775.
+    # Group 'root' is privileged, so ONLY that exact systemd directory may
+    # retain its default group-write bit. All private OAuth directories,
+    # drop-ins, symlinks and other paths keep the strict nonwritable rule.
+    coreelec_systemd = (
+        folder == "/storage/.config/system.d"
+        and os.geteuid() == 0
+        and meta.st_uid == 0
+        and meta.st_gid == 0
+        and mode in (0o755, 0o775)
+    )
     if (not stat.S_ISDIR(meta.st_mode)
             or meta.st_uid != os.geteuid()
-            or stat.S_IMODE(meta.st_mode) & 0o022):
+            or (mode & 0o022 and not coreelec_systemd)):
         raise ValueError("Unsafe install directory")
 
 
