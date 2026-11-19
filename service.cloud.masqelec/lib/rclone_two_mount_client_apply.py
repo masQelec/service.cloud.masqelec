@@ -73,6 +73,11 @@ def apply_verified(prepared, *, authorized=False, verified_probe=False,
         return "MANUAL_RECOVERY_REQUIRED"
 
 
+def _get_role():
+    from lib import device_utils
+    return device_utils.get_device_role()
+
+
 def recover_one(*, account_index, auth_status, read_sources, head, get,
                 probe, key, rpc_call, media_check, authorized=False,
                 adapter_factory=None, account_path=None, journal_dir=None):
@@ -89,8 +94,7 @@ def recover_one(*, account_index, auth_status, read_sources, head, get,
             getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
             is not True):
         return "BLOCKED_RELEASE_GATES"
-    from lib import device_utils
-    if device_utils.get_device_role() != "CLIENT":
+    if _get_role() != "CLIENT":
         return "BLOCKED_NOT_CLIENT"
     if rollout.mode(True) != "active":
         return "BLOCKED_NOT_ACTIVE"
