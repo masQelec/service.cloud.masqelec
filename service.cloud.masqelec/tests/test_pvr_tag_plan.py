@@ -1,6 +1,17 @@
 """G3-C fail-closed planner tests. No TVH server required."""
+import importlib.util
+from pathlib import Path
+import sys
 import unittest
-from lib.pvr_tag_plan import PlanBlocked, m3u_groups, plan
+
+MODULE_PATH = Path(__file__).resolve().parents[1] / "lib" / "pvr_tag_plan.py"
+SPEC = importlib.util.spec_from_file_location("pvr_tag_plan", MODULE_PATH)
+MODULE = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = MODULE
+SPEC.loader.exec_module(MODULE)
+PlanBlocked = MODULE.PlanBlocked
+m3u_groups = MODULE.m3u_groups
+plan = MODULE.plan
 
 
 PLAYLIST = '#EXTM3U\n#EXTINF:-1 group-title="B",One\nhttp://invalid.test/1\n#EXTINF:-1 group-title="A",Two\nhttp://invalid.test/2\n'
