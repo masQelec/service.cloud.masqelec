@@ -94,3 +94,100 @@ def audit(playlist, tags_grid, channel_grid):
         "group_mismatch_samples": mismatches[:10],
         "apply_authorized": False,
     }
+
+
+# This matcher is deliberately separate from audit(): legacy G3-E callers keep
+# their original exact-name-only diagnostics.
+_ATTR_NUMBER = re.compile(r'(?:^|\\s)(tvh-chnum|tvg-chno)\\s*=\\s*"([^"]*)"')
+
+
+def _canonical_number(value):
+    """Normalize positive integer/decimal channel numbers, never float-round."""
+    if isinstance(value, bool) or value is None:
+        return None
+    token = str(value).strip()
+    if not re.fullmatch(r"[0-9]+(?:\\.[0-9]+)?", token):
+        return None
+    whole, separator, decimals = token.partition(".")
+    whole = str(int(whole))
+    decimals = decimals.rstrip("0")
+    return whole + ("." + decimals if separator and decimals else "")
+
+
+def audit_with_numbers(playlist, tags_grid, channel_grid):
+    """G3-F diagnostic: exact unique names, then unique (name, number).
+
+    Number is an instantaneous discriminator, never a durable channel ID.
+    A missing/different number leaves the item unresolved. No write authority.
+    """
+    base = audit(playlist, tags_grid, channel_grid)
+    if base["status"] in ("BLOCKED", "DEFERRED"):
+        return base
+
+    source = []
+    for line in playlist.splitlines():
+        if not line.startswith("#EXTINF"):
+            continue
+        header, _, name = line.partition(",")
+        group = _ATTR_GROUP.search(header)
+        tokens = {}
+        for key, value in _ATTR_NUMBER.findall(header):
+            if key in tokens and tokens[key] != value:
+                return {"status": "BLOCKED", "reason": "CONFLICTING_CHANNEL_NUMBER",
+                        "apply_authorized": False}
+            tokens[key] = value
+        a = _canonical_number(tokens.get("tvh-chnum"))
+        b = _canonical_number(tokens.get("tvg-chno"))
+        if a is not None and b is not None and a != b:
+            return {"status": "BLOCKED", "reason": "CONFLICTING_CHANNEL_NUMBER",
+                    "apply_authorized": False}
+        source.append((name.strip(), group.group(1).strip(), a or b))
+
+    channels = channel_grid["entries"]
+    source_counts = Counter(name for name, _, _ in source)
+    tvh_counts = Counter(ch["name"] for ch in channels)
+    unique_names = {name for name in source_counts
+                    if source_counts[name] == 1 and tvh_counts[name] == 1}
+
+    # Reject malformed/duplicate number tokens as matches, never substitute
+    # channel position or UUID for a missing public number.
+    src_keys = Counter((name, number) for name, _, number in source
+                       if name not in unique_names and number is not None)
+    tvh_keys = Counter((ch["name"], _canonical_number(ch.get("number")))
+                       for ch in channels if ch["name"] not in unique_names
+                       and _canonical_number(ch.get("number")) is not None)
+    by_key = {(ch["name"], _canonical_number(ch.get("number"))): ch
+              for ch in channels if ch["name"] not in unique_names
+              and _canonical_number(ch.get("number")) is not None}
+
+    names_by_uuid = {t["uuid"]: t["name"] for t in tags_grid["entries"]}
+    extra_matches = 0
+    extra_mismatches = []
+    for name, wanted_group, number in source:
+        if name in unique_names or number is None:
+            continue
+        key = (name, number)
+        if src_keys[key] != 1 or tvh_keys[key] != 1:
+            continue
+        channel = by_key[key]
+        groups = {names_by_uuid[uid] for uid in channel["tags"]}
+        extra_matches += 1
+        if groups != {wanted_group}:
+            extra_mismatches.append({
+                "channel_name": name, "expected": wanted_group,
+                "actual_groups": sorted(groups),
+            })
+
+    result = dict(base)
+    result["number_disambiguated_pairs"] = extra_matches
+    result["resolved_pairs"] = base["exact_unique_name_pairs"] + extra_matches
+    result["unresolved_m3u_channels"] = len(source) - result["resolved_pairs"]
+    result["group_mismatch_count"] = base["group_mismatch_count"] + len(extra_mismatches)
+    result["group_mismatch_samples"] = (base["group_mismatch_samples"] + extra_mismatches)[:10]
+    result["status"] = ("DIAGNOSTIC_ONLY" if result["unresolved_m3u_channels"] == 0
+                        else "INCONCLUSIVE")
+    result["reason"] = ("NAME_AND_NUMBER_NOT_TECHNICAL_IDENTITY"
+                        if not result["unresolved_m3u_channels"]
+                        else "UNRESOLVED_CHANNEL_IDENTITIES")
+    result["apply_authorized"] = False
+    return result
