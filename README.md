@@ -1,308 +1,165 @@
-# Cloud masQelec — servicio Kodi/KodiELEC
+# Cloud masQelec — mantenimiento automático de KodiELEC
 
-**Addon:** `service.cloud.masqelec` · **versión:** `2.3.2` · **rama de trabajo:** `develop` · Python 3 / Kodi.
+**Addon:** `service.cloud.masqelec` · **Versión:** 2.3.2 · **Kodi:** Python 3 · **Roles:** MASTER y CLIENT.
 
-**Estado a 20-11-2026:** migración 2 FUSE + 4 bind completada y verificada
-en MASTER y CLIENT piloto. La separación de las credenciales OneDrive de
-`rclone.conf` también está comprobada en ambos: configuración general
-Drive=2/OneDrive=0/Crypt=0; cada `isolated-mounts/account*.conf`
-OneDrive=1/Crypt=1. Reproducción correcta en las cuatro rutas de ambos
-equipos; reinicio CLIENT probado con la versión anterior 2.3.1.
-Regresión de 2.3.2 **1025/1025 OK** antes de limpiar;
-**957/957 OK** después de retirar los tests históricos (GitHub Actions
-[44807388207](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44807388207)).
+Este servicio mantiene los **montajes de medios**, la **base de datos de películas/series**, el **catálogo STRM**, **Tvheadend/PVR**, la **guía EPG** y la **actualización del sistema**. Se inicia con Kodi y repite tareas según su configuración. No es un reproductor multimedia: los archivos `.strm` apuntan a los archivos reales de OneDrive mediante los montajes rclone.
 
-**Limitación vigente:** la recuperación automática de un token OneDrive
-revocado realmente NO está validada. El MASTER publica MQC2 v2 y el CLIENT
-lo consulta solo bajo condiciones de fallo AUTH; no confundir ejecución de
-workers con prueba física de recuperación.
+Esta descripción corresponde al **código auditado a 20/11/2026**, no a una propuesta. Los ensayos históricos y los detalles de implementación se mantienen en [docs/](service.cloud.masqelec/docs/README.md).
 
-**Mantenimiento:** los laboratorios exploratorios previos a la migración
-se han reducido; las pruebas de rollback, arranque temprano, OAuth, seguridad
-y contrato de rutas se conservan. Consultar
-[estado de limpieza y criterios](service.cloud.masqelec/docs/REPO_CLEANUP_2026-11-20.md)
-antes de reusar procedimientos antiguos.
+## 1. Qué hace al arrancar
 
-## Arquitectura v2.3.2: rclone.conf general + dos cuentas OneDrive aisladas
+`service.py::run_service()` ejecuta las operaciones **en este orden**. Los *one-shots* se ejecutan secuencialmente, no a la vez; si falla una tarea, el servicio registra el error y continúa con las siguientes.
 
-La versión candidata 2.3.2 no cambia ninguna ruta de la biblioteca ni de
-`/storage/.mnt/cloud/{1,2}`. El FUSE 1 usa exclusivamente
-`/storage/.config/rclone/isolated-mounts/account1.conf`; el FUSE 2,
-`account2.conf`. Ambos pueden renovar sus propios tokens OAuth con rclone.
-
-Al recibir `ACTIVE_VERIFIED_LEGACY_RETIRED` o `ACTIVE_CLEAN_ALREADY`,
-el servicio verifica los seis montajes, el estado del diario y los archivos
-privados. Solo entonces elimina de `rclone.conf` las **dos secciones OneDrive y
-sus dos wrappers crypt** ya representadas por account1/2.conf. No reescribe
-account1/2.conf ni reinicia FUSE. Conserva las dos cuentas Google Drive y
-las secciones de uso general, como `masqelec` y `log`. Se rechazan identidades
-distintas, remotos OneDrive inesperados, archivos ajenos o permisos inseguros.
-La sustitución de `rclone.conf` es atómica con modo 0600 y fsync; ante error,
-se deja la configuración anterior sin continuar borrando.
-
-Las interfaces previas MQC2 v2 aún validan un snapshot canónico completo
-(2 Google Drive + 2 OneDrive). `rclone_two_mount_config_split.full_view()`
-lo reconstruye **solo en memoria** con las secciones generales y los tokens
-reales procedentes de los dos archivos aislados; nunca guarda esa vista en
-`rclone.conf`. MASTER publica únicamente en
-`rclone/rclone-v2.conf.crypt` tras checks de OAuth y readback de GitHub.
-CLIENT ante fallo AUTH explícito por cuenta valida ese MQC2, prueba el
-candidato y usa un journal privado 0700 para cambiar únicamente la cuenta
-afectada. No copia tokens constantemente del repositorio ni de un
-`rclone.conf` desactualizado. El directorio compartido
-`/storage/.config/masqelec` puede ser root-owned 0755; los subdirectorios
-privados y archivos de credenciales mantienen 0700/0600.
-
-**Validación física realizada en 2.3.2:** MASTER y CLIENT piloto confirmados
-con `rclone.conf` sin OneDrive y reproducciones en los cuatro bind.
-La CI debe volver a pasar después de cualquier limpieza del repositorio.
-No divulgar los contenidos de los tres archivos ni tokens en logs.
-
-## Validación KodiELEC real — 19/11/2026 (laboratorio aislado)
-
-**Resultado comunicado por el operador:** `LAB_RESULT=PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL`, `CLEANUP=COMPLETE`.
-
-- Dos montajes rclone FUSE contra fixtures **locales** (sin OneDrive real) y cuatro bind mounts gestionados por seis unidades systemd temporales.
-- El script comprueba el árbol de montajes mediante `/proc/self/mountinfo` y lee los archivos de prueba en los cuatro destinos bind antes de devolver PASS.
-- Marcadores del ensayo: `ONEDRIVE_ACCESSED=NO`, `LIVE_RCLONE_CONFIG_READ=NO`, `KODI_MOUNT_PATHS_CHANGED=NO`, `LEGACY_SERVICE_START_STOP=NO`, `LEGACY_UNIT_FILES_CHANGED=NO`, `PERMANENT_UNITS_ENABLED=NO`.
-- La limpieza terminó correctamente. Se había observado antes un `EXECSTARTPRE_FAILURE` en `BIND_VIDEOS_1`, pero no se pudo demostrar su causa; el ensayo posterior pasó sin cambiar la lógica de montaje.
-- **Alcance limitado:** no certifica OAuth, remotos OneDrive reales, recuperación tras reinicio/corte, comportamiento bajo carga, configuración MASTER/CLIENT ni migración productiva.
-- **Despliegue NO autorizado**: `main` y `cloud.masqelec` permanecen fuera de este ensayo. La publicación en el repositorio de addons sigue siendo responsabilidad del operador.
-
-**Gate integrado antes de release:** [Auditoría y bloqueos de migración v2 (19/11/2026)](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md). El laboratorio aislado pasó; faltan recuperación OAuth CLIENTE v2 y validación física de cutover/rollback/reboot. No publicar ni activar flags todavía.
-
-**Estado CLIENTE v2 (19/11/2026):** última suite confirmada por el operador **911/911 OK** antes de los cambios más recientes. KodiELEC pasó los ensayos físicos aislados de ciclo de cuenta y rollback de credenciales *ficticias* (`PASS_REAL_SYSTEMD_ONE_ACCOUNT_RESTART_ISOLATED`, `PASS_REAL_SYSTEMD_FAKE_OAUTH_ROLLBACK_ISOLATED`). La lógica AUTH por cuenta → MQC2 v2 → sonda privada con token renovado → transacción/journal → recuperación en arranque está ahora conectada al worker y al runner temprano **solo detrás de banderas desactivadas**. Estas nuevas pruebas todavía no han sido ejecutadas por el operador. **NO PUBLICAR** hasta validar reinicio/interrupción real, OAuth/OneDrive real y publicación MASTER v2. [Gate completo](service.cloud.masqelec/docs/INTEGRATION_RELEASE_GATE_2026-11-19.md).
-
-## ¿Qué es?
-
-Addon de servicio para la distribución masQelec basada en Kodi/KodiELEC. Coordina al arrancar la configuración cifrada de rclone, los servicios de montajes, las actualizaciones del sistema, la biblioteca de Kodi, el catálogo, los procesos PVR/Tvheadend y tareas de mantenimiento. Dispone de roles **MASTER** y **CLIENT**, detectados localmente (código en `lib/device_utils.py`), y utiliza un repositorio de configuración separado: **[masQelec/cloud.masqelec](https://github.com/masQelec/cloud.masqelec)**.
-
-La versión de trabajo puede *preparar*, **sin activar**, una futura reducción de **cuatro procesos `rclone mount` a dos** manteniendo las mismas cuatro rutas de Kodi y preservando el cifrado `crypt` (contenido cifrado, nombres de archivos sin cifrar).
-
-## Estado en una tabla
-
-| Área | Estado real | Observación |
+| Orden | Función / módulo | Actuación real |
 | --- | --- | --- |
-| Servicio Kodi, biblioteca, PVR y actualización del sistema | Código existente | No equivale a una certificación de despliegue de OAuth v2. |
-| Montajes actuales | **LEGACY: 4 procesos rclone / 4 FUSE** | Las unidades vigentes están en `cloud.masqelec/develop/system.d/`. |
-| Configuración compartida | `/storage/.config/rclone/rclone.conf` | 2 remotos OneDrive + 2 Google Drive + 2 wrappers `crypt`. |
-| Detección de procesos que escriben el mismo conf | **Lab real PASS** | Bloquea recuperación del fichero si hay montajes activos. |
-| Aislamiento `crypt → OneDrive` | **Lab real PASS** | 4 configs propuestas, 2 cuentas coherentes. |
-| Diseño 2 FUSE + 4 bind | **Plan y lab sin despliegue PASS** | Rutas de Kodi sin cambios; servicios nuevos no instalados. |
-| Reconciliación OAuth v2 | **Política y lab sin escritura PASS** | No hay coordinador productivo conectado. |
-| Verificador OAuth y publicación GitHub por SHA | **Código de laboratorio, pruebas unitarias OK** | No se han validado aún sobre la instalación real en su conjunto. |
-| Compatibilidad con CLIENTES antiguos | **Preservada por diseño** | El backup MQC2 canónico seguirá siendo el formato objetivo. |
-| Actualización/autodespliegue de la nueva arquitectura | **Prohibidos** | Manifiesto `stage_only`, activación individual pendiente. |
+| 1 | `cloud_storage.start_cloud_storage()` | Si está en modo v2 activo, **no descarga ni reinstala** los rclone/systemd legacy. En modos antiguos puede actualizar su configuración y unidades. |
+| 2 | `rclone_two_mount_autostart.tick()` | Verifica el estado 2 FUSE + 4 bind, repara montajes v2 cuando procede y completa la retirada legacy. Tras confirmar v2, elimina OneDrive duplicado de `rclone.conf`. |
+| 3 | `fix_settings.fix_skin_home_menu_visibility_and_reload()` | Desactiva determinados ajustes de menú del skin; recarga el skin solo si hubo cambios y está inactivo. |
+| 4 | `updater.update_system()` | Si `auto_update` está activado y Kodi lleva al menos 300 s inactivo, compara `VERSION_ID` local/remota y prepara una actualización si existe. |
+| 5 | `update_library.update_library()` | Si está permitido al arranque, valida `MyVideos*.db` y sus rutas/scrapers. Solo descarga y sustituye la base de datos si falta o no cumple; puede reiniciar Kodi tras la reparación. |
+| 6 | `update_pvr.update_pvr()` | Comprueba autenticación de Tvheadend, `tv_grab_file`, User-Agent, fuentes EPG, recarga de EPG y estado final de `pvr.hts`. |
+| 7 | `_startup_maintenance_wrapper()` | Con red y montajes disponibles: actualiza playlist, sincroniza catálogo CLIENT, ejecuta CleanLibrary cuando corresponde y genera/publica catálogo MASTER. **No ejecuta VideoLibrary.Scan de arranque** en el flujo actual. |
+| 8 | Diagnóstico | Registra estadísticas de biblioteca, addons instalados relevantes y trata de subir el log al remoto `log:`. |
 
-### Barreras de seguridad vigentes
+**Diferencia importante:** `update_library()` **no equivale** a `VideoLibrary.Scan`. La primera verifica/repara `MyVideos*.db`; el segundo escanea fuentes para actualizar el inventario de vídeo en Kodi.
 
-```python
-# service.cloud.masqelec/lib/constants.py (develop)
-RCLONE_TOKEN_SYNC_ENABLED = False
-RCLONE_TWO_MOUNT_FEATURE_ALLOWED = False
+En la fase 7 se comprueba red y estructura de montajes antes de sincronizar o limpiar. Las fases 4, 5 y 6 tienen **sus propias condiciones** y no heredan automáticamente esa barrera.
+
+## 2. Mantenimientos periódicos
+
+Tras el arranque se crean seis workers. Su *tick* de planificación es de 60 segundos salvo el trabajador OAuth adicional, programado cada hora.
+
+| Mantenimiento | Cadencia por defecto | Condiciones y resultado |
+| --- | --- | --- |
+| Playlist PVR (`update_playlist`) | 12 h | Ajustes PVR activos, red, Kodi inactivo y sin cooldown. Compara playlist y consistencia TV DB; puede efectuar un soft reset del stack PVR. |
+| Escaneo/sync biblioteca | 6 h | Ajustes activos, red, Kodi inactivo, montajes correctos y lock libre. MASTER escanea y después regenera/publica STRM. CLIENT sincroniza catálogo y solo escanea si hay cambios o desajuste DB↔FS. |
+| Limpieza biblioteca | 12 h | Misma barrera de red/inactividad/montajes y lock. MASTER invoca `VideoLibrary.Clean`; CLIENT limpia según actualizaciones o entradas sobrantes y puede realizar un escaneo posterior. |
+| Control montajes v2 | 60 s | Examina estado de migración y salud del árbol 2 FUSE + 4 bind; aplica mantenimiento/reparación autorizada, sin recrear cuatro FUSE legacy. |
+| OAuth MASTER/CLIENT | 3600 s | Solo si el rol, estado v2 y flags permiten la operación. MASTER verifica/publica MQC2; CLIENT comprueba autorización OAuth y plantea recuperación por cuenta. |
+| `rclone_token_sync.tick()` | 60 s | **Actualmente no opera** con `RCLONE_TOKEN_SYNC_ENABLED=False`. Es la ruta de sincronización heredada/alternativa, no un segundo recuperador activo. |
+
+`0` horas en los intervalos configurables desactiva esa periodicidad. Los tiempos son aproximados: el worker despierta cada minuto y pospone tareas si faltan condiciones; no es un cron rígido. Los contadores de PVR, escaneo y limpieza se reinician con el proceso.
+
+Los tres mantenimientos PVR / escaneo / limpieza tienen un circuito de espera de **1 hora tras tres excepciones consecutivas**; `cloud_storage`, catálogo y updater también cuentan con protecciones propias. Estas barreras no equivalen a supervisión externa del resultado.
+
+## 3. Biblioteca de vídeo y catálogo STRM
+
+### MASTER
+
+`lib/core_catalog.py::generate_catalog()` consulta las películas y episodios existentes en la biblioteca Kodi, genera `.strm` en un **staging**, calcula hash/versión y verifica el contenido antes de aplicarlo a las rutas locales `/storage/videos/` y `/storage/tvshows/`.
+
+- El nuevo catálogo no se aplica mientras se está generando. La fase de aplicación dispone de respaldo persistente para rollback.
+- Si el catálogo queda vacío o es inválido se bloquea; no se interpreta como una orden para borrar toda la biblioteca.
+- Cuando cambia, genera `/storage/.catalog/catalog.zip` y `catalog.version`. `catalog_utils.load_catalog_github()` valida ZIP y manifiesto, publica **ZIP primero, versión después**. Si falla, conserva ZIP para el próximo intento; si no hay cambios, no vuelve a subirlo.
+- Las rutas multimedia de los STRM remiten a los montajes v2 existentes. El proceso no mueve el contenido de OneDrive.
+
+### CLIENT
+
+`sync_catalog_https()` compara `catalog.version` con la versión local, descarga `catalog.zip` cuando procede, valida los miembros y aplica altas/cambios y eliminaciones bajo las comprobaciones de seguridad del catálogo.
+
+- Después contrasta la existencia de los STRM locales con las entradas de la base de datos Kodi.
+- Si hay elementos nuevos o faltantes: puede iniciar `VideoLibrary.Scan`.
+- Si hay entradas sobrantes: puede iniciar `VideoLibrary.Clean` y, según la ruta de mantenimiento, un escaneo posterior.
+- Si no hubo cambios y DB↔FS coincide, omite operaciones innecesarias.
+
+**La biblioteca STRM se almacena internamente.** Una interrupción del FUSE puede impedir reproducir un vídeo, pero no implica borrar los STRM. Para evitar que un FUSE ausente se interprete como material eliminado, las tareas periódicas exigen que se mantenga la estructura de montajes y que Kodi no esté reproduciendo.
+
+## 4. PVR, IPTV y guía EPG
+
+`lib/update_pvr.py` contiene dos procedimientos distintos:
+
+**`update_pvr()` (arranque):** comprueba credenciales HTTP de Tvheadend, actualiza el script `tv_grab_file` si procede, asegura User-Agent, repara asociaciones EPG, solicita nueva carga interna y comprueba que el servicio y `pvr.hts` estén operativos. Puede reactivar Tvheadend o `pvr.hts` si no están listos.
+
+**`update_playlist()` (arranque y periódico):** descarga la plantilla `pvr/playlist.m3u` desde `cloud.masqelec/develop`; usa `USER_CODE`/`PASS_CODE` del fichero privado `/storage/.user/user`. Si falta ese fichero, intenta recuperarlo del remoto `masqelec:` correspondiente al dispositivo.
+
+Si cambió la lista o se detecta inconsistencia entre playlist y TV DB, el procedimiento puede deshabilitar temporalmente `pvr.hts`, reconciliar canales/grupos en la base de datos, depurar canales del bouquet en Tvheadend, sincronizar etiquetas, reiniciar Tvheadend y reactivar PVR. Tiene fases de recuperación si PVR no vuelve a READY. Si no hay diferencias, no efectúa el soft reset.
+
+**Precaución:** una actualización de playlist puede interrumpir TV en directo durante el soft reset. Hay una barrera de inactividad para la ejecución periódica, pero el procedimiento de arranque no tiene la misma comprobación. No usar manualmente este flujo mientras se graba o visualiza televisión sin estudiar su impacto.
+
+## 5. Actualización del sistema KodiELEC
+
+`lib/updater.py::update_system()` obtiene `VERSION_ID` y `COREELEC_DEVICE` desde `/etc/os-release`, consulta `masqelec:masqelec/update/<DEVICE>/os-release` y compara versiones numéricas.
+
+Solo si la remota es **superior** descarga el paquete a staging y lo coloca en `/storage/.update`. Presenta al usuario la opción de reiniciar para actualizar o posponer al siguiente reinicio. No instala una versión inferior por ese flujo. La comprobación automática de arranque requiere `auto_update=true` y 300 segundos de inactividad.
+
+Esta función actualiza **el sistema**; las versiones del addon se distribuyen separadamente mediante el repositorio de addons de Kodi.
+
+## 6. Almacenamiento rclone y recuperación
+
+Arquitectura activa, validada en MASTER y CLIENT piloto:
+
+| Proceso | Montaje raíz | Bind de series | Bind de películas |
+| --- | --- | --- | --- |
+| OneDrive 1 | `/storage/.mnt/cloud/1` | `/storage/.mnt/tvshows/1` | `/storage/.mnt/videos/1` |
+| OneDrive 2 | `/storage/.mnt/cloud/2` | `/storage/.mnt/tvshows/2` | `/storage/.mnt/videos/2` |
+
+Solo hay **dos FUSE**; los cuatro bind reutilizan los mismos dispositivos de montaje del kernel. `rclone.conf` mantiene las dos conexiones Google Drive y remotos generales. OneDrive 1 y 2 usan respectivamente `/storage/.config/rclone/isolated-mounts/account1.conf` y `account2.conf`; cada uno contiene su `crypt` y credencial OAuth, con permisos privados.
+
+El proceso de mantenimiento comprueba la topología en `/proc/self/mountinfo` **sin listar OneDrive**. Que un FUSE figure montado acredita su presencia en el kernel, **no** que Microsoft o la red respondan correctamente.
+
+**OAuth v2:** MASTER reconstruye en memoria un canónico a partir de las configuraciones aisladas y la general; publica un MQC2 cifrado en `rclone/rclone-v2.conf.crypt` tras comprobaciones. CLIENT recupera únicamente la cuenta afectada ante un fallo AUTH identificado, verificando configuración, candidato, estado de reproducción y transacción de rollback. Los archivos STRM y la otra cuenta no forman parte de esa sustitución.
+
+El ejecutor systemd de recuperación temprana intenta resolver transacciones interrumpidas antes del arranque completo de Kodi. Si hay un journal inconsistente debe bloquear acciones peligrosas y exigir revisión.
+
+**Limitación conocida:** el comportamiento de OAuth ante una revocación real no se ha validado físicamente. Las sondas rclone pueden renovar tokens sobre copias temporales: se implementó una protección contra publicación de generaciones anteriores, pero sigue pendiente coordinar esa renovación con el escritor FUSE. Véase [incidencia OAuth #2](https://github.com/masQelec/service.cloud.masqelec/issues/2).
+
+## 7. Ajustes disponibles en Kodi
+
+En `resources/settings.xml`:
+
+| Ajuste | Valor inicial | Efecto |
+| --- | --- | --- |
+| `auto_update` | Sí | Comprobar actualización del sistema al arrancar |
+| `update_library` | Sí | Permiso general para mantenimiento de biblioteca |
+| `lib_update_on_start` | Sí | Verificar/reparar MyVideos al iniciar |
+| `lib_update_period_hours` | 6 | Intervalo de escaneo y sincronización de catálogo |
+| `lib_clean_enabled` | Sí | Permitir CleanLibrary |
+| `lib_clean_period_hours` | 12 | Intervalo de limpieza |
+| `update_pvr` | Sí | Permitir el mantenimiento PVR de arranque y playlist de arranque |
+| `pvr_update_enabled` | Sí | Permitir actualización periódica de playlist |
+| `pvr_update_period_hours` | 12 | Intervalo de playlist PVR |
+| `pvr_disable_conflicts` / `pvr_disable_conflict_services` | Sí | Preferencias de conflictos PVR; verificar su aplicación antes de asumir que actúan siempre |
+| `activar_log` / `ver_log` | Sí / acción | Archivo de registro y consulta desde Kodi |
+
+Los flags internos de migración y OAuth viven en `lib/constants.py`; **no** son ajustes normales para cambiar desde la interfaz. Algunos comportamientos siguen utilizando `cloud.masqelec/develop` aunque el código esté fusionado en `main`.
+
+## 8. Diagnóstico y operación
+
+Para revisar los seis montajes sin acceder a contenidos ni credenciales:
+
+```sh
+grep -E ' /storage/\.mnt/(cloud|tvshows|videos)/[12] ' /proc/self/mountinfo
+systemctl is-active \
+  rclone_library_1.service rclone_library_2.service \
+  masqelec_bind_tvshows_1.service masqelec_bind_tvshows_2.service \
+  masqelec_bind_videos_1.service masqelec_bind_videos_2.service
 ```
 
-**No habilitar esas banderas por haber superado 228 pruebas.** La opción `--real-probe` está ahora **bloqueada incluso sin montajes locales**, porque no se puede demostrar que otros CLIENTES estén inactivos. No habilitarla sin coordinación de flota y pruebas específicas.
+El log del addon reside en el perfil Kodi de `service.cloud.masqelec` (archivo `service.log`). En el arranque se sobrescribe al primer registro; el addon intenta subirlo al remoto `log:` al finalizar los one-shots. No compartir tokens, ficheros `rclone.conf`, `account*.conf`, ficheros `/storage/.user/user` o logs completos sin revisar los datos privados.
 
-## Estructura
+Para ejecutar la regresión en Ubuntu:
 
-```text
-README.md                         # esta página
-service.cloud.masqelec/
-├── addon.xml                     # addon Kodi, versión 2.3.1
-├── service.py                    # secuencia de arranque y workers periódicos
-├── resources/settings.xml        # ajustes de usuario
-├── lib/
-│   ├── cloud_storage.py          # MQC2 inicial y unidades systemd LEGACY
-│   ├── device_utils.py           # rol MASTER / CLIENT
-│   ├── updater.py                # actualización del SISTEMA por rclone
-│   ├── update_library.py         # BD MyVideos, cachés y flujo de biblioteca
-│   ├── update_pvr.py             # PVR/Tvheadend/playlist
-│   ├── core_catalog.py           # catálogo .strm, publicación y sincronización
-│   ├── rclone_token_*.py         # política y worker OAuth legacy (desactivado)
-│   ├── rclone_mount_isolation.py  # dependencias crypt -> OneDrive
-│   ├── rclone_two_mount_*.py     # propuesta 2 FUSE, estado, OAuth, salud, CAS
-│   └── ...                       # red, cifrado, logging y fiabilidad
-├── tools/                        # laboratorios controlados; ver OPERATIONS
-├── tests/                        # suite unittest sin Kodi real
-└── docs/                         # documentación y handoff
+```sh
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q
 ```
 
-**Atención:** `auto_update` de `resources/settings.xml` invoca `updater.update_system()`, que gestiona **paquetes del sistema** desde rclone y `/storage/.update`; **no implementa un despliegue automático del código del addon ni del nuevo esquema FUSE a todos los CLIENTES**.
+CI: [GitHub Actions](https://github.com/masQelec/service.cloud.masqelec/actions). El resultado de laboratorio no reemplaza una prueba física de reproducción, PVR o recuperación OAuth.
 
-## Modos de trabajo y ramas
+## 9. Limitaciones detectadas en la auditoría
 
-| Ámbito | Uso |
-| --- | --- |
-| `service.cloud.masqelec/develop` | Desarrollo, pruebas, documentación y laboratorios. **Rama activa de este proyecto.** |
-| `service.cloud.masqelec/main` | Rama estable del addon: no modificar sin autorización de release. |
-| `cloud.masqelec/develop` | Datos y unidades de desarrollo; contiene el manifiesto **no operativo** del piloto en `rollouts/`. |
-| `cloud.masqelec/master` | Configuración estable: no modificar en estos trabajos. |
-| Rol MASTER / CLIENT | Afecta a catálogo y reconciliación. **No confundir rol** con `main`/`master` de Git. |
-| LEGACY / `prepared` / `active` / `unsafe` | Estados por dispositivo, definidos en `rclone_two_mount_rollout.py`. Solo LEGACY está autorizado ahora. |
+Estas limitaciones están **en seguimiento** y no se deben confundir con errores de montajes observados:
 
-**Regla:** primero código en `develop` + pruebas de Ubuntu; después laboratorios de **solo lectura** en KodiELEC; ninguna prueba crea por sí sola permiso de despliegue. No actualizar `cloud/develop/system.d/` con las unidades v2: el arranque legacy puede ejecutar `systemctl try-restart` de las unidades que cambien.
+1. `VideoLibrary.Scan` y `VideoLibrary.Clean` pueden devolver `False` por timeout o porque Kodi no confirmó el inicio; algunos llamadores ignoran ese resultado y aun así actualizan el tiempo de última ejecución.
+2. `update_playlist()` retorna `(ok, did_something)`, pero varios llamadores no inspeccionan `ok`; el circuito de fallos periódico registra éxito si no hubo excepción.
+3. `update_pvr()` y la actualización de playlist del arranque no comparten todas las barreras de inactividad usadas por los workers periódicos.
+4. La comprobación del montaje basada en `mountinfo` no acredita por sí misma una lectura remota sana.
+5. Coordinación definitiva de generaciones OAuth y separación `cloud/main` / `cloud/develop` pendientes.
 
-## Flujo de arranque (existente)
+No se ha modificado el comportamiento de estas operaciones durante la reescritura documental. Las correcciones deben incorporar tests y conservar los requisitos de seguridad de biblioteca, PVR y OAuth.
 
-1. Kodi inicia `service.py` y detecta rol, versión, red y ZeroTier.
-2. `start_cloud_storage()` obtiene la reserva MQC2, comprueba identidad de remotos, protege tokens locales compatibles y gestiona las unidades legacy. **Este flujo puede cambiar archivos o reiniciar servicios antiguos en circunstancias determinadas: no es un laboratorio.**
-3. Ejecuciones secuenciales: correcciones de ajustes, actualización de **sistema** si corresponde, BD/biblioteca, PVR y mantenimiento de arranque.
-4. Workers periódicos: PVR, actualización/limpieza de biblioteca y tick OAuth. El tick OAuth está **sin efecto** mientras la bandera esté desactivada.
+## Documentación técnica e historial
 
-La salud de los montajes legacy exige 4 `fuse.rclone`. El modo v2 añade la comprobación por `/proc/self/mountinfo` de **2 FUSE raíz + 4 bind**, pero no se activa.
-
-## Desarrollar y validar
-
-En Ubuntu, tras sincronizar `develop`:
-
-```bash
-cd ~/GitHub/service.cloud.masqelec
-git switch develop
-git pull --ff-only origin develop
-python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'
-```
-
-**Referencia confirmada por el operador:** `Ran 228 tests ... OK` (17-11-2026). Este número es un control histórico, no una garantía de que futuras versiones conserven exactamente 228.
-
-**Prueba siguiente recomendada en KodiELEC (sin OAuth real):**
-
-```bash
-wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/c701e74e5a677e3d300094f9ea112eb830749c3f/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' \
-  -O /tmp/rclone_two_mount_real_probe_lab.py
-python3 -m py_compile /tmp/rclone_two_mount_real_probe_lab.py
-python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
-```
-
-Este `--preflight` descarga y valida el respaldo MQC2 publicado: **lectura, no escritura**; no ejecuta consultas OAuth. Si falla por divergencia local/GitHub, conservar ambos estados y analizar; no sobrescribir tokens. **No ejecutar `--real-probe` con montajes activos**.
-
-## Referencia operativa KodiELEC / CoreELEC
-
-**Leer antes de modificar rutas, unidades systemd o journal:** [Sistema de archivos, rutas y compatibilidad TX3/X96 X4](service.cloud.masqelec/docs/KODIELEC_COREELEC_FILESYSTEM_AND_PATHS.md). Incluye evidencia real del MASTER, diferencias con Ubuntu, inventario de rutas confirmadas/propuestas, y discrepancias del preflight todavía pendientes. No equiparar `/etc/systemd/system` con el directorio persistente de KodiELEC `/storage/.config/system.d`.
-
-## Documentación
-
-La documentación mantenida está en [**docs/README.md**](service.cloud.masqelec/docs/README.md):
-
-- [Arquitectura y modos](service.cloud.masqelec/docs/ARCHITECTURE_AND_MODES.md)
+- [Arquitectura y roles](service.cloud.masqelec/docs/ARCHITECTURE_AND_MODES.md)
 - [Operaciones y pruebas](service.cloud.masqelec/docs/OPERATIONS_AND_TESTING.md)
-- [Seguridad y auditoría](service.cloud.masqelec/docs/SECURITY_AUDIT.md)
-- [CLIENTES: distribución, compatibilidad y migración](service.cloud.masqelec/docs/CLIENT_ROLLOUT.md)
-- [Progreso, decisiones y trabajo pendiente](service.cloud.masqelec/docs/ROADMAP_AND_PROGRESS.md)
-- [**Handoff para otro chat — 17-11-2026**](service.cloud.masqelec/docs/HANDOFF_2026-11-17.md)
-- [Documentos históricos de los laboratorios](service.cloud.masqelec/docs/README.md#historial-de-laboratorios)
-
-## Reglas de contribución y seguridad
-
-- Un solo objetivo: **consolidar `develop`**; no abrir ramas innecesarias, no fusionar a `main` sin aprobación.
-- Nunca pegar `rclone.conf`, `token`, `refresh_token`, contraseñas `crypt`, `authorized_keys` o claves MQC2 en GitHub Issues, README, logs o chats.
-- Las copias de pruebas con credenciales deben estar en `/tmp` privado (directorio `0700`, archivos `0600`) y eliminarse al terminar.
-- No interpretar `LAB_RESULT=PASS` como autorización de release. Registrar commit, comando, entorno, salida, alcance y **lo que NO se probó**.
-- El refresco de token en una **copia** puede tener efectos en Microsoft; evitar comprobaciones reales con escritor(es) activo(s).
-- El protocolo de publicación OAuth no puede usar reintentos 409/422 con un SHA nuevo; requiere comprobación estricta de concurrencia y confirmación posterior.
-- Cualquier operación de transición de montajes requiere plan de rollback por dispositivo y ventana sin reproducción.
-
-**Estado de release a 17-11-2026: `NO DEPLOY`; `NO LIVE UNIT CHANGE`; `NO GITHUB CREDENTIAL UPLOAD`.**
-
-### Endurecimiento posterior al corte documental (17-11-2026)
-
-En `develop` se incorporaron cinco pruebas nuevas y dos barreras: `--real-probe` falla con `BLOCKED_FLEET_COORDINATION` aunque no existan montajes rclone locales; `--preflight` lee el MQC2 desde el commit GitHub fijado y comprueba también `GH_BRANCH_COMMIT_STABLE=YES` para detectar cambios del HEAD remoto. Commits: `17cb2901`, `41b9f033`, `c701e74e`, `75cb8b48`. **La suite ampliada quedó validada en GitHub Actions: 233/233 OK** sobre el commit `70543894` (run `44188131468`). Los 228/228 corresponden al corte anterior comunicado por el operador. El preflight en KodiELEC sigue **PENDIENTE**.
-
-
-**CI registrado (17-11-2026):** workflow `develop unit tests (no deployment)` con `permissions: contents: read`, checkout sin credenciales persistentes y Python 3.11. Run: https://github.com/masQelec/service.cloud.masqelec/actions/runs/44188131468; `Ran 233 tests in 0.359s / OK`. Esto **no** verifica ejecución en KodiELEC, dispositivos remotos, publicación GitHub MQC2 ni migración real. `main`, `cloud/master`, `cloud/develop/system.d` y montajes no se han modificado.
-
-### Discrepancia real OAuth detectada (17-11-2026)
-
-El preflight KodiELEC confirmó SHA GitHub, autenticación MQC2 e identidad estática, pero devolvió **BLOCKED_BASELINE_DIVERGED**. Una o más de las cuatro cuentas OAuth presentan refresh diferentes; no es prueba de caducidad. La rama `develop` incorpora un informe por proveedor/cuenta sin secretos, sin modificar las fuentes. Pruebas GitHub Actions **239/239 OK** (commit `07b008d`); falta repetir el preflight de diagnóstico en KodiELEC. Ver [informe de incidencia](service.cloud.masqelec/docs/PREFLIGHT_BASELINE_DIVERGENCE_2026-11-17.md).
-
-### P0-B/P0-D: ventanas de generación y readback (17-11-2026)
-
-La suite ampliada quedó en **271/271 OK**, GitHub Actions [run 44194785936](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44194785936). Se incorporaron un control puro de generaciones/ABA, que sin contadores compartidos con rclone bloquea, y un verificador puro de readback MQC2/GitHub por SHA/commit. Ninguno está conectado a producción, y **P0-C (coordinación interdispositivo) permanece pendiente**. Véase [informe P0-B/P0-D](service.cloud.masqelec/docs/OAUTH_GENERATIONS_CAS_LAB_2026-11-17.md).
-
-### Coordinación OAuth P0-C (laboratorio)
-
-Modelados inventario global, exclusión de legacy/offline/desconocidos, confirmaciones por dispositivo, epochs y coherencia conjunta de las dos OneDrive con la fuente MQC2 (sin publicación). **CI 322/322 OK**. Sin coordinador real o integración con rclone, ninguna prueba demuestra exclusión operativa. Microsoft no invalida automáticamente los refresh antiguos al renovarlos: la divergencia no prueba revocación. [Documento técnico P0-C](service.cloud.masqelec/docs/OAUTH_FLEET_COORDINATION_P0C_2026-11-17.md).
-
-### Actualización del addon y migración local (corrección de arquitectura)
-
-Los CLIENTES reciben actualizaciones del addon y arrancan con el código nuevo. MASTER publica catálogo; CLIENTES reproducen mediante rutas `.strm` idénticas. La versión definitiva preparará en cada dispositivo 2 FUSE + 4 bind a partir de sus credenciales locales, sin coordinador central ni lecturas de directorios para poblar la biblioteca. Nuevo modelo de decisión de arranque y 15 tests; GitHub Actions **352/352 PASS**. **Sin activación**. [Procedimiento](service.cloud.masqelec/docs/ADDON_STARTUP_ROLLOUT_2026-11-17.md).
-
-### Preparación privada al iniciar el addon (18-11-2026)
-
-La fase 1 del addon tiene un hook **desactivado** para preparar localmente dos `account*.conf`, dos propuestas FUSE, cuatro bind y un manifiesto sin secretos. No instala unidades ni requiere inspeccionar los directorios de OneDrive. El token de origen es el `rclone.conf` local, no una restauración forzada del MQC2. **371/371 PASS** en GitHub Actions; staging real de KodiELEC **NOT RUN**. [Diseño y resultados](service.cloud.masqelec/docs/ADDON_STARTUP_ROLLOUT_2026-11-17.md).
-
-### Laboratorio aislado 2 FUSE + 4 bind (18-11-2026)
-
-Disponible el preflight independiente y un piloto opcional con dos fuentes **locales ficticias**: no toca OneDrive, `.strm` ni montajes Kodi. Pruebas sintéticas **401/401 PASS** en CI; la ejecución física en KodiELEC sigue **NOT RUN**. [Instrucciones detalladas](service.cloud.masqelec/docs/TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md).
-
-### Preflight KodiELEC — bloqueo explicado (18-11-2026)
-
-El preflight real halló `RCLONE_MOUNT_FLAGS=NO` con FUSE y herramientas de montaje disponibles. Se corrigió el falso negativo posible por buscar `--config` (global) en `rclone mount --help` y un bug de detección FUSE del script standalone. **406/406 tests PASS en CI**, segundo preflight real pendiente. [Protocolo corregido](service.cloud.masqelec/docs/TWO_FUSE_FOUR_BIND_LOCAL_LAB_2026-11-18.md).
-
-### Arranque seguro y rollback OAuth (18-11-2026)
-
-Generadas unidades bind que esperan de forma acotada al montaje FUSE de `Type=simple` y una función pura para reintroducir en el canónico los tokens OneDrive renovados por dos montajes aislados, sin tocar Google Drive. **424/424 tests CI PASS**. No hay migración automática ni instalación. [Pendientes y controles](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
-
-### Preflight real de transición 4→2 (18-11-2026)
-
-Disponible verificación standalone de configuración, cuatro servicios legacy/mountinfo y ausencia de unidades v2; **solo lectura**. Suite 440/440 OK. El diagnóstico del MASTER debe preceder a cualquier corte. [Comando y gates](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
-
-### Transición transaccional v2 — 18/11/2026
-
-El MASTER ha pasado el preflight **real de solo lectura**. Preparados motor de transición/rollback con inyección de fallos, gate Kodi inactivo, journal privado y escritura exclusiva. **507/507 tests CI OK**. Aún falta el adaptador systemd y probar cutover/reinicio reales; flags apagados. [Procedimiento](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
-
-### Adaptador local desactivado, sin cambios de producción (18/11/2026)
-
-Prototipo para ejecutar transición y rollback con journal, Kodi idle, dos FUSE y cuatro bind; pruebas **530/530 OK**. El MASTER sigue con los cuatro montajes legacy. Pendiente recuperación tras reboot y coordinación de escritura OAuth. [Protocolo](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
-
-### 18/11/2026 — guardas de arranque y protección OAuth
-
-La migración v2 continúa sin desplegar. El addon bloquea actualizaciones legacy y escaneos si detecta una transacción v2 interrumpida; la reversión conserva tokens nuevos en journal privado **sin sobrescribir el canónico compartido**. 552/552 pruebas OK. La recuperación automática con tokens rotados y un reinicio real siguen pendientes. [Detalles](service.cloud.masqelec/docs/TWO_FUSE_TRANSITION_ROLLBACK_2026-11-18.md).
-
-### 18/11/2026 — motor de recuperación y tokens aislados
-
-Versión `develop` con **588/588 tests PASS**. El rollback puede volver a los cuatro montajes con refresh OneDrive renovado usando configuración privada y drop-ins systemd, sin sobrescribir el canónico de Google Drive. Disponible recuperación explícita desde journal tras interrupción. Sin deploy, sin prueba de crypt real y con flags apagados. [Handoff actualizado](service.cloud.masqelec/docs/HANDOFF_2026-11-18_CRASH_RECOVERY.md).
-
-### KodiELEC: laboratorio systemd real, aislado (18-11-2026)
-
-Preparado script para comprobar **2 FUSE + 4 bind gestionados por systemd** sin OneDrive y sin cambiar los 4 montajes legacy. Preflight solo lectura y ejecución temporal bajo `/tmp` con unidades runtime aleatorias. **617/617 pruebas sintéticas OK**; ensayo real pendiente del usuario. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
-
-### Primer ensayo real de systemd: diagnóstico pendiente (18-11-2026)
-
-KodiELEC: preflight READY; piloto `FAIL_SERVICE_START` con `CLEANUP=COMPLETE`. Preparado diagnóstico de unidad fallida, 622/622 tests CI OK; aún **no** existe PASS systemd real. [Runbook y siguiente comando](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
-
-### Fix KodiELEC systemd: `/bin/test` ausente (18/11/2026)
-
-Causa real del fallo de `BIND_VIDEOS_1`: KodiELEC no tiene `/bin/test`. Ambas generaciones de bind (laboratorio y unidades candidatas) usan ahora el builtin `[ -d ... ]`. **624/624 CI OK**; reensayo real pendiente. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
-
-### 18/11/2026 — systemd real 2 FUSE + 4 bind: PASS
-
-El MASTER KodiELEC confirmó **`PASS_REAL_SYSTEMD_2FUSE_4BIND_LOCAL` + `CLEANUP=COMPLETE`** en laboratorio local sin acceso a OneDrive ni cambios de producción. La corrección de `/bin/test` funcionó en dispositivo. Generador candidato con `ExecStop=/bin/umount`. **624/624 CI OK**. Próximo gate: coordinación OAuth MASTER/CLIENTES antes de OneDrive real. [Runbook](service.cloud.masqelec/docs/TWO_FUSE_SYSTEMD_ISOLATED_LAB_2026-11-18.md).
-
-### 18/11/2026 — inventario de escritores rclone sin tocar OAuth
-
-Disponible en `develop` un script standalone de solo lectura para contar procesos rclone y montajes en MASTER y CLIENTES (incluye `cmdline` local, nunca se imprime). **No habilita sondeos OneDrive ni migraciones**: la coordinación entre dispositivos sigue pendiente. [Procedimiento](service.cloud.masqelec/docs/FLEET_OAUTH_INVENTORY_2026-11-18.md).
-
-### 18/11/2026 — inventario rclone MASTER observado
-
-El MASTER KodiELEC tiene **4 rclone mount activos / 4 FUSE legacy**, sin raíces v2 ni apilamientos; inventario local root `PASS_READ_ONLY`. Aún sin coordinación de CLIENTES ni autorización OAuth. [Registro y siguientes gates](service.cloud.masqelec/docs/FLEET_OAUTH_INVENTORY_2026-11-18.md).
-
-### Diseño definitivo de distribución (18/11/2026)
-
-**Sin migración gradual manual:** una versión futura del addon se distribuirá desde el repositorio de Kodi y cada equipo migrará autónomamente 4 FUSE→2 FUSE+4 bind cuando se actualice y esté inactivo; MASTER publica MQC2, CLIENTE mantiene sus OAuth salvo fallo confirmado. **La publicación y recuperación OAuth v2 y la transición automática aún faltan**. [Decisión técnica](service.cloud.masqelec/docs/AUTO_UPDATE_TWO_MOUNT_ARCHITECTURE_2026-11-18.md).
-
-### 19/11/2026 — ruta independiente de configuración cifrada v2
-
-Nuevo contrato puro `rclone_two_mount_config_routes.py`: la versión antigua permanece en `rclone/rclone.conf.crypt`; la futura versión v2 utilizará **`rclone/rclone-v2.conf.crypt`**. 657/657 tests CI OK; **no existe todavía el archivo v2 en cloud ni se ha conectado el lector/escritor de producción**. En la primera ejecución del addon se retirarán los cuatro unit files antiguos después de validar 2 FUSE+4 bind y asegurar recuperación. La biblioteca `.strm` sigue local. [Diseño y gates](service.cloud.masqelec/docs/AUTO_UPDATE_TWO_MOUNT_ARCHITECTURE_2026-11-18.md).
-
-### 19/11/2026 — MASTER: creación y actualización de MQC2 v2 en GitHub (desactivado)
-
-MASTER v2 está preparado para **crear `rclone/rclone-v2.conf.crypt` si el GET autenticado es 404**, o **actualizarlo mediante CAS cuando cambien refresh tokens verificados**, cifrando y comprobando readback. La versión actual mantiene las banderas False y no ha publicado nada; el endpoint cloud v2 aún no existe. CI 704/704 OK. [Diseño y pruebas](service.cloud.masqelec/docs/MASTER_V2_GITHUB_SYNC_2026-11-19.md).
-
-### 19/11/2026 — primer arranque y limpieza legacy preparados, desactivados
-
-El addon ya contiene el trabajador de primer arranque y reintento al quedar Kodi inactivo, con cutover local y borrado verificado de las cuatro unidades systemd antiguas **solo tras ACTIVE**. Las bibliotecas `.strm` siguen locales. **754/754 pruebas CI OK**, banderas False y pruebas reales pendientes; la selección automática desde .strm local ya está implementada, pero exige preflight real. [Procedimiento y pendientes](service.cloud.masqelec/docs/AUTO_FIRST_RUN_CUTOVER_2026-11-19.md).
-
-### 19/11/2026 — detección automática de muestras desde STRM local
-
-Sin configurar rutas por equipo, el addon buscará una referencia de película o episodio por cuenta desde `/storage/videos` y `/storage/tvshows`. No accede a OneDrive durante el descubrimiento; la lectura real se prueba tras montar v2. **773/773 pruebas OK**; falta ensayo físico. [CLI seguro y límites](service.cloud.masqelec/docs/AUTO_FIRST_RUN_CUTOVER_2026-11-19.md).
+- [Auditoría post-main](service.cloud.masqelec/docs/AUDIT_POST_MAIN_2026-11-20.md)
+- [Documentación completa y archivo histórico](service.cloud.masqelec/docs/README.md)
