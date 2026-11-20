@@ -8,8 +8,9 @@ en MASTER y CLIENT piloto. La separación de las credenciales OneDrive de
 Drive=2/OneDrive=0/Crypt=0; cada `isolated-mounts/account*.conf`
 OneDrive=1/Crypt=1. Reproducción correcta en las cuatro rutas de ambos
 equipos; reinicio CLIENT probado con la versión anterior 2.3.1.
-Regresión de 2.3.2 **1025/1025 OK** comunicada por el operador antes
-de la limpieza del repositorio.
+Regresión de 2.3.2 **1025/1025 OK** antes de limpiar;
+**957/957 OK** después de retirar los tests históricos (GitHub Actions
+[44807388207](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44807388207)).
 
 **Limitación vigente:** la recuperación automática de un token OneDrive
 revocado realmente NO está validada. El MASTER publica MQC2 v2 y el CLIENT
