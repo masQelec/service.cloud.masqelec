@@ -39,3 +39,28 @@ Ambos archivos deben ubicarse juntos en el directorio de diagnóstico del master
 El sincronizador antiguo en `lib/update_pvr.py` escribe y borra archivos de `channel/tag` directamente. Hay que desactivarlo al incorporar las operaciones API; nunca ejecutar ambos. Falta implementar registro persistente de UUID propios y validar convergencia en TVH/PVR por API con grupo temporal y un canal controlado, sin editar las M3U originales ni asignaciones de canales de producción. Cualquier prueba de creación/borrado temporal requiere gate separado y autorización explícita.
 
 Estado: diseño/pruebas en develop; master y pipeline CI aún pendientes de validación.
+
+
+## Resultado real master — G3-M (operador)
+
+```text
+=== G3-M READ-ONLY TVH INTEGRATION ===
+M3U_CHANNELS=720
+TVH_CHANNELS=720
+M3U_GROUPS=26
+TVH_TAGS=32
+GROUPS_TO_CREATE=0
+GROUPS_TO_REORDER_DIAGNOSTIC=26
+OWNED_EMPTY_TO_DELETE=0
+UNOWNED_OR_PROTECTED_EMPTY=6
+SNAPSHOT_STABLE=YES
+API_WRITE_EXECUTED=NO
+AUTOMATIC_INTEGRATION_ACTIVE=NO
+HISTORIC_DELETE_AUTHORIZED=NO
+```
+
+**G3-M lectura real PASS**: inventario estable; todos los grupos de M3U presentes y canales convergidos. `GROUPS_TO_REORDER_DIAGNOSTIC=26` refleja diferencias de índices respecto al orden M3U, **no errores ni permiso para reordenar**. Kodi GUI presenta grupos con canales alfabéticamente y, después, grupos vacíos también alfabéticamente.
+
+Las seis etiquetas históricas están preservadas porque el registro explícito de propiedad aún no las acredita. `OWNED_EMPTY_TO_DELETE=0` es correcto. Ni la prueba demuestra que Tvheadend reconstruya automáticamente asociaciones de canal al recuperar un grupo ni autoriza limpiar históricos.
+
+**Próximo gate**: validar en simulación persistencia atómica del registro de propiedad, creación vía API y comprobación de convergencia tras refetch, antes de integrar con `update_pvr.py`. No mezclar el sincronizador viejo que manipula ficheros con la nueva vía API. Borrado de grupos no autorizados permanece desactivado.
