@@ -46,3 +46,28 @@ ssh root@192.168.1.102 'python3 /storage/.cache/masqelec-g3-audit/pvr_g3i_tag_de
 3. **Backup recuperable:** exportar configuración exacta y verificar el método de restauración con un tag temporal antes de borrar objetos originales.
 4. **Borrado piloto explícito y acotado:** una sola etiqueta por UUID mediante API, tras autorización del operador, con postcheck en TVH y Kodi sin resetear SQLite.
 5. **Sin automatización destructiva** ni modificaciones en `update_pvr.py` hasta que el piloto y la recuperación estén validados.
+
+
+## Ejecución real del preflight (operador, 21-11-2026)
+
+Resultado de solo lectura en el master `192.168.1.102`:
+
+```text
+M3U_CHANNELS=720
+TVH_CHANNELS=720
+TVH_TAGS=32
+TARGET_PRESENT_IN_M3U=FALSE
+TARGET_TAG_MATCHES=1
+TARGET_NAME_MATCHES=1
+TARGET_TVH_LINKED_CHANNELS=0
+TARGET_KODI_GROUP_MATCHES=1
+CHANNEL_ROWS_WITHOUT_TAGS_LIST=0
+PRECHECK=PASS
+OWNERSHIP_VERIFIED=NO
+ROLLBACK_VERIFIED=NO
+DELETE_AUTHORIZED=NO
+```
+
+**Interpretación:** `ES - NBA` está ausente en la M3U actual, su UUID y nombre son inequívocos, no tiene referencias entre los canales de la cuadrícula observada, pero permanece visible en Kodi. Es una **candidata** a limpieza, no un borrado autorizado. El preflight no inspecciona exhaustivamente DVR, bouquets ni referencias en otras configuraciones.
+
+**Próximo gate G3-J:** copia de seguridad exacta y confidencial del tag, inspección de referencias adicionales, ensayo de creación/restauración de un tag temporal por API y verificación de reversibilidad. El borrado piloto del tag histórico solo podrá proponerse después de acreditar pertenencia y recuperación. No tocar `TVxx.db`, M3U ni EPG.
