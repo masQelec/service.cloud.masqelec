@@ -10,9 +10,8 @@ import sys
 import urllib.parse
 import urllib.request
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from lib.pvr_tag_plan import plan, PlanBlocked
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pvr_tag_plan import plan, PlanBlocked
 
 PLAYLIST = Path("/storage/.user/playlist.m3u")
 API = "http://127.0.0.1:9981/api/"
