@@ -2,8 +2,8 @@
 
 **Índice vigente: 20-11-2026.** Versión 2.3.2: MASTER y CLIENT
 piloto con 2 FUSE + 4 bind, `rclone.conf` general sin OneDrive y
-reproducción confirmada. Antes de la limpieza se verificó 1025/1025
-tests. La recuperación OAuth después de una revocación real sigue
+reproducción confirmada. Antes de limpiar se verificó 1025/1025 tests; después,
+957/957 tests PASS en GitHub Actions. La recuperación OAuth después de una revocación real sigue
 **sin validar**. El mantenimiento de pruebas y herramientas se describe
 en [REPO_CLEANUP_2026-11-20.md](REPO_CLEANUP_2026-11-20.md).
 
