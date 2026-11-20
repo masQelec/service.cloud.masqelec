@@ -16,6 +16,10 @@ from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_startup_stage as stage
 
 
+def _is_root():
+    return os.geteuid() == 0
+
+
 def _blocks(raw):
     """Preserve complete original sections, including unknown options."""
     lines = conf._lines(raw)
@@ -142,7 +146,7 @@ def retire_once(*, authorized=False, conf_path=None, account_paths=None,
     """
     if authorized is not True or health_verified is not True:
         return "BLOCKED_NOT_VERIFIED"
-    if rollout.mode(True) != "active" or os.geteuid() != 0:
+    if rollout.mode(True) != "active" or not _is_root():
         return "BLOCKED_NOT_ACTIVE"
     conf_path = stage.LOCAL_CONF if conf_path is None else conf_path
     account_paths = plan.ACCOUNT_CONFS if account_paths is None else account_paths
@@ -151,7 +155,7 @@ def retire_once(*, authorized=False, conf_path=None, account_paths=None,
     try:
         canonical, generation = stage._read_file(conf_path, confidential=True)
         info = os.lstat(conf_path)
-        if (info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o600):
+        if (info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o600):
             return "BLOCKED_INPUT"
         accounts = tuple(stage._read_file(path, confidential=True)[0]
                          for path in account_paths)
