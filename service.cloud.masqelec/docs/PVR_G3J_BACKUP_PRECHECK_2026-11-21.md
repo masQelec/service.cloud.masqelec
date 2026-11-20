@@ -66,3 +66,23 @@ ssh root@192.168.1.102 'python3 /storage/.cache/masqelec-g3-audit/pvr_g3j_tag_ba
 ```
 
 Aun si la segunda pasada devuelve cero referencias y cero archivos omitidos, **no** demuestra ausencia de referencias indirectas ni propiedad del tag ni recuperación del UUID, y **no** habilita borrado.
+
+
+## G3-J segunda pasada REAL — búsqueda de referencias completa dentro del alcance (operador)
+
+```text
+=== G3-J REFERENCE SCAN ONLY ===
+BACKUP_CREATED=NO
+CONFIG_REFERENCES_FOUND=0
+CONFIG_FILES_EXAMINED=2006
+CONFIG_FILES_UNREADABLE=0
+CONFIG_FILES_SKIPPED_OR_TRUNCATED=0
+REFERENCE_SCAN_EXHAUSTIVE=NO
+UUID_RESTORE_PROVEN=NO
+OWNERSHIP_VERIFIED=NO
+DELETE_AUTHORIZED=NO
+```
+
+El lector por bloques ya no deja ningún archivo omitido **dentro del árbol y límites inspeccionados**. Cero menciones directas del UUID **no prueba** ausencia de referencias indirectas, relaciones de runtime ni dependencias DVR. El respaldo original ya había superado igualdad byte a byte y SHA-256. No se crea otro respaldo.
+
+**Decisión:** G3-J gate de integridad de respaldo y barrido de referencias directas = PASS; gate de recuperación de UUID/procedencia = PENDIENTE. Próximo paso: ensayo aislado de recuperación de UUID de un tag **temporal** mediante API, contrastando el mismo identificador después de recrearlo. No borrar `ES - NBA`, no tocar configuración TVH directamente ni SQLite Kodi hasta comprobar restauración, propiedad y protecciones DVR.
