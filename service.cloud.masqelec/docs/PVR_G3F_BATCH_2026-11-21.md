@@ -39,3 +39,13 @@ Esperado: 13+21=34 tests; pendientes de confirmación de ejecución sobre el com
 6. Conservar flujo histórico activo hasta piloto completo y corte explícito. No tocar `TVxx.db`, M3U publicada, EPG, master ni ZIP en este bloque.
 
 **No se habilita todavía sincronización automática ni borrados.**
+
+
+## Ejecución real de la tanda unitaria (operador, 21-11-2026)
+
+Desde el checkout local sincronizado en `develop`:
+- `test_pvr_tag_plan.py`: `Ran 13 tests ... OK`.
+- `test_pvr_group_audit.py`: `Ran 21 tests ... OK`.
+- Total: **34/34 PASS**.
+
+Estas pruebas no sustituyen el gate de contraste integrado sobre los 720 canales reales, ni prueban orden Kodi/refetch de Tvheadend. La limpieza automática, la sincronización por escritura y la publicación de ZIP permanecen bloqueadas.
