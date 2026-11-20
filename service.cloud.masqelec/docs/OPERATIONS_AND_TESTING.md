@@ -45,8 +45,9 @@ La suite se diseñó sin dependencias de Kodi y con mocks. **Última evidencia e
 
 ```bash
 # Estado de procesos/montajes (lectura)
-systemctl is-active rclone_tvshows_1.service rclone_tvshows_2.service \
-  rclone_videos_1.service rclone_videos_2.service
+systemctl is-active rclone_library_1.service rclone_library_2.service \
+  masqelec_bind_tvshows_1.service masqelec_bind_tvshows_2.service \
+  masqelec_bind_videos_1.service masqelec_bind_videos_2.service
 cat /proc/self/mountinfo | grep -E '(/storage/\.mnt/(videos|tvshows)/[12]|/storage/\.mnt/cloud/[12])'
 
 # Preflight MQC2 remoto y SHA; NO realiza consultas OAuth a Microsoft
