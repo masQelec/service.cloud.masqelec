@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import rclone_two_mount_master_runtime as runtime
 from lib import rclone_two_mount_config_routes as routes
 from lib import constants
+from lib import rclone_token_sync as tokens
 
 
 class MasterV2RuntimeTests(unittest.TestCase):
@@ -195,7 +196,7 @@ class MasterV2RuntimeTests(unittest.TestCase):
                 Path(path).write_bytes(source.replace(
                     token.encode("utf-8"), b"NEW-PRIVATE-ONLY-REFRESH"))
             return "ok"
-        with mock.patch("lib.rclone_token_sync._probe",
+        with mock.patch.object(tokens, "_probe",
                         side_effect=rotate_first):
             result = runtime._probe_candidate(candidate, names)
         self.assertEqual(result[names[0]], "unavailable")
@@ -207,7 +208,7 @@ class MasterV2RuntimeTests(unittest.TestCase):
         from lib import rclone_token_policy as policy
         candidate, _accounts = fixture()
         names = tuple(sorted(policy.oauth_tokens(candidate)))
-        with mock.patch("lib.rclone_token_sync._probe",
+        with mock.patch.object(tokens, "_probe",
                         return_value="ok"):
             result = runtime._probe_candidate(candidate, names)
         self.assertEqual(result, {name: "ok" for name in names})
@@ -222,7 +223,7 @@ class MasterV2RuntimeTests(unittest.TestCase):
             Path(path).write_bytes(Path(path).read_bytes().replace(
                 b"drive_type = personal", b"drive_type = business"))
             return "ok"
-        with mock.patch("lib.rclone_token_sync._probe",
+        with mock.patch.object(tokens, "_probe",
                         side_effect=tamper):
             result = runtime._probe_candidate(candidate, names)
         self.assertEqual(result, {name: "unavailable" for name in names})
