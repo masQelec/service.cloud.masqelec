@@ -86,7 +86,9 @@ def _local_sources():
                 stat.S_IMODE(meta.st_mode) != 0o600):
             raise ValueError("Untrusted local OAuth config")
         result.append(raw)
-    return result[0], (result[1], result[2])
+    from lib import rclone_two_mount_config_split as split
+    accounts = (result[1], result[2])
+    return split.full_view(result[0], accounts), accounts
 
 
 def _probe_candidate(candidate, names):
