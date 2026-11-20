@@ -1,0 +1,111 @@
+# Cloud masQelec — preflight MQC2 con refresh divergente
+
+## Confirmación causal del operador — 17-11-2026
+
+**Causa confirmada por el operador:** después de la publicación del último respaldo MQC2, los procesos `rclone mount` activos renovaron los `refresh_token` de las dos cuentas OneDrive (`library_1` y `library_2`) en la configuración local. El MQC2 de `cloud/develop` retuvo los refresh anteriores. Esta información procede de la confirmación expresa del operador; el preflight por sí solo demostró la diferencia, **no** su secuencia temporal.
+
+- OneDrive 1 y 2: `DIFFERENT`; Google Drive 1 y 2: `SAME`.
+- Los datos `crypt` y opciones estáticas mantienen compatibilidad.
+- **No se ha demostrado vigencia del refresh local ni invalidación del remoto**, ni se ha coordinado el resto de CLIENTES.
+- No restaurar tokens antiguos; **tampoco** publicar automáticamente los locales mientras existan escritores concurrentes.
+- El riesgo activo es la falta de reconciliación de renovaciones OAuth; dos procesos FUSE por equipo reducirán los escritores locales, **no** los escritores entre equipos.
+- `P0-A` queda con **causa de divergencia identificada**, pero el gate de coherencia OAuth permanece **BLOCKED**.
+- Próximos gates P0-B/C/D: generaciones por fuente, detección de cambios concurrentes de ambos remotos y del MQC2, coordinación entre MASTER/CLIENTES, publicación CAS con readback y revalidación independiente en laboratorios sintéticos.
+- `RCLONE_TOKEN_SYNC_ENABLED=False`, `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; sin deploy, reinicios, ni escritura de credenciales en GitHub.
+
+**Fecha:** 17-11-2026 · **Máquina:** KodiELEC MASTER · **Clasificación:** Seguridad / P0-A · **Estado:** BLOCKED, sin corrección automática.
+
+## Evidencia recibida
+
+```text
+LAB_MODE=TWO_MOUNT_OAUTH_V2_GITHUB_SHA_AND_PROBE
+CODE_REF=636866996cd72551ef37eb4439c6f023d5c3561d
+LIVE_CONFIG_WRITE=NO
+MOUNT_RESTART=NO
+SYSTEMD_WRITE=NO
+GITHUB_UPLOAD=NO
+OAUTH_PROBE_REQUESTED=NO
+MASTER_CANONICAL_LAYOUT=PASS
+GH_BLOB_SHA_VALID=PASS
+MQC2_AUTHENTICATED=PASS
+GH_STATIC_IDENTITY=PASS
+GH_OAUTH_BASELINE=DIFFERENT
+LAB_RESULT=BLOCKED_BASELINE_DIVERGED
+```
+
+El fichero local y el respaldo MQC2 GitHub son estructuralmente compatibles y el MQC2 se ha autenticado. **Al menos un refresh_token entre los 4 OAuth (2 OneDrive y 2 Google Drive) difiere.** No prueba caducidad, validez ni orden cronológico. La respuesta del programa es de seguridad: no selecciona origen, no consulta OAuth a proveedores, no restaura y no publica.
+
+## Instrumentación para identificación sin secretos
+
+El script del commit `07b008db93ad524e9cbfec5b5e0e4b63704fe15e` añade estos marcadores de diagnóstico:
+
+```text
+BASELINE_REFRESH_ONEDRIVE_1=SAME|DIFFERENT
+BASELINE_REFRESH_ONEDRIVE_2=SAME|DIFFERENT
+BASELINE_REFRESH_DRIVE_1=SAME|DIFFERENT
+BASELINE_REFRESH_DRIVE_2=SAME|DIFFERENT
+GH_BRANCH_COMMIT_STABLE=YES
+LIVE_CONFIG_CHANGED=NO
+REAL_OAUTH_PROBE=NOT_EXECUTED
+GITHUB_PUBLISH_ALLOWED=NO
+LAB_RESULT=BLOCKED_BASELINE_DIVERGED
+```
+
+Los signos `|` en este ejemplo indican valores posibles, no salida literal. El orden OneDrive sigue los wrappers `users_library_1` y `users_library_2`, pero esos nombres **no se imprimen**; los Drive se ordenan por sección. No registrar valores ni hashes de refresh.
+
+Antes de informar diferencias, el script relee la configuración local y compara el HEAD remoto `cloud/develop`: si cualquiera cambia, el resultado pasa a `INCONCLUSIVE`. La rama remota se usa por commit fijo para leer MQC2 autenticado. La comprobación de HEAD no sustituye un bloqueo distribuido, no detecta necesariamente todos los ciclos ABA de referencias ni garantiza cuál refresh funciona.
+
+## Comandos para repetir exclusivamente el diagnóstico de lectura
+
+```bash
+wget -q 'https://raw.githubusercontent.com/masQelec/service.cloud.masqelec/07b008db93ad524e9cbfec5b5e0e4b63704fe15e/service.cloud.masqelec/tools/rclone_two_mount_real_probe_lab.py' -O /tmp/rclone_two_mount_real_probe_lab.py
+python3 -m py_compile /tmp/rclone_two_mount_real_probe_lab.py
+python3 /tmp/rclone_two_mount_real_probe_lab.py --preflight
+```
+
+**No ejecutar `--real-probe`.** Si vuelve a producir `BLOCKED_BASELINE_DIVERGED`, guardar solo los marcadores no sensibles y detenerse. No publicar `rclone.conf`, credenciales, JSON OAuth, claves ni capturas de secretos. No usar `rclone config reconnect`, `rclone lsf` contra OAuth ni herramientas que puedan renovar tokens. No detener/reiniciar montajes. No editar `cloud/develop/system.d`.
+
+## Validación del desarrollo
+
+- Commits de diagnóstico: `f1c6ba1` (script), `20f924c` (pruebas de reporte), `07b008d` (dos tests end-to-end del preflight con MQC2 ficticio y cambio de HEAD).
+- CI `develop`: `Ran 239 tests ... OK` / GitHub Actions run [44191814025](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44191814025).
+- El resultado 239/239 corresponde a pruebas sintéticas. **Este nuevo script todavía NO tiene salida de KodiELEC real.**
+- Gates: `P0-A=BLOCKED`; `RCLONE_TOKEN_SYNC_ENABLED=False`; `RCLONE_TWO_MOUNT_FEATURE_ALLOWED=False`; `NO_DEPLOY=YES`; `LIVE_MOUNT_CHANGE=NO`; `GITHUB_CREDENTIAL_UPLOAD=NO`.
+
+## Siguiente diagnóstico / decisión
+
+1. Identificar si difiere OneDrive 1, OneDrive 2, Drive 1 y/o Drive 2.
+2. Mantener las dos copias intactas y examinar la secuencia de renovación documentada y el estado de los montajes **sin solicitar un refresh OAuth**.
+3. Diseñar coordinación MASTER–CLIENTES y generaciones antes de autorizar cualquier recuperación controlada.
+4. Un `DIFFERENT` no determina qué token reemplazar. Cualquier paso con escritura o proveedor OAuth real requiere análisis adicional y permiso operativo específico.
+
+### Identidad real de las cuentas y arquitectura prevista (aclaración del operador)
+
+La pareja lógica **1** consta del remoto OAuth OneDrive `library_1` y el wrapper `crypt` `users_library_1`; la pareja lógica **2** utiliza el remoto OAuth `library_2` y el wrapper `crypt` `users_library_2`. El nombre `users_library_*` (plural) es el usado por las unidades y constantes actuales del repositorio. No confundir **remoto OAuth** con **wrapper crypt** ni cambiar sus nombres por esta anotación. La dependencia se valida desde `crypt.remote` al leer la configuración; los nombres OAuth aquí son los comunicados por el operador y no deben deducirse de los tests sintéticos `one_a/one_b`.
+
+| Par | OAuth subyacente | Wrapper `crypt` | Proceso FUSE futuro | Bind a Kodi |
+| --- | --- | --- | --- | --- |
+| 1 | `library_1` | `users_library_1` | `rclone_library_1.service` → `/storage/.mnt/cloud/1` | `movies` → `/storage/.mnt/videos/1`; `tvshows` → `/storage/.mnt/tvshows/1` |
+| 2 | `library_2` | `users_library_2` | `rclone_library_2.service` → `/storage/.mnt/cloud/2` | `movies` → `/storage/.mnt/videos/2`; `tvshows` → `/storage/.mnt/tvshows/2` |
+
+**LEGACY:** cuatro procesos `rclone mount` (vídeos y series por cada `crypt`), cuatro puntos FUSE. **Objetivo aún NO desplegado:** dos procesos `rclone mount` (uno por wrapper/OneDrive) más **cuatro bind mounts**, conservando las mismas rutas Kodi; esto no significa seis procesos rclone. El problema OAuth observado es que **ambos tokens OneDrive** difieren del MQC2; ambos Google Drive coinciden. El cambio estructural no garantiza coordinación de refresh entre dispositivos.
+
+### Evidencia nueva del segundo preflight KodiELEC
+
+```text
+GH_BRANCH_COMMIT_STABLE=YES
+LIVE_CONFIG_CHANGED=NO
+BASELINE_REFRESH_ONEDRIVE_1=DIFFERENT
+BASELINE_REFRESH_ONEDRIVE_2=DIFFERENT
+BASELINE_REFRESH_DRIVE_1=SAME
+BASELINE_REFRESH_DRIVE_2=SAME
+GH_OAUTH_BASELINE=DIFFERENT
+REAL_OAUTH_PROBE=NOT_EXECUTED
+GITHUB_PUBLISH_ALLOWED=NO
+LAB_RESULT=BLOCKED_BASELINE_DIVERGED
+```
+
+**Resultado observado en equipo real** (segundo preflight): `2/2 OneDrive = DIFFERENT`, `2/2 Google Drive = SAME`. SHA GitHub/autenticidad MQC2/opciones estáticas PASS. **Seguridad: bloqueo correcto; coherencia OAuth OneDrive: BLOCKED.** El script no sondeó OAuth, no subió el respaldo y no cambió los montajes.
+
+Histórico remoto (solo metadatos): última actualización del archivo cifrado `cloud/develop/rclone/rclone.conf.crypt` en commit `da412cd09191033731b7a7e7dff6e77196ad743f`, 2026-11-17 00:05:09 UTC. Una renovación posterior es plausible pero no demostrada. No establecer frescura/validez con fecha, `expiry` o mtime.
+

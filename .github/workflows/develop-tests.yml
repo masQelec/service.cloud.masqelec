@@ -1,0 +1,33 @@
+name: develop unit tests (no deployment)
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-masqelec-develop-tests
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout develop only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python modules
+        run: |
+          python -m compileall -q service.cloud.masqelec/lib service.cloud.masqelec/tools service.cloud.masqelec/tests
+      - name: Unit tests (no Kodi, OAuth, mounts or deploy)
+        run: |
+          python -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py'

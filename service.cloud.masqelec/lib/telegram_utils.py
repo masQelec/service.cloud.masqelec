@@ -7,7 +7,7 @@ Comportamiento:
 - Envía:
   1) Mensaje resumen (red + métricas + cooldown + líneas problema)
   2) Adjunta el log como documento (multipart/form-data)
-- Token cifrado TG_TOKEN_B64 (Feistel) → se descifra con clave derivada de authorized_keys
+- Token cifrado TG_TOKEN_B64 (MQC2) → clave derivada de authorized_keys
 """
 
 import os
@@ -28,12 +28,7 @@ from lib import reliability_utils
 # ------------------------------
 # Constantes (preferente: constants.py)
 # ------------------------------
-try:
-    from lib.constants import TG_TOKEN_B64, TG_FEISTEL_ROUNDS, TG_CHATID
-except Exception:
-    TG_TOKEN_B64 = "rAn4xRtvfVFS9L/8wJIxc/S8D92Zb83zVAAAAC44NTk5NzIxOTMxOkFBR2R0eENrZEY="
-    TG_FEISTEL_ROUNDS = 8
-    TG_CHATID = "952051424"
+from lib.constants import TG_TOKEN_B64, TG_CHATID
 
 
 # ------------------------------
@@ -51,7 +46,7 @@ def _tg_get_plain_credentials():
         if not key:
             return "", ""
 
-        token_bytes = crypto_utils.decrypt(TG_TOKEN_B64, key, rounds=int(TG_FEISTEL_ROUNDS))
+        token_bytes = crypto_utils.decrypt(TG_TOKEN_B64, key)
         if not token_bytes:
             return "", ""
 

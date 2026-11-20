@@ -4,6 +4,8 @@ import re
 import time
 import json
 import shutil
+import tempfile
+import errno
 import hashlib
 import zipfile
 import calendar
@@ -14,12 +16,16 @@ import urllib.error
 
 from lib import log_utils
 from lib import utils
+from lib import constants
+from lib import catalog_safety
+from lib import master_catalog_safety
+from lib import catalog_workspace
 import xbmc
 
 # ==========================
 # CONFIG
 # ==========================
-RAW_BASE = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/catalog"
+RAW_BASE = f"{constants.CLOUD_RAW_BASE}/catalog"
 
 CATALOG_ROOT = "/storage/"
 EXPORT_DIR   = "/storage/.catalog"
@@ -211,13 +217,22 @@ def _read_old_version_hash(ver_path: str):
 # ==========================
 # BUILD STRM
 # ==========================
-def build_movies_strm():
+def build_movies_strm(output_dir=None):
     res = rpc("VideoLibrary.GetMovies", {
         "properties": ["title", "year", "file"],
         "sort": {"method": "title", "order": "ascending"},
         "limits": {"start": 0, "end": 200000},
     })
+    if not isinstance(res, dict):
+        raise RuntimeError("Respuesta GetMovies inválida")
     movies = res.get("movies", []) or []
+    if not isinstance(movies, list):
+        raise RuntimeError("GetMovies devolvió datos incorrectos")
+    limits = res.get("limits") or {}
+    if isinstance(limits, dict) and int(limits.get("total") or 0) > len(movies):
+        raise RuntimeError("GetMovies devolvió respuesta parcial; se conserva catálogo anterior")
+    if output_dir is None:
+        output_dir = MOVIES_DIR
 
     n = 0
     for m in movies:
@@ -230,7 +245,7 @@ def build_movies_strm():
         base = f"{title} ({year})" if year else title
         base = safe_name(base)
 
-        strm = os.path.join(MOVIES_DIR, base + ".strm")
+        strm = os.path.join(output_dir, base + ".strm")
         write_text(strm, fpath + "\n")
 
         _clone_mtime_from_video(fpath, strm)
@@ -241,13 +256,22 @@ def build_movies_strm():
 
     log_utils.write_log(f"Películas total .strm: {n}")
 
-def build_tv_strm():
+def build_tv_strm(output_dir=None):
     res = rpc("VideoLibrary.GetEpisodes", {
         "properties": ["title", "file", "showtitle", "season", "episode"],
         "sort": {"method": "title", "order": "ascending"},
         "limits": {"start": 0, "end": 2000000},
     })
+    if not isinstance(res, dict):
+        raise RuntimeError("Respuesta GetEpisodes inválida")
     eps = res.get("episodes", []) or []
+    if not isinstance(eps, list):
+        raise RuntimeError("GetEpisodes devolvió datos incorrectos")
+    limits = res.get("limits") or {}
+    if isinstance(limits, dict) and int(limits.get("total") or 0) > len(eps):
+        raise RuntimeError("GetEpisodes devolvió respuesta parcial; se conserva catálogo anterior")
+    if output_dir is None:
+        output_dir = TV_DIR
 
     total = 0
     fallback = 0
@@ -266,7 +290,7 @@ def build_tv_strm():
             fallback += 1
             show_folder = safe_name(e.get("showtitle") or "Unknown Show")
 
-        show_dir = os.path.join(TV_DIR, safe_name(show_folder))
+        show_dir = os.path.join(output_dir, safe_name(show_folder))
         season_dir = os.path.join(show_dir, f"Season {season:02d}")
         os.makedirs(season_dir, exist_ok=True)
 
@@ -286,21 +310,8 @@ def build_tv_strm():
 # VERSION / ZIP
 # ==========================
 def compute_version_hash(root):
-    h = hashlib.sha256()
-    files = []
-    for base, dirs, fns in os.walk(root):
-        for fn in fns:
-            if fn.endswith(".strm"):
-                files.append(os.path.join(base, fn))
-    files.sort()
-
-    for p in files:
-        rel = os.path.relpath(p, root).replace("\\", "/")
-        h.update(rel.encode("utf-8"))
-        with open(p, "rb") as f:
-            h.update(f.read())
-
-    return h.hexdigest(), len(files)
+    """Hash histórico del conjunto STRM: rutas relativas ordenadas + contenido."""
+    return catalog_safety.compute_catalog_hash(root)
 
 def make_zip(src_root, out_zip):
     os.makedirs(os.path.dirname(out_zip), exist_ok=True)
@@ -313,53 +324,119 @@ def make_zip(src_root, out_zip):
                     z.write(full, arc)
 
 def generate_catalog():
-    os.makedirs(MOVIES_DIR, exist_ok=True)
-    os.makedirs(TV_DIR, exist_ok=True)
+    """Genera en /tmp cuando hay espacio, valida y publica desde /storage.
+
+    La fase de aplicación conserva backups persistentes. El ZIP y VERSION
+    finales se escriben con reemplazo atómico dentro de su FS de destino.
+    """
     os.makedirs(EXPORT_DIR, exist_ok=True)
+    if not acquire_lock():
+        raise RuntimeError("Catálogo MASTER: operación concurrente bloqueada")
 
-    ver_path = os.path.join(EXPORT_DIR, VER_NAME)
-    old_hash = _read_old_version_hash(ver_path)
+    workdir = None
+    backup_root = None
+    preserve_recovery = False
+    try:
+        ver_path = os.path.join(EXPORT_DIR, VER_NAME)
+        old_hash = _read_old_version_hash(ver_path)
+        chosen = catalog_workspace.select_staging_base(
+            preferred="/tmp", fallback=EXPORT_DIR
+        )
+        bases = [chosen]
+        if os.path.abspath(chosen) != os.path.abspath(EXPORT_DIR):
+            bases.append(EXPORT_DIR)
 
-    if old_hash:
-        log_utils.write_log(f"Hash anterior detectado: {old_hash}")
-    else:
-        log_utils.write_log("No hay hash anterior válido (catalog.version ausente o corrupto).")
+        # Solo repetir generación en /storage si /tmp se agota.
+        # Ningún STRM activo se modifica antes de completar esta fase.
+        for base in bases:
+            try:
+                workdir = tempfile.mkdtemp(prefix=".catalog-build-", dir=base)
+                stage_root = os.path.join(workdir, "content")
+                staged_movies = os.path.join(stage_root, "videos")
+                staged_tv = os.path.join(stage_root, "tvshows")
+                os.makedirs(staged_movies, exist_ok=True)
+                os.makedirs(staged_tv, exist_ok=True)
+                log_utils.write_log(
+                    f"MASTER: staging catálogo en {base}; STRM activos intactos"
+                )
+                build_movies_strm(output_dir=staged_movies)
+                build_tv_strm(output_dir=staged_tv)
 
-    log_utils.write_log("Limpiando catálogo previo (.strm)…")
-    wipe_strm_only()
+                new_hash, count = compute_version_hash(stage_root)
+                if count <= 0:
+                    raise RuntimeError(
+                        "Catálogo generado vacío; se conserva el anterior"
+                    )
 
-    log_utils.write_log("Generando .strm de películas…")
-    build_movies_strm()
+                stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                new_version = f"{new_hash}  strm_files={count}  utc={stamp}\n"
+                if catalog_safety.verify_staging(stage_root, new_version) != count:
+                    raise RuntimeError("Verificación de staging MASTER fallida")
 
-    log_utils.write_log("Generando .strm de series…")
-    build_tv_strm()
+                changed = not (old_hash and old_hash == new_hash)
+                staged_zip = os.path.join(workdir, ZIP_NAME)
+                if changed:
+                    if not MAKE_ZIP:
+                        raise RuntimeError("VERSION requiere catalog.zip")
+                    make_zip(stage_root, staged_zip)
+                    catalog_safety.verify_zip_manifest(staged_zip, new_version)
+                break
+            except OSError as exc:
+                if exc.errno != errno.ENOSPC or os.path.abspath(base) == os.path.abspath(EXPORT_DIR):
+                    raise
+                log_utils.write_log(
+                    "MASTER: /tmp agotado durante generación; reintentando en /storage",
+                    "WARNING",
+                )
+                if workdir:
+                    shutil.rmtree(workdir, ignore_errors=True)
+                workdir = None
+                continue
+        else:
+            raise RuntimeError("No se pudo crear staging del catálogo")
 
-    new_hash, count = compute_version_hash(CATALOG_ROOT)
+        # Backup persistente SIEMPRE en /storage, nunca en /tmp.
+        backup_root = tempfile.mkdtemp(
+            prefix=".catalog-rollback-", dir=EXPORT_DIR
+        )
+        copied, deleted = master_catalog_safety.apply_staged_catalog(
+            stage_root, CATALOG_ROOT, backup_root
+        )
+        log_utils.write_log(
+            f"MASTER: catálogo local aplicado: copiados={copied} eliminados={deleted}"
+        )
 
-    changed = not (old_hash and old_hash == new_hash.lower())
-
-    if not changed:
-        log_utils.write_log(f"Hash idéntico al anterior; NO se actualiza {VER_NAME} ni se crea ZIP (hash={new_hash})")
-        # Si existe un ZIP viejo, opcionalmente bórralo para evitar que alguien lo suba por error
-        try:
-            old_zip = os.path.join(EXPORT_DIR, ZIP_NAME)
-            if os.path.exists(old_zip):
-                os.remove(old_zip)
-        except Exception:
-            pass
-    else:
-        stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        ver_txt = f"{new_hash}  strm_files={count}  utc={stamp}\n"
-        write_text(ver_path, ver_txt)
-        log_utils.write_log(f"Version actualizada: {ver_path} (hash={new_hash})")
-
-        if MAKE_ZIP:
-            zip_path = os.path.join(EXPORT_DIR, ZIP_NAME)
-            log_utils.write_log("Creando ZIP (.strm)…")
-            make_zip(CATALOG_ROOT, zip_path)
-            log_utils.write_log(f"ZIP: {zip_path}")
-
-    log_utils.write_log(f"OK. hash={new_hash} strm_files={count} changed={int(changed)}")
+        if changed:
+            # La copia temporal de publicación se crea dentro de /storage;
+            # no se usa os.replace() directamente entre FS diferentes.
+            catalog_workspace.publish_file_atomic(
+                staged_zip, os.path.join(EXPORT_DIR, ZIP_NAME)
+            )
+            version_temp = os.path.join(workdir, VER_NAME)
+            write_text(version_temp, new_version)
+            catalog_workspace.publish_file_atomic(version_temp, ver_path)
+            log_utils.write_log(
+                f"MASTER: catálogo preparado: hash={new_hash} STRM={count}"
+            )
+        else:
+            log_utils.write_log(
+                f"MASTER: sin cambios ({new_hash}); se conserva cualquier ZIP pendiente"
+            )
+        return bool(changed)
+    except Exception as exc:
+        if "rollback INCOMPLETO" in str(exc):
+            preserve_recovery = True
+            log_utils.write_log(
+                f"MASTER: recuperación pendiente; respaldos conservados en {backup_root}",
+                "ERROR",
+            )
+        raise
+    finally:
+        if workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
+        if backup_root and not preserve_recovery:
+            shutil.rmtree(backup_root, ignore_errors=True)
+        release_lock()
 
 
 # ==========================
@@ -738,6 +815,17 @@ def sync_catalog_https() -> bool:
             utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "download_zip"})
             return False
 
+        # Rechazar ZIPs con rutas anómalas, duplicados o tamaños peligrosos
+        # antes de escribir ningún archivo en el área de staging.
+        try:
+            archive_count = catalog_safety.validate_catalog_zip(TMP_ZIP)
+            log_utils.write_log(f"ZIP validado: {archive_count} archivos STRM")
+        except Exception as e:
+            log_utils.write_log(f"ZIP rechazado por validación: {e}", "ERROR")
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "zip_safety"})
+            return False
+
         # Extraer ZIP en staging + fijar mtime desde ZipInfo
         try:
             log_utils.write_log("Extrayendo ZIP en staging (preservando fechas)…")
@@ -761,6 +849,18 @@ def sync_catalog_https() -> bool:
             log_utils.write_log("Staging vacío tras extraer. No aplico.", "ERROR")
             return False
 
+        # El hash del manifest corresponde a la concatenación de los STRM,
+        # NO al hash binario del ZIP. Rechazar antes de borrar/copiar.
+        try:
+            verified_count = catalog_safety.verify_staging(STAGING_DIR, remote_ver)
+            if verified_count != archive_count or len(staged) != verified_count:
+                raise ValueError("Número de STRM distinto entre ZIP, staging y manifest")
+        except Exception as e:
+            log_utils.write_log(f"Catálogo rechazado por integridad: {e}", "ERROR")
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "manifest_mismatch"})
+            return False
+
         # Estado local
         local_movies = _collect_strm(MOVIES_DIR)
         local_tv     = _collect_strm(TV_DIR)
@@ -777,6 +877,16 @@ def sync_catalog_https() -> bool:
         to_delete = sorted(local_keys - staged_keys)
         to_apply  = sorted(staged_keys)
 
+        # Un cambio de catálogo legítimo puede requerir más borrados, pero
+        # no se ejecuta automáticamente hasta revisar ese caso.
+        try:
+            catalog_safety.validate_deletions(len(local_keys), len(to_delete))
+        except ValueError as e:
+            log_utils.write_log(f"Sincronización detenida: {e}", "ERROR")
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "delete_fence"})
+            return False
+
         # Asegurar carpetas base
         try:
             os.makedirs(MOVIES_DIR, exist_ok=True)
@@ -785,27 +895,10 @@ def sync_catalog_https() -> bool:
             log_utils.write_log(f"No se pudieron crear carpetas base del catálogo: {e}", "ERROR")
             return False
 
-        # Eliminar sobrantes
-        deleted = 0
-        if to_delete:
-            log_utils.write_log(f"Eliminando {len(to_delete)} .strm obsoletos…")
-        for rel in to_delete:
-            if rel.startswith("videos/"):
-                dst = os.path.join(MOVIES_DIR, rel[len("videos/"):])
-            elif rel.startswith("tvshows/"):
-                dst = os.path.join(TV_DIR, rel[len("tvshows/"):])
-            else:
-                continue
-
-            if os.path.isfile(dst):
-                try:
-                    os.remove(dst)
-                    deleted += 1
-                except Exception as e:
-                    log_utils.write_log(f"No se pudo borrar {dst}: {e}", "WARNING")
-
-        # Añadir / actualizar
+        # Añadir / actualizar ANTES de borrar. Si falla una sola copia,
+        # la versión local no se actualiza y el siguiente intento puede reparar.
         changed = 0
+        copy_errors = 0
         for rel in to_apply:
             src = os.path.join(STAGING_DIR, rel.replace("/", os.sep))
             if rel.startswith("videos/"):
@@ -817,15 +910,52 @@ def sync_catalog_https() -> bool:
 
             old_hash = local_all.get(rel)
             new_hash = staged.get(rel)
-
             if old_hash == new_hash and os.path.isfile(dst):
                 continue
-
             try:
                 _atomic_copy(src, dst)
                 changed += 1
-            except Exception as e:
-                log_utils.write_log(f"Error copiando {rel} -> {dst}: {e}", "ERROR")
+            except Exception as exc:
+                copy_errors += 1
+                log_utils.write_log(f"Error copiando {rel} -> {dst}: {exc}", "ERROR")
+
+        if copy_errors:
+            log_utils.write_log(
+                f"Sincronización incompleta: {copy_errors} fallos de copia; se conservan los STRM existentes.",
+                "ERROR",
+            )
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "copy_error"})
+            return False
+
+        # Eliminar obsoletos solo después de verificar el catálogo y copiar.
+        deleted = 0
+        delete_errors = 0
+        if to_delete:
+            log_utils.write_log(f"Eliminando {len(to_delete)} .strm obsoletos…")
+        for rel in to_delete:
+            if rel.startswith("videos/"):
+                dst = os.path.join(MOVIES_DIR, rel[len("videos/"):])
+            elif rel.startswith("tvshows/"):
+                dst = os.path.join(TV_DIR, rel[len("tvshows/"):])
+            else:
+                continue
+            if os.path.isfile(dst):
+                try:
+                    os.remove(dst)
+                    deleted += 1
+                except Exception as exc:
+                    delete_errors += 1
+                    log_utils.write_log(f"No se pudo borrar {dst}: {exc}", "ERROR")
+
+        if delete_errors:
+            log_utils.write_log(
+                f"Sincronización incompleta: {delete_errors} fallos de borrado; no se guarda catalog.version.",
+                "ERROR",
+            )
+            utils.cb_note_failure("catalog", max_fails=3, cooldown_sec=3600)
+            utils.metrics_note("catalog", False, time.time() - start_ts, {"reason": "delete_error"})
+            return False
 
         _cleanup_empty_dirs(MOVIES_DIR)
         _cleanup_empty_dirs(TV_DIR)

@@ -30,6 +30,7 @@ import urllib.parse
 from lib import log_utils
 from lib import rclone_utils
 from lib import utils
+from lib import constants
 from lib import jsonrpc_utils
 
 try:
@@ -1505,7 +1506,7 @@ def tvh_delete_channels_not_in_playlist_or_bad(
 # ------------------------------
 def update_tv_grab_file() -> bool:
     local_path = "/storage/.kodi/addons/service.tvheadend43/bin/tv_grab_file"
-    remote_url = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/pvr/tv_grab_file"
+    remote_url = f"{constants.CLOUD_RAW_BASE}/pvr/tv_grab_file"
     remote_tmp = local_path + ".remote"
 
     try:
@@ -1863,7 +1864,7 @@ def update_playlist() -> tuple[bool, bool]:
     user_file = os.path.join(user_dir, "user")
 
     BASE_URLS = [
-        "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/pvr/playlist.m3u",
+        f"{constants.CLOUD_RAW_BASE}/pvr/playlist.m3u",
     ]
 
     def _read_text(path: str) -> str:

@@ -1,0 +1,380 @@
+# -*- coding: utf-8 -*-
+"""Pruebas del primer arranque: flags desactivados, idle, idempotencia."""
+import sys
+from pathlib import Path
+import unittest
+from unittest import mock
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import rclone_two_mount_autostart as auto
+from lib import constants
+from lib import rclone_two_mount_v2_publication as publication
+
+
+FILES = ("/storage/.mnt/videos/1/probe.mkv",
+         "/storage/.mnt/tvshows/2/probe.mkv")
+
+
+class FirstRunTests(unittest.TestCase):
+    def config(self, *, enabled=True, feature=True, rollback=True,
+               retire=True, recovery=True, known=FILES):
+        patches = [
+            mock.patch.object(constants, "RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED",
+                              enabled),
+            mock.patch.object(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
+                              feature),
+            mock.patch.object(constants, "RCLONE_TWO_MOUNT_ROLLBACK_GATE_PASSED",
+                              rollback),
+            mock.patch.object(constants,
+                              "RCLONE_TWO_MOUNT_LEGACY_RETIRE_ENABLED",
+                              retire),
+            mock.patch.object(constants,
+                              "RCLONE_TWO_MOUNT_AUTO_RECOVERY_ENABLED",
+                              recovery),
+            mock.patch.object(constants, "RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES",
+                              known),
+            mock.patch.object(auto.os, "geteuid", return_value=0),
+        ]
+        return patches
+
+    def run_case(self, mode, *, playback_idle=True, outcome="ACTIVE",
+                 cleanup="CLEANED", **flags):
+        patches = self.config(**flags)
+        with mock.patch.object(auto.rollout, "mode", return_value=mode), \
+             mock.patch.object(auto.kodi_idle, "is_playback_idle",
+                               return_value=playback_idle), \
+             mock.patch.object(auto.live, "execute_with_local_lock",
+                               return_value=outcome) as execute, \
+             mock.patch.object(auto.live, "recover_with_local_lock",
+                               return_value="ROLLED_BACK") as recover, \
+             mock.patch.object(auto.cleanup, "retire_after_active",
+                               return_value=cleanup) as retire, \
+             mock.patch.object(auto.maintenance, "ensure_active",
+                               return_value="ACTIVE_HEALTHY"), \
+             mock.patch.object(auto.boot_install, "ensure_installed",
+                               return_value="READY"), \
+             mock.patch.object(publication, "available", return_value=True), \
+             mock.patch.object(auto.live, "LocalAdapter") as adapter, \
+             patches[0], patches[1], patches[2], patches[3], patches[4], \
+             patches[5], patches[6]:
+            result = auto.tick(lambda _: '{}')
+        return result, execute, recover, retire, adapter
+
+    def test_explicitly_disabled_without_any_calls(self):
+        with mock.patch.object(constants, "RCLONE_TWO_MOUNT_FIRST_RUN_ENABLED",
+                               False), \
+             mock.patch.object(auto.rollout, "mode",
+                               side_effect=AssertionError("no state")), \
+             mock.patch.object(auto.live, "LocalAdapter",
+                               side_effect=AssertionError("no IO")):
+            self.assertEqual(auto.tick(None), "DISABLED")
+
+    def test_missing_release_feature_gate_refuses(self):
+        result, execute, recover, retire, adapter = self.run_case(
+            "legacy", feature=False)
+        self.assertEqual(result, "BLOCKED_RELEASE_GATES")
+        adapter.assert_not_called()
+        execute.assert_not_called()
+
+    def test_rollback_gate_must_be_true(self):
+        result, _, _, _, adapter = self.run_case("legacy", rollback=False)
+        self.assertEqual(result, "BLOCKED_RELEASE_GATES")
+        adapter.assert_not_called()
+
+    def test_first_cutover_requires_armed_early_boot_recovery(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no discovery")):
+            result, execute, recover, retire, adapter = self.run_case(
+                "legacy", recovery=False, known=())
+        self.assertEqual(result, "BLOCKED_BOOT_RECOVERY_NOT_ARMED")
+        execute.assert_not_called()
+        recover.assert_not_called()
+        retire.assert_not_called()
+        adapter.assert_not_called()
+
+    def test_absent_published_v2_config_blocks_first_cutover(self):
+        flags = self.config()
+        with mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+             mock.patch.object(auto.kodi_idle, "is_playback_idle", return_value=True), \
+             mock.patch.object(publication, "available", return_value=False), \
+             mock.patch("lib.rclone_two_mount_master_runtime._get_role",
+                        return_value="CLIENT"), \
+             mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no samples")), \
+             mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
+             mock.patch.object(auto.live, "LocalAdapter") as adapter, \
+             flags[0], flags[1], flags[2], flags[3], flags[4], flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "BLOCKED_V2_CONFIG_NOT_PUBLISHED")
+        adapter.assert_not_called()
+        cut.assert_not_called()
+
+    def test_master_publication_error_reports_safe_category_without_cutover(self):
+        flags = self.config()
+        from lib import rclone_two_mount_master_runtime as master_runtime
+        for actual, expected in (
+                ("blocked_missing_credentials",
+                 "BLOCKED_V2_PUBLISH_MISSING_CREDENTIALS"),
+                ("blocked_local_health", "BLOCKED_V2_PUBLISH_OAUTH"),
+                ("blocked_repository_unverified", "BLOCKED_V2_PUBLISH_GITHUB"),
+                ("blocked_local_changed", "BLOCKED_V2_PUBLISH_LOCAL_CHANGED"),
+                ("blocked_master_runtime", "BLOCKED_V2_PUBLISH_UNAVAILABLE"),
+                ("refresh_token=SECRET", "BLOCKED_V2_PUBLISH_UNAVAILABLE")):
+            with self.subTest(actual=expected), \
+                 mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+                 mock.patch.object(auto.kodi_idle, "is_playback_idle",
+                                   return_value=True), \
+                 mock.patch.object(publication, "available", return_value=False), \
+                 mock.patch.object(master_runtime, "_get_role", return_value="MASTER"), \
+                 mock.patch.object(master_runtime,
+                                   "publish_from_legacy_before_cutover",
+                                   return_value=actual), \
+                 mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
+                 mock.patch.object(auto.live, "LocalAdapter") as adapter, \
+                 flags[0], flags[1], flags[2], flags[3], flags[4], flags[5], flags[6]:
+                result = auto.tick(lambda _: "{}")
+                self.assertEqual(result, expected)
+                self.assertNotIn("SECRET", result)
+                adapter.assert_not_called()
+                cut.assert_not_called()
+
+    def test_master_publishes_before_cutover_not_after(self):
+        flags = self.config(retire=True)
+        from lib import rclone_two_mount_master_runtime as master_runtime
+        actions = []
+        with mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+             mock.patch.object(auto.kodi_idle, "is_playback_idle",
+                               return_value=True), \
+             mock.patch.object(publication, "available",
+                               side_effect=[False, True]), \
+             mock.patch.object(master_runtime, "_get_role", return_value="MASTER"), \
+             mock.patch.object(
+                 master_runtime, "publish_from_legacy_before_cutover",
+                 side_effect=lambda **kw: (
+                     actions.append("publish") or "created_verified")), \
+             mock.patch.object(auto.boot_install, "ensure_installed",
+                               return_value="READY"), \
+             mock.patch.object(auto.live, "execute_with_local_lock",
+                               side_effect=lambda *a, **kw: (
+                                   actions.append("cutover") or "ACTIVE")), \
+             mock.patch.object(auto.cleanup, "retire_after_active",
+                               side_effect=lambda *a, **kw: (
+                                   actions.append("cleanup") or "CLEANED")), \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "ACTIVE_VERIFIED_LEGACY_RETIRED")
+        self.assertEqual(actions, ["publish", "cutover", "cleanup"])
+
+    def test_no_rpc_blocks_before_any_adapter(self):
+        flags = self.config()
+        with mock.patch.object(auto.live, "LocalAdapter") as adapter, \
+             flags[0], flags[1], flags[2], flags[3], flags[4], \
+             flags[5], flags[6]:
+            self.assertEqual(auto.tick(None), "BLOCKED_KODI_RPC")
+            adapter.assert_not_called()
+
+    def test_empty_config_autodiscovers_samples_without_network(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               return_value=FILES) as discovery:
+            result, execute, _, retire, adapter = self.run_case(
+                "legacy", known=())
+        self.assertEqual(result, "ACTIVE_VERIFIED_LEGACY_RETIRED")
+        discovery.assert_called_once_with()
+        execute.assert_called_once()
+        self.assertEqual(adapter.call_args.kwargs["known_media_files"], FILES)
+        retire.assert_called_once()
+
+    def test_autodiscovery_no_second_account_blocks_mutations(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               return_value=None) as discovery:
+            result, execute, recover, retire, adapter = self.run_case(
+                "legacy", known=())
+        self.assertEqual(result, "BLOCKED_MEDIA_FIXTURES")
+        discovery.assert_called_once_with()
+        adapter.assert_not_called()
+        execute.assert_not_called()
+        retire.assert_not_called()
+
+    def test_unsafe_recovery_does_not_depend_on_media_discovery(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no catalog scan")):
+            result, execute, recover, _, adapter = self.run_case(
+                "unsafe", known=(), recovery=True)
+        self.assertEqual(result, "ROLLED_BACK")
+        recover.assert_called_once()
+        self.assertEqual(adapter.call_args.kwargs["known_media_files"], ())
+        execute.assert_not_called()
+
+    def test_playback_active_defers_without_catalog_scan(self):
+        with mock.patch.object(auto.media_samples, "discover",
+                               side_effect=AssertionError("no scan")):
+            result, execute, _, retire, adapter = self.run_case(
+                "legacy", playback_idle=False, known=())
+        self.assertEqual(result, "DEFERRED_PLAYBACK_ACTIVE")
+        adapter.assert_not_called()
+        execute.assert_not_called()
+        retire.assert_not_called()
+
+    def test_media_missing_fails_closed_before_touch(self):
+        result, _, _, _, adapter = self.run_case("legacy", known=())
+        self.assertEqual(result, "BLOCKED_MEDIA_FIXTURES")
+        adapter.assert_not_called()
+
+    def test_media_path_escape_or_duplicate_account_blocked(self):
+        for values in (
+            ("/tmp/a.mkv", FILES[1]),
+            ("/storage/.mnt/videos/1/../oops", FILES[1]),
+            (FILES[0], FILES[0]),
+            (FILES[0], "/storage/.mnt/videos/2/"),
+            ("", FILES[1])):
+            with self.subTest(values=values):
+                self.assertFalse(auto._valid_media_paths(values))
+
+    def test_legacy_active_playback_is_deferred_without_mutation(self):
+        result, execute, recover, retire, _ = self.run_case(
+            "legacy", playback_idle=False)
+        self.assertEqual(result, "DEFERRED_PLAYBACK_ACTIVE")
+        execute.assert_not_called()
+        recover.assert_not_called()
+        retire.assert_not_called()
+
+    def test_idle_legacy_executed_once_and_cleanup_after_active(self):
+        result, execute, recover, retire, adapter = self.run_case("legacy")
+        self.assertEqual(result, "ACTIVE_VERIFIED_LEGACY_RETIRED")
+        execute.assert_called_once()
+        retire.assert_called_once()
+        recover.assert_not_called()
+        self.assertEqual(adapter.call_count, 1)
+
+    def test_rollout_rolled_back_does_not_delete_legacy(self):
+        result, _, _, retire, _ = self.run_case(
+            "legacy", outcome="ROLLED_BACK")
+        self.assertEqual(result, "ROLLED_BACK")
+        retire.assert_not_called()
+
+    def test_legacy_boot_recovery_install_failure_prevents_cutover(self):
+        flags = self.config()
+        with mock.patch.object(auto.rollout, "mode", return_value="legacy"), \
+             mock.patch.object(auto.kodi_idle, "is_playback_idle",
+                               return_value=True), \
+             mock.patch.object(auto.boot_install, "ensure_installed",
+                               return_value="BLOCKED_BOOT_INSTALL_UNVERIFIED"), \
+             mock.patch.object(publication, "available", return_value=True), \
+             mock.patch.object(auto.live, "execute_with_local_lock") as cut, \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], \
+             flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "BLOCKED_BOOT_INSTALL_UNVERIFIED")
+        cut.assert_not_called()
+
+    def test_legacy_active_without_cleanup_flag_keeps_old_files(self):
+        result, execute, recover, retire, _ = self.run_case(
+            "legacy", retire=False)
+        self.assertEqual(result, "ACTIVE_PENDING_CLEANUP")
+        execute.assert_called_once()
+        retire.assert_not_called()
+
+    def test_active_mode_does_not_repeat_cutover(self):
+        result, execute, recover, retire, _ = self.run_case(
+            "active", cleanup="ALREADY_CLEAN")
+        self.assertEqual(result, "ACTIVE_CLEAN_ALREADY")
+        execute.assert_not_called()
+        recover.assert_not_called()
+        retire.assert_called_once()
+
+    def test_active_broken_mount_does_not_cleanup(self):
+        flags = self.config()
+        with mock.patch.object(auto.rollout, "mode", return_value="active"), \
+             mock.patch.object(auto.maintenance, "ensure_active",
+                               return_value="BLOCKED_ROOT_OCCUPIED"), \
+             mock.patch.object(auto.cleanup, "retire_after_active") as retire, \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], \
+             flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "BLOCKED_ROOT_OCCUPIED")
+        retire.assert_not_called()
+
+    def test_existing_v2_without_media_samples_still_supervises(self):
+        flags = self.config(known=())
+        with mock.patch.object(auto.rollout, "mode", return_value="active"), \
+             mock.patch.object(auto.media_samples, "discover",
+                               return_value=None), \
+             mock.patch.object(auto.maintenance, "ensure_active",
+                               return_value="ACTIVE_HEALTHY") as maintain, \
+             mock.patch.object(auto.cleanup, "retire_after_active") as retire, \
+             mock.patch.object(auto.live, "LocalAdapter"), \
+             flags[0], flags[1], flags[2], flags[3], flags[4], \
+             flags[5], flags[6]:
+            self.assertEqual(auto.tick(lambda _: "{}"),
+                             "ACTIVE_PENDING_CLEANUP")
+        maintain.assert_called_once()
+        retire.assert_not_called()
+
+    def test_active_resume_partial_cleanup(self):
+        result, execute, _, retire, _ = self.run_case("active")
+        self.assertEqual(result, "ACTIVE_VERIFIED_LEGACY_RETIRED")
+        execute.assert_not_called()
+        retire.assert_called_once()
+
+    def test_active_cleanup_failure_keeps_v2(self):
+        result, execute, recover, retire, _ = self.run_case(
+            "active", cleanup="BLOCKED_CLEANUP_INCOMPLETE")
+        self.assertEqual(result, "BLOCKED_CLEANUP_INCOMPLETE")
+        execute.assert_not_called()
+        recover.assert_not_called()
+
+    def test_prepared_marker_blocks_reentry(self):
+        result, execute, recover, retire, adapter = self.run_case("prepared")
+        self.assertEqual(result, "BLOCKED_PREPARED_STATE")
+        adapter.assert_not_called()
+
+    def test_unknown_mode_blocks(self):
+        result, _, _, _, adapter = self.run_case("unexpected")
+        self.assertEqual(result, "BLOCKED_UNEXPECTED_MODE")
+        adapter.assert_not_called()
+
+    def test_unsafe_requires_recovery_flag(self):
+        result, execute, recover, retire, _ = self.run_case(
+            "unsafe", recovery=False)
+        self.assertEqual(result, "BLOCKED_RECOVERY_NOT_ENABLED")
+        execute.assert_not_called()
+        recover.assert_not_called()
+        retire.assert_not_called()
+
+    def test_unsafe_recovery_only_when_idle_and_flagged(self):
+        result, execute, recover, retire, _ = self.run_case(
+            "unsafe", recovery=True)
+        self.assertEqual(result, "ROLLED_BACK")
+        recover.assert_called_once()
+        execute.assert_not_called()
+        retire.assert_not_called()
+
+    def test_unsafe_playback_does_not_recover(self):
+        result, _, recover, _, _ = self.run_case(
+            "unsafe", recovery=True, playback_idle=False)
+        self.assertEqual(result, "DEFERRED_PLAYBACK_ACTIVE")
+        recover.assert_not_called()
+
+    def test_unknown_engine_return_is_not_exposed(self):
+        result, _, _, _, _ = self.run_case(
+            "legacy", outcome="refresh_token=SENSITIVE")
+        self.assertEqual(result, "BLOCKED_MANUAL_RECOVERY_REQUIRED")
+
+    def test_unknown_cleanup_return_is_not_exposed(self):
+        result, _, _, _, _ = self.run_case(
+            "active", cleanup="SECRET_CONTENT")
+        self.assertEqual(result, "BLOCKED_LOCAL_ERROR")
+
+    def test_service_wires_first_run_and_periodic_retry(self):
+        service = (Path(__file__).resolve().parents[1] / "service.py").read_text()
+        self.assertIn("_rclone_v2_autostart_worker", service)
+        self.assertIn("rclone_two_mount_autostart.tick", service)
+        self.assertIn("periodic_rclone_v2_cutover", service)
+
+
+if __name__ == "__main__":
+    unittest.main()

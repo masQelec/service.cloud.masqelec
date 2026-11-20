@@ -6,7 +6,7 @@ Funcionalidad:
 - Master: sube catalog.zip y catalog.version a GitHub (API contents PUT).
 - Orden: primero ZIP y luego VERSION.
 - Control tamaño: <= 75MB raw y <= 100MB base64 (como antes).
-- Token GitHub: cifrado (base64+Feistel) -> se descifra con key de authorized_keys.
+- Token GitHub: formato MQC2 autenticado (ChaCha20-Poly1305) -> clave del dispositivo.
 """
 
 import os
@@ -22,34 +22,24 @@ import urllib.error
 from lib import log_utils
 from lib import device_utils
 from lib import crypto_utils
+from lib import catalog_safety
 
 # ------------------------------
 # Config (preferente: constants.py)
 # ------------------------------
-try:
-    from lib.constants import (
-        OWNER,
-        REPO,
-        BRANCH,
-        API_BASE,
-        GITHUB_TOKEN_B64,
-        GITHUB_FEISTEL_ROUNDS,
-        SRC_DIR,
-        FILES,  # list[ (fname, dst_path) ]
-    )
-except Exception:
-    # Fallbacks conservadores: si falta algo, fallará con logs claros.
-    OWNER = "masQelec"
-    REPO = "cloud.masQelec"
-    BRANCH = "master"
-    API_BASE = f"https://api.github.com/repos/{OWNER}/{REPO}/contents"
-    GITHUB_TOKEN_B64 = "rwfU5iQ5OjtJt7ihpPMwbIu3fP6OIAAAAChnaHBfOFQ0OWlsT0tMWEtDQTQ="
-    GITHUB_FEISTEL_ROUNDS = 8
-    SRC_DIR = "/storage/.catalog"
-    FILES = [
-        ("catalog.zip", "catalog/catalog.zip"),
-        ("catalog.version", "catalog/catalog.version"),
-    ]
+from lib import constants
+
+OWNER = constants.CLOUD_OWNER
+REPO = constants.CLOUD_REPO
+BRANCH = constants.CLOUD_BRANCH
+API_BASE = f"https://api.github.com/repos/{OWNER}/{REPO}/contents"
+
+GITHUB_TOKEN_B64 = constants.GITHUB_TOKEN_B64
+SRC_DIR = getattr(constants, "SRC_DIR", "/storage/.catalog")
+FILES = getattr(constants, "FILES", [
+    ("catalog.zip", "catalog/catalog.zip"),
+    ("catalog.version", "catalog/catalog.version"),
+])
 
 # ------------------------------
 # Token GH (descifrado)
@@ -66,7 +56,7 @@ def _gh_get_plain_token():
         if not key:
             return ""
 
-        plain = crypto_utils.decrypt(GITHUB_TOKEN_B64, key, rounds=int(GITHUB_FEISTEL_ROUNDS))
+        plain = crypto_utils.decrypt(GITHUB_TOKEN_B64, key)
         if not plain:
             return ""
 
@@ -234,15 +224,30 @@ def load_catalog_github():
         log_utils.write_log("[catalog_uploader] Estado inconsistente: zip=True version=False. Abortando subida.", "ERROR")
         return False
 
+    # Nunca publicar ZIP/version incongruentes, ni reintentar archivos
+    # incompletos de un arranque anterior.
+    try:
+        with open(ver_path, "r", encoding="utf-8") as f:
+            version_text = f.read()
+        checked_count = catalog_safety.verify_zip_manifest(zip_path, version_text)
+        log_utils.write_log(
+            "[catalog_uploader] ZIP y manifest verificados: {} STRM".format(checked_count), "INFO"
+        )
+    except Exception as exc:
+        log_utils.write_log(
+            "[catalog_uploader] ZIP/version inválidos; subida bloqueada: {}".format(exc),
+            "ERROR",
+        )
+        return False
+
     # Ya sabemos que hay algo real que subir -> ahora sí exigimos token
     token = _gh_get_plain_token()
     if not token:
         log_utils.write_log("Token GitHub no disponible, abortando subida", "ERROR")
         return False
 
-    ok_all = True
-
-    # Orden fijo: ZIP primero, VERSION después
+    # Orden fijo: ZIP primero, VERSION después. En fallo del ZIP,
+    # queda prohibido publicar una VERSION nueva.
     for fname, dst in FILES:
         src = os.path.join(SRC_DIR, fname)
 
@@ -253,11 +258,19 @@ def load_catalog_github():
 
         log_utils.write_log("Subiendo {} -> {}".format(src, dst), "INFO")
         if not _upload_file(token, src, dst):
-            log_utils.write_log("Fallo subiendo {}".format(dst), "ERROR")
-            ok_all = False
-        else:
-            log_utils.write_log("{} subido correctamente".format(dst), "INFO")
+            log_utils.write_log("Fallo subiendo {}; no se publicarán más archivos".format(dst), "ERROR")
+            return False
+        log_utils.write_log("{} subido correctamente".format(dst), "INFO")
 
-    return ok_all
+    # La ausencia de ZIP representa 'sin publicación pendiente'.
+    # En caso de error en GitHub, el ZIP se conserva para reintentar.
+    try:
+        os.remove(zip_path)
+    except OSError as exc:
+        log_utils.write_log(
+            "[catalog_uploader] Publicado, pero no se pudo retirar ZIP local: {}".format(exc),
+            "WARNING",
+        )
+    return True
 
 

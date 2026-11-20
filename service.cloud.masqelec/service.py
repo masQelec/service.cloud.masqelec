@@ -33,7 +33,17 @@ from lib.update_pvr import update_pvr, update_playlist
 from lib.jsonrpc_utils import get_library_stats, get_installed_addons_filtered, format_addons_for_log
 from lib.fix_settings import fix_skin_home_menu_visibility_and_reload
 from lib import utils
+from lib import device_utils
 from lib import core_catalog
+from lib import rclone_token_sync
+from lib import constants
+from lib import rclone_two_mount_rollout
+from lib import rclone_two_mount_health
+from lib import rclone_two_mount_startup_stage
+from lib import rclone_two_mount_boot_guard
+from lib import rclone_two_mount_autostart
+from lib import rclone_two_mount_master_runtime
+from lib import rclone_two_mount_client_worker
 
 # ---- Config constante ----
 SLEEP_INTERVAL_SECS = 10
@@ -249,14 +259,49 @@ def _unescape_mount(s: str) -> str:
          .replace("\\134", "\\")
     )
 
+def _two_mounts_ready() -> bool:
+    """Valida la nueva arquitectura sin exigir 4 FUSE en rutas legacy."""
+    try:
+        with open("/proc/self/mountinfo", "r", encoding="utf-8") as stream:
+            entries = stream.read(1024 * 1024 + 1)
+        if len(entries) > 1024 * 1024:
+            return False
+        if not rclone_two_mount_health.check_two_fuse_four_bind(entries):
+            log("_two_mounts_ready: árbol FUSE/bind incorrecto", "WARNING")
+            return False
+        # MASTER/CLIENTES: no enumerar OneDrive para comprobar montaje.
+        # check_two_fuse_four_bind valida las seis entradas y fsroot exacto
+        # usando solo información del kernel, sin os.listdir/FUSE I/O.
+        return True
+    except Exception:
+        log("_two_mounts_ready: fallo leyendo mountinfo", "WARNING")
+        return False
+
+
 def _mounts_ready() -> bool:
     """
-    Verifica que los montajes rclone están:
-      ✔ en /proc/mounts como fuse.rclone
-      ✔ accesibles
-      ✔ NO vacíos
-      ✔ sin bloquear por FUSE colgado
+    Verifica las rutas rclone usando la tabla de montajes del kernel.
+
+    No hace os.listdir/stat sobre OneDrive: en CLIENTES la biblioteca usa
+    los STRM locales y los remotos sólo se leen al reproducir. Mountinfo
+    acredita estructura montada, NO salud de red ni contenido disponible.
     """
+    if rclone_two_mount_boot_guard.recovery_required(
+            feature_allowed=getattr(
+                constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)):
+        log("_mounts_ready: transición interrumpida; escaneo remoto/local bloqueado",
+            "ERROR")
+        return False
+    mode = rclone_two_mount_rollout.mode(
+        getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+    )
+    if mode == "unsafe":
+        log("_mounts_ready: marcador de migración inválido o no autorizado",
+            "ERROR")
+        return False
+    if mode == "active":
+        return _two_mounts_ready()
+
     try:
         try:
             with open("/proc/mounts", "r") as f:
@@ -292,19 +337,9 @@ def _mounts_ready() -> bool:
             log(f"_mounts_ready: faltan targets montados: {sorted(missing)}", "WARNING")
             return False
 
-        for _, target in REQUIRED_RCLONE_MOUNTS:
-            if not os.path.isdir(target):
-                log(f"_mounts_ready: directorio no existe: {target}", "WARNING")
-                return False
-
-            items = _safe_listdir(target, timeout=LIST_TIMEOUT)
-            if items is None:
-                log(f"_mounts_ready: TIMEOUT listando {target} (posible rclone colgado)", "WARNING")
-                return False
-            if not items:
-                log(f"_mounts_ready: carpeta vacía (montaje incompleto): {target}", "WARNING")
-                return False
-
+        # Sin listados remotos (4 rutas por comprobación). El sistema
+        # declarará montado un FUSE aunque una lectura remota falle:
+        # pruebas de red/contenido son responsabilidad de sondas explícitas.
         return True
 
     except Exception as e:
@@ -455,6 +490,73 @@ def _upload_log(n: str, nwid: str, id_device: str, eth0: str, wlan0: str):
     except Exception:
         log(f"upload_log fallido:\n{traceback.format_exc()}", "ERROR")
 
+# Primera ejecución y reintento diferido cuando Kodi está reproduciendo.
+# Hasta activar los gates de release, tick devuelve DISABLED sin IO.
+_rclone_v2_autostart_last = None
+
+
+def _rclone_v2_autostart_worker():
+    global _rclone_v2_autostart_last
+    try:
+        status = rclone_two_mount_autostart.tick(xbmc.executeJSONRPC)
+        # Only after the v2 engine proved 2 FUSE + 4 binds and retired
+        # legacy, strip duplicate OneDrive sections from rclone.conf.
+        # account1/2.conf remain the ONLY active OneDrive token writers.
+        if status in ("ACTIVE_VERIFIED_LEGACY_RETIRED",
+                      "ACTIVE_CLEAN_ALREADY"):
+            from lib import rclone_two_mount_config_split as split
+            compact = split.retire_once(
+                authorized=True, health_verified=True)
+            if compact not in ("CLEANED", "ALREADY_CLEAN"):
+                log("rclone v2 general config: " + compact, "WARNING")
+            elif compact == "CLEANED":
+                log("rclone v2 general config: ONEDRIVE_ISOLATED", "INFO")
+        # Lista cerrada para no volcar tokens/errores de procesos externos.
+        if status not in rclone_two_mount_autostart._STATUSES:
+            status = "BLOCKED_LOCAL_ERROR"
+        if status != _rclone_v2_autostart_last:
+            _rclone_v2_autostart_last = status
+            if status not in ("DISABLED", "ACTIVE_CLEAN_ALREADY"):
+                log("rclone v2 autostart: " + status,
+                    "INFO" if status == "ACTIVE_VERIFIED_LEGACY_RETIRED"
+                    else "WARNING")
+    except Exception:
+        if _rclone_v2_autostart_last != "BLOCKED_LOCAL_ERROR":
+            _rclone_v2_autostart_last = "BLOCKED_LOCAL_ERROR"
+            log("rclone v2 autostart: BLOCKED_LOCAL_ERROR", "WARNING")
+
+
+def _rclone_v2_oauth_worker():
+    """Account-scoped v2 sync only after the local layout is ACTIVE."""
+    if (getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+            is not True):
+        return
+    if rclone_two_mount_rollout.mode(True) != "active":
+        return
+    try:
+        role = device_utils.get_device_role()
+        if (role == "MASTER"
+                and getattr(constants,
+                            "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
+                            False) is True):
+            result = rclone_two_mount_master_runtime.run_once(
+                release_authorized=True)
+            if result not in ("unchanged", "created_verified",
+                              "updated_verified"):
+                log("rclone v2 MASTER MQC2: BLOCKED_OR_DEFERRED", "WARNING")
+        elif (role == "CLIENT"
+                and getattr(constants,
+                            "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                            False) is True):
+            result = rclone_two_mount_client_worker.tick(
+                xbmc.executeJSONRPC, authorized=True, role=role)
+            if result not in ("HEALTHY_OR_UNAVAILABLE",
+                              "DEFERRED_INTERVAL", "DEFERRED_PLAYBACK"):
+                log("rclone v2 CLIENT OAuth: CHECK_REQUIRED", "WARNING")
+    except Exception:
+        log("rclone v2 OAuth: BLOCKED_UNEXPECTED_ERROR", "WARNING")
+
+
 # ------------- FASES -------------
 def _phase1_cloud_storage_blocking(monitor: xbmc.Monitor):
     log("Fase 1: cloud_storage (start_cloud_storage) -> inicio")
@@ -462,6 +564,18 @@ def _phase1_cloud_storage_blocking(monitor: xbmc.Monitor):
         start_cloud_storage()
     except Exception:
         log(f"Fallo en cloud_storage:\n{traceback.format_exc()}", "ERROR")
+    # Staging local de 2 FUSE + 4 bind: sólo cuando la bandera específica
+    # esté autorizada. La rama develop la mantiene False.
+    if getattr(constants, "RCLONE_TWO_MOUNT_STAGING_ENABLED", False) is True:
+        try:
+            stage_result = rclone_two_mount_startup_stage.stage_on_startup(
+                staging_enabled=True)
+            # Sólo marcadores cerrados, nunca rutas, excepciones o credenciales.
+            if stage_result not in ("disabled",):
+                log("rclone v2 local staging: " + stage_result, "INFO")
+        except Exception:
+            # La fase de staging NO debe interrumpir el servicio legado.
+            log("rclone v2 local staging: blocked_unexpected_error", "WARNING")
     log("Fase 1: cloud_storage -> finalizado")
     if monitor.abortRequested():
         raise SystemExit
@@ -584,33 +698,19 @@ def _startup_maintenance_wrapper():
         else:
             log("Mantenimiento de arranque: CleanLibrary desactivado por ajustes")
 
-        # 3) UpdateLibrary
-        if prefs.get("update_enabled", True) and prefs.get("update_on_start", True):
-            if utils.is_client():
-                do_scan = False
-                if sync_applied:
-                    do_scan = True
-                else:
-                    tot = (verify or {}).get("total") or {}
-                    missing = int(tot.get("missing", 0) or 0)
-                    extra   = int(tot.get("extra", 0) or 0)
-                    do_scan = (missing > 0) or (extra > 0)
+        # DEVELOP: se omite SOLO el escaneo VideoLibrary.Scan al arrancar.
+        # update_library_silent()  # temporalmente comentado para acelerar pruebas
+        # Se inicia el periodo de espera normal para que el worker periódico
+        # no dispare inmediatamente un Scan al minuto de arrancar.
+        _last_update_ts = time.time()
+        log("DEVELOP: UpdateLibrary (Scan) al arranque omitido; periódico activo.")
 
-                if do_scan:
-                    log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> inicio")
-                    update_library_silent()
-                    log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> finalizado")
-                    _last_update_ts = time.time()
-            else:
-                log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> inicio")
-                update_library_silent()
-                _last_update_ts = time.time()
-                log("Mantenimiento de arranque: UpdateLibrary (silencioso) -> finalizado")
-                log("Iniciando carga del catalogo")
-                core_catalog.generate_catalog()
-                utils.load_catalog_github()
-        else:
-            log("Mantenimiento de arranque: UpdateLibrary al inicio desactivado por ajustes")
+        # MASTER: generar y publicar STRM a partir de la biblioteca ya existente.
+        # Así se reflejan películas/episodios eliminados sin forzar un Scan.
+        if not utils.is_client():
+            log("Iniciando carga del catalogo (sin Scan de arranque)")
+            core_catalog.generate_catalog()
+            utils.load_catalog_github()
 
     except Exception:
         log(
@@ -888,6 +988,8 @@ def run_service():
         log(f"Direcciones MAC: Eth: {eth0}  Wlan: {wlan0}")
 
     _phase1_cloud_storage_blocking(monitor)
+    if not monitor.abortRequested():
+        _rclone_v2_autostart_worker()
 
     oneshot_sequence = [
         ("fix_settings_once",   _fix_settings_wrapper),
@@ -974,6 +1076,9 @@ def run_service():
         StoppableWorker("periodic_pvr_tick", _periodic_pvr_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_clean_tick", _periodic_clean_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_update_tick", _periodic_update_worker, monitor, interval=CHECK_TICK_SECS),
+        StoppableWorker("periodic_rclone_v2_cutover", _rclone_v2_autostart_worker, monitor, interval=CHECK_TICK_SECS),
+        StoppableWorker("periodic_rclone_v2_oauth", _rclone_v2_oauth_worker, monitor, interval=3600),
+        StoppableWorker("periodic_rclone_token_tick", rclone_token_sync.tick, monitor, interval=CHECK_TICK_SECS),
     ]
     for w in workers_periodic:
         try:

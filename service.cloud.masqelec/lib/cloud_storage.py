@@ -15,10 +15,16 @@ import shutil
 import socket
 import re
 import hashlib
+import tempfile
 import gzip
 
 from lib import log_utils
 from lib import utils
+from lib import constants
+from lib import rclone_conf_merge
+from lib import rclone_two_mount_rollout
+from lib import rclone_two_mount_boot_guard
+from lib import coreelec_systemd_dir
 
 # ==============================
 # Config red
@@ -88,6 +94,8 @@ def _atomic_write_bytes(dst_path: str, data: bytes, mode: int = None):
     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
 
     with open(tmp_out, "wb") as f:
+        if mode is not None:
+            os.fchmod(f.fileno(), mode)
         f.write(data)
         f.flush()
         os.fsync(f.fileno())
@@ -134,7 +142,7 @@ def download_to_file(url: str, dst_path: str) -> bool:
         log_utils.write_log(f"Error descargando '{url}': {e}\n{traceback.format_exc()}", "ERROR")
         return False
 
-def decrypt_file_to_file(src_path: str, key: bytes, dst_path: str, rounds: int = 8) -> bool:
+def decrypt_file_to_file(src_path: str, key: bytes, dst_path: str) -> bool:
     try:
         with open(src_path, "rb") as f:
             blob = f.read() or b""
@@ -143,10 +151,10 @@ def decrypt_file_to_file(src_path: str, key: bytes, dst_path: str, rounds: int =
         if len(blob) >= 2 and blob[0] == 0x1F and blob[1] == 0x8B:
             blob = gzip.decompress(blob)
 
-        # El cipher esperado por decrypt() es base64 en texto ASCII
+        # El formato MQC2 incluye prefijo ASCII y contenido base64 autenticado
         encrypted_text = blob.decode("ascii", "strict")
 
-        decrypted = utils.decrypt(encrypted_text, key, rounds=rounds)
+        decrypted = utils.decrypt(encrypted_text, key)
         if decrypted is None:
             return False
 
@@ -231,7 +239,7 @@ def handle_service_file(service_name: str, base_url: str, systemd_dir: str) -> b
                 log_utils.write_log(f"'{service_unit}' coincide con la versión remota.")
         else:
             log_utils.write_log(f"Archivo '{service_unit}' no encontrado. Creándolo (atómico).")
-            os.makedirs(systemd_dir, exist_ok=True)
+            coreelec_systemd_dir.ensure_directory(systemd_dir)
             _atomic_write_bytes(dest, remote_content, mode=0o644)
             changed = True
 
@@ -258,67 +266,139 @@ def _ensure_services_active(services):
 # CLOUD STORAGE
 # ==============================
 def start_cloud_storage():
+    # Un corte iniciado pero interrumpido NO puede volver a activar legacy
+    # aunque el marcador de modo esté ausente o dañado tras el reinicio.
+    if rclone_two_mount_boot_guard.recovery_required(
+            feature_allowed=getattr(
+                constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)):
+        log_utils.write_log(
+            "rclone: transición interrumpida/inconsistente; "
+            "bloqueado actualizador legacy hasta recuperación operativa",
+            "ERROR")
+        return
+    # El actualizador legacy puede reiniciar rclone al cambiar unidades.
+    # Nunca aplicarlo sobre un CLIENTE marcado como two-fuse activo; la
+    # migración necesita su propio protocolo de versión y rollback.
+    mount_mode = rclone_two_mount_rollout.mode(
+        getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
+    )
+    if mount_mode == "unsafe":
+        log_utils.write_log(
+            "rclone: marcador de arquitectura no autorizado/inválido; "
+            "bloqueada actualización de mounts legacy", "ERROR"
+        )
+        return
+    if mount_mode == "active":
+        log_utils.write_log(
+            "rclone: dos montajes activos; sincronizador legacy en pausa. "
+            "Ninguna unidad se sobrescribe ni reinicia.", "INFO"
+        )
+        return
+    # Modos legacy y prepared continúan con el código anterior SIN
+    # modificar rutas ni sustituir cuatro unidades prematuramente.
     if not utils.cb_should_run("cloud_storage"):
         if utils.cb_should_log_cooldown("cloud_storage"):
             log_utils.write_log("cloud_storage en cooldown; se omite.", "INFO")
         return
 
     enc_tmp = os.path.join(tmp_dir, ".rclone.conf.crypt.tmp")
-    dec_tmp = os.path.join(tmp_dir, ".rclone.conf.plain.tmp")
+    dec_tmp = None
 
     try:
+        # Temporal privado (0600) desde su creación, sin nombre fijo en /tmp.
+        dec_fd, dec_tmp = tempfile.mkstemp(prefix=".masqelec-rclone.", suffix=".tmp", dir=tmp_dir)
+        os.close(dec_fd)
         key = utils.get_key_from_authorized_keys()
 
         rclone_conf_path = "/storage/.config/rclone/rclone.conf"
         rclone_dir = os.path.dirname(rclone_conf_path)
-        enc_url = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/rclone/rclone.conf.crypt"
+        enc_url = f"{constants.CLOUD_RAW_BASE}/rclone/rclone.conf.crypt"
 
         if not download_to_file(enc_url, enc_tmp):
             log_utils.write_log("No se pudo descargar rclone.conf.crypt.", "WARNING")
             return
 
-        if not decrypt_file_to_file(enc_tmp, key, dec_tmp, rounds=8):
+        if not decrypt_file_to_file(enc_tmp, key, dec_tmp):
             log_utils.write_log("Falló el desencriptado de rclone.conf.", "ERROR")
             return
 
         with open(dec_tmp, "rb") as f:
             remote_raw = f.read()
 
-        remote_norm = _normalize_rclone_conf_bytes(remote_raw)
-
         os.makedirs(rclone_dir, exist_ok=True)
 
-        local_norm = None
+        local_raw = None
         if os.path.exists(rclone_conf_path):
             try:
                 with open(rclone_conf_path, "rb") as lf:
                     local_raw = lf.read()
-                local_norm = _normalize_rclone_conf_bytes(local_raw)
-            except Exception:
-                local_norm = None
+            except Exception as exc:
+                # No reemplazar una configuración potencialmente válida si
+                # ni siquiera se ha podido leer para preservar su token.
+                raise RuntimeError("No se pudo leer rclone.conf local") from exc
 
-        if local_norm is not None and local_norm == remote_norm:
-            log_utils.write_log("rclone.conf sin cambios (idéntico tras normalizar).")
+        identity_blocked = False
+        if local_raw is not None:
+            # Una biblioteca OneDrive no puede cambiar de unidad/destino
+            # automáticamente por descargar un nuevo conf del repositorio.
+            identity_blocked = rclone_conf_merge.onedrive_identity_changed(
+                remote_raw, local_raw
+            )
+            if identity_blocked:
+                merged_raw = local_raw
+            else:
+                # Las renovaciones normales de OAuth deben conservarse.
+                merged_raw = rclone_conf_merge.preserve_local_oauth_tokens(
+                    remote_raw, local_raw
+                )
+            remote_norm = _normalize_rclone_conf_bytes(merged_raw)
+            local_norm = _normalize_rclone_conf_bytes(local_raw)
+        else:
+            merged_raw = remote_raw
+            remote_norm = _normalize_rclone_conf_bytes(merged_raw)
+            local_norm = None
+
+        if identity_blocked:
+            log_utils.write_log(
+                "OneDrive: identidad de unidad diferente; "
+                "se conserva rclone.conf local hasta revisión manual.",
+                "WARNING",
+            )
+        elif local_norm is not None and (
+            local_norm == remote_norm or
+            rclone_conf_merge.same_non_token_settings(local_raw, merged_raw)
+        ):
+            log_utils.write_log(
+                "rclone.conf sin cambios relevantes; se conserva el token local."
+            )
         else:
             if local_norm is not None:
+                changed_keys = rclone_conf_merge.compare_non_token_settings(
+                    local_raw, merged_raw
+                )
+                # Solo nombres de opciones; nunca nombres de remotos o valores.
                 log_utils.write_log(
-                    f"rclone.conf difiere: sha_local={utils._sha256(local_norm)} sha_remote={utils._sha256(remote_norm)}",
+                    "rclone.conf: opciones diferentes={} (o solo formato).".format(
+                        ",".join(changed_keys[:16]) if changed_keys else "ninguna"
+                    ),
                     "DEBUG",
                 )
-            else:
-                log_utils.write_log(
-                    f"rclone.conf local no legible/no existe; sha_remote={utils._sha256(remote_norm)}",
-                    "DEBUG",
-                )
-
-            # Escribimos estable: LF + newline final (PERO escribimos el RAW, no el norm filtrado)
-            stable = b"\n".join(remote_raw.splitlines()).rstrip(b"\n") + b"\n"
+            stable = b"\n".join(merged_raw.splitlines()).rstrip(b"\n") + b"\n"
             _atomic_write_bytes(
-                rclone_conf_path,
-                stable,
-                mode=(stat.S_IRUSR | stat.S_IWUSR),  # 0600
+                rclone_conf_path, stable, mode=(stat.S_IRUSR | stat.S_IWUSR)
             )
-            log_utils.write_log("rclone.conf actualizado (cambios detectados).")
+            log_utils.write_log(
+                "rclone.conf actualizado preservando tokens OAuth locales compatibles."
+            )
+
+        if identity_blocked:
+            # Evitar cambios de units que puedan reiniciar o redirigir
+            # una biblioteca OneDrive incompatible con el conf local.
+            log_utils.write_log(
+                "OneDrive: se omiten actualizaciones de unidades systemd "
+                "hasta resolver la diferencia de identidad.", "WARNING"
+            )
+            return
 
         # ==========================
         # Units systemd desde remoto
@@ -332,9 +412,9 @@ def start_cloud_storage():
         ]
 
         systemd_dir = "/storage/.config/system.d/"
-        os.makedirs(systemd_dir, exist_ok=True)
+        coreelec_systemd_dir.ensure_directory(systemd_dir)
 
-        base_units_url = "https://raw.githubusercontent.com/masQelec/cloud.masqelec/master/system.d/"
+        base_units_url = f"{constants.CLOUD_RAW_BASE}/system.d/"
 
         changed_units = []
         for svc in services:
