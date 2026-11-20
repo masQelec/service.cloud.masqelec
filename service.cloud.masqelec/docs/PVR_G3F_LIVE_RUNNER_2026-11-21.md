@@ -61,3 +61,27 @@ En error o inconcluso devuelve código de salida 2. Estado `DIAGNOSTIC_ONLY` sig
 - Refetch de la M3U por API: endpoint real no demostrado.
 - Seis categorías vacías: propiedad desconocida, ninguna eliminación autorizada.
 - `update_pvr.py` y SQLite siguen sin cambios en este bloque. No publicar ZIP ni aplicar el nuevo mantenimiento.
+
+
+## Master CoreELEC: comprobación integrada G3-F — PASS
+
+El operador ejecutó `pvr_group_audit_real.py` en el master `192.168.1.102` con M3U local y API Tvheadend de solo lectura. Salida reportada:
+
+```text
+=== G3-F INTEGRADO / SOLO LECTURA ===
+RESULT=DIAGNOSTIC_ONLY
+REASON=NAME_AND_NUMBER_NOT_TECHNICAL_IDENTITY
+M3U_CHANNELS=720
+TVH_CHANNELS=720
+EXACT_NAME_PAIRS=696
+NAME_NUMBER_PAIRS=24
+RESOLVED_PAIRS=720
+UNRESOLVED=0
+GROUP_MISMATCHES=0
+READ_ONLY=YES
+APPLY_AUTHORIZED=NO
+```
+
+**Gate de asociación canal-grupo de la instantánea: PASS (720/720; 0 discrepancias).** El estado técnico del comprobador es deliberadamente `DIAGNOSTIC_ONLY`, porque la correspondencia se basa en nombre/número y no en CUID o identidad técnica permanente. No convierte el resultado en autorización de escritura.
+
+Próximos gates: observar orden real de categorías en Kodi; determinar si TVH puede releer la M3U inmediatamente sin reiniciar; confirmar propiedad/uso de las seis etiquetas históricas antes de cualquier borrado. Mantener el reconciliador activo antiguo mientras no exista corte validado; no tocar SQLite ni publicar ZIP.
