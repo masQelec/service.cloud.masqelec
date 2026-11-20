@@ -56,3 +56,28 @@ No afirmar 720/720 categorías correctas: 24 canales siguen pendientes. La igual
 ## Próximo gate: G3-F
 
 Auditoría pasiva de `tvh-chnum`/`tvg-chno` frente al campo `number` de `channel/grid` para intentar desambiguar los 24. Comprobar unicidad global de números y coincidencias de grupo de cada par. No asumir que la numeración es identidad persistente; la comprobación es diagnóstica y queda bloqueado cualquier borrado. Evitar imprimir URL, tokens o contraseñas.
+
+
+## G3-F REAL — auditoría de los 24 nombres no únicos (operador, 21-11-2026)
+
+Prueba real de solo lectura: pareja `(nombre exacto, numeración normalizada)`, con comprobación de unicidad de la pareja en las dos fuentes, comparación de `group-title` de la M3U con los tags actuales de TVH.
+
+Resultado aportado por el operador:
+
+```text
+Canales M3U: 720
+Canales TVH: 720
+Pendientes por nombre: 24
+Identificados por nombre + número: 24
+Asociaciones discrepantes: 0
+Ambiguos o sin coincidencia: 0
+Sin número utilizable: 0
+READ_ONLY=PASS
+APPLY_AUTHORIZED=NO
+```
+
+Acumulado G3-E + G3-F: **696 pares únicos por nombre + 24 por nombre/número, 720 asociaciones de grupo correctas en la instantánea actual, cero divergencias**.
+
+**Alcance restringido:** no implica prueba de identidad técnica persistente CUID ↔ TVH UUID ↔ Kodi; no valida orden de visualización Kodi, ni integridad de TVxx.db, ni si otras categorías históricas pertenecen al addon. El test ad hoc tiene un alcance diagnóstico, no autoriza escrituras. En especial, el comparador de producción `pvr_group_audit.py` aún no implementa el fallback por número probado con el script externo; implementar y añadir tests antes de adoptarlo.
+
+Próximo gate: implementar matching conservador por `(nombre,número)` exclusivamente para entradas con nombre duplicado; nunca usar número como ID permanente, no registrar URLs privadas ni borrar si hay ambigüedad. Después piloto seguro para orden en Kodi, y separadamente verificar refresco M3U y limpieza nativa de tags vacíos por API.
