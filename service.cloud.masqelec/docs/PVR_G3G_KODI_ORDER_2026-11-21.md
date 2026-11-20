@@ -42,3 +42,29 @@ La salida permite decidir si se necesita investigar JSON-RPC Kodi o su configura
 3. Antes de cambiar M3U antigua/nueva, proteger DVR y registrar los 720 canales originales, grupos e índices.
 4. Cualquier borrado de las seis categorías antiguas exige verificar propiedad, ausencia de usos y copia de recuperación. La prueba de API temporal no autoriza su borrado.
 5. No integrar el aplicador en `update_playlist()` ni tocar Kodi SQLite durante este bloque.
+
+
+## G3-G REAL — resultados en master (operador, 21-11-2026)
+
+El operador confirmó `Ran 3 tests ... OK` en Ubuntu y ejecución de `pvr_g3g_kodi_groups_readonly.py` en el master CoreELEC `192.168.1.102`.
+
+```text
+M3U_GROUP_COUNT=26
+TVH_TAG_COUNT=32
+TVH_GROUPS_MISSING=0
+TVH_EXTRA_TAGS=6
+KODI_GROUP_COUNT=32
+KODI_M3U_GROUPS_PRESENT=26
+KODI_M3U_GROUPS_MISSING=0
+KODI_ORDER_MATCH=NO
+READ_ONLY=YES
+APPLY_AUTHORIZED=NO
+```
+
+Los 26 nombres reconocidos en la lista de JSON-RPC `PVR.GetChannelGroups` llegaron **en orden alfabético** (`ADULTOS`, `ES - APPLE TV+ SERIES`, `ES - CINE`... `ES - UFC`), no en orden de primera aparición de la M3U (`ES - TDT`, `ES - CINE`... `ADULTOS`).
+
+**Límite de la evidencia:** la respuesta JSON-RPC puede estar ordenada independientemente de los índices de Tvheadend y de la presentación visible en Kodi. No extrapolar automáticamente que los `index` están mal o que la UI Kodi ordena así. Tampoco está demostrado el orden de entrada o el campo exacto de orden de cada tag TVH.
+
+Gate siguiente G3-H, read-only: contrastar los índices `channeltag/grid` y la lista obtenida de Kodi con el orden M3U, además de comprobación visual de orden en la interfaz Kodi y ajuste efectivo de orden del cliente. **No escribir index sobre tags reales todavía**.
+
+Las seis etiquetas históricas siguen sin autorización de borrado, y `update_pvr.py`, SQLite, TVH, playlist y ZIP siguen sin cambios.
