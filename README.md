@@ -1,10 +1,27 @@
 # Cloud masQelec — servicio Kodi/KodiELEC
 
-**Addon:** `service.cloud.masqelec` · **versión declarada:** `2.3.2` (`addon.xml`) · **lenguaje:** Python 3 / Kodi · **estado del desarrollo:** arquitectura v2 validada en MASTER y CLIENT piloto; candidato de separación OAuth `2.3.2` pendiente de regresión y ensayo físico.
+**Addon:** `service.cloud.masqelec` · **versión:** `2.3.2` · **rama de trabajo:** `develop` · Python 3 / Kodi.
 
-> **Estado revisado: 19-11-2026.** Última ejecución CI documentada: **773/773 OK** (Python 3.11; código anterior a esta revisión documental). KodiELEC: ambas OneDrive `DIFFERENT` respecto al MQC2 tras renovación rclone confirmada por el operador; ambas Google Drive `SAME`. P0-B generaciones, P0-C flota y P0-D readback: **PASS solo en laboratorios**. La coordinación real MASTER/CLIENTES y el montaje 2 FUSE + 4 bind siguen **sin desplegar**.
+**Estado a 20-11-2026:** migración 2 FUSE + 4 bind completada y verificada
+en MASTER y CLIENT piloto. La separación de las credenciales OneDrive de
+`rclone.conf` también está comprobada en ambos: configuración general
+Drive=2/OneDrive=0/Crypt=0; cada `isolated-mounts/account*.conf`
+OneDrive=1/Crypt=1. Reproducción correcta en las cuatro rutas de ambos
+equipos; reinicio CLIENT probado con la versión anterior 2.3.1.
+Regresión de 2.3.2 **1025/1025 OK** comunicada por el operador antes
+de la limpieza del repositorio.
 
-> **Estado actual 20-11-2026 — candidato 2.3.2:** MASTER y CLIENT piloto migraron automáticamente a 2 FUSE + 4 bind, retiraron 4 unidades legacy, reprodujeron correctamente en las 4 rutas y el CLIENT arrancó tras reinicio con el sincronizador legacy en pausa. Para 2.3.2 se implementó rclone.conf general sin OneDrive duplicado, usando account1/2.conf como origen de tokens. **Las pruebas automatizadas y la instalación física de 2.3.2 no se han reportado: no atribuirles PASS.** La recuperación OAuth del CLIENT frente a revocación real tampoco está probada.\n\n
+**Limitación vigente:** la recuperación automática de un token OneDrive
+revocado realmente NO está validada. El MASTER publica MQC2 v2 y el CLIENT
+lo consulta solo bajo condiciones de fallo AUTH; no confundir ejecución de
+workers con prueba física de recuperación.
+
+**Mantenimiento:** los laboratorios exploratorios previos a la migración
+se han reducido; las pruebas de rollback, arranque temprano, OAuth, seguridad
+y contrato de rutas se conservan. Consultar
+[estado de limpieza y criterios](service.cloud.masqelec/docs/REPO_CLEANUP_2026-11-20.md)
+antes de reusar procedimientos antiguos.
+
 ## Arquitectura v2.3.2: rclone.conf general + dos cuentas OneDrive aisladas
 
 La versión candidata 2.3.2 no cambia ninguna ruta de la biblioteca ni de
@@ -35,12 +52,10 @@ afectada. No copia tokens constantemente del repositorio ni de un
 `/storage/.config/masqelec` puede ser root-owned 0755; los subdirectorios
 privados y archivos de credenciales mantienen 0700/0600.
 
-**Validación pendiente para 2.3.2:** ejecutar
-`python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q`;
-instalar solo en MASTER y CLIENT piloto ya migrados; verificar en ambos que
-`rclone.conf` no contiene OneDrive, las cuentas aisladas permanecen intactas,
-MQC2 sigue operativo, hay 6 montajes y se reproduce vídeo. No divulgar los
-contenidos de los tres archivos ni los tokens en los logs.
+**Validación física realizada en 2.3.2:** MASTER y CLIENT piloto confirmados
+con `rclone.conf` sin OneDrive y reproducciones en los cuatro bind.
+La CI debe volver a pasar después de cualquier limpieza del repositorio.
+No divulgar los contenidos de los tres archivos ni tokens en logs.
 
 ## Validación KodiELEC real — 19/11/2026 (laboratorio aislado)
 
