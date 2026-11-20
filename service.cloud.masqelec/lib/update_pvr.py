@@ -2111,6 +2111,31 @@ def update_playlist() -> tuple[bool, bool]:
             _log_pvr_db_stats(prefix="[pvr]")
             return True, True
         
+        # G3-P shadow: SOLO lectura, sin activar reconciliador API.
+        # Se ejecuta después de READY; NUNCA modifica tags, Kodi ni playlist.
+        try:
+            from lib.pvr_tag_shadow import audit as _pvr_tag_shadow_audit
+            _pvr_g3p = _pvr_tag_shadow_audit(
+                playlist_file, _tvh_api_get_json, _read_text
+            )
+            log_utils.write_log(
+                "[pvr][G3P][shadow] estado={} canales_m3u={} canales_tvh={} "
+                "crear={} vacios_protegidos={} indices_diagnostico={} "
+                "writes=NO".format(
+                    _pvr_g3p.get("status"),
+                    _pvr_g3p.get("m3u_channels", "-"),
+                    _pvr_g3p.get("tvh_channels", "-"),
+                    _pvr_g3p.get("create_count", "-"),
+                    _pvr_g3p.get("unowned_empty_count", "-"),
+                    _pvr_g3p.get("index_mismatch_diagnostic", "-"),
+                ), level="INFO" if _pvr_g3p.get("status") == "PASS" else "WARNING"
+            )
+        except Exception as _pvr_g3p_error:
+            log_utils.write_log(
+                "[pvr][G3P][shadow] BLOCKED: {}".format(type(_pvr_g3p_error).__name__),
+                level="WARNING"
+            )
+
         # 7.1) TVH a veces regenera basura al arrancar -> limpieza 2ª pasada
         try:
             bq_uuid = _tvh_find_target_bouquet_uuid()
