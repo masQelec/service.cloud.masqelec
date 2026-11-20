@@ -44,21 +44,21 @@ class ConfigSplitTests(unittest.TestCase):
     def test_virtual_full_uses_current_isolated_refresh_tokens(self):
         full, accounts = fixture()
         general = split.general_only(full, accounts)
-        fresh = accounts[0].replace(b"refresh-one_a", b"current-one-a")
+        fresh = accounts[0].replace(b"refresh-users_library_1", b"current-one-a")
         virtual = split.full_view(general, (fresh, accounts[1]))
         policy.validate_master_layout(virtual)
         self.assertIn(b"current-one-a", virtual)
-        self.assertNotIn(b"refresh-one_a", virtual)
+        self.assertNotIn(b"refresh-users_library_1", virtual)
         self.assertEqual(plan.account_snapshot(virtual, 0), fresh)
         self.assertEqual(plan.account_snapshot(virtual, 1), accounts[1])
 
     def test_virtual_full_accepts_existing_legacy_canonical(self):
         full, accounts = fixture()
         renewed = accounts[1].replace(
-            b"refresh-one_b", b"rotated-one-b")
+            b"refresh-users_library_2", b"rotated-one-b")
         virtual = split.full_view(full, (accounts[0], renewed))
         self.assertIn(b"rotated-one-b", virtual)
-        self.assertNotIn(b"refresh-one_b", virtual)
+        self.assertNotIn(b"refresh-users_library_2", virtual)
         self.assertEqual(split.general_only(virtual, (accounts[0], renewed)),
                          split.general_only(full, accounts))
 
