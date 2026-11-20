@@ -70,6 +70,11 @@ class BackupPreflightTests(unittest.TestCase):
         self.assertEqual((hits, bad, skipped), (0, 0, 0))
 
     def test_reference_scan_file_limit_denied(self):
+        # The target tag is deliberately excluded from the scan.
+        # Add a second file so the scan really exceeds a zero-file limit.
+        extra = self.root / "dvr" / "independent"
+        extra.parent.mkdir(parents=True)
+        extra.write_text("unrelated configuration", encoding="utf-8")
         with patch.object(M, "MAX_SCAN_FILES", 0):
             with self.assertRaisesRegex(ValueError, "REFERENCE_SCAN_LIMIT_FILES"):
                 M._scan_references()
