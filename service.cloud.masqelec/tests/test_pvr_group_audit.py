@@ -103,12 +103,14 @@ class GroupNumberAuditTests(unittest.TestCase):
             {"uuid": "c2", "name": "Duplicated", "number": 2, "tags": ["u2"]},
             {"uuid": "c3", "name": "Unique", "number": 3, "tags": ["u1"]},
         ]}
-        self.m3u = (
-            '#EXTM3U\\n'
-            '#EXTINF:-1 group-title="A" tvh-chnum="1",Duplicated\\nhttp://example.invalid/1\\n'
-            '#EXTINF:-1 group-title="B" tvg-chno="2",Duplicated\\nhttp://example.invalid/2\\n'
-            '#EXTINF:-1 group-title="A" tvh-chnum="3",Unique\\nhttp://example.invalid/3\\n'
-        ).replace("\\\\n", "\\n")
+        self.m3u = """#EXTM3U
+#EXTINF:-1 group-title="A" tvh-chnum="1",Duplicated
+http://example.invalid/1
+#EXTINF:-1 group-title="B" tvg-chno="2",Duplicated
+http://example.invalid/2
+#EXTINF:-1 group-title="A" tvh-chnum="3",Unique
+http://example.invalid/3
+"""
 
     def audit(self, playlist=None):
         return audit_with_numbers(self.m3u if playlist is None else playlist,
