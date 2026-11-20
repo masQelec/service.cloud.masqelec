@@ -48,3 +48,16 @@ No se afirma PASS hasta recibir las salidas. La biblioteca sigue desconectada de
 6. Solo entonces probar limpieza controlada de históricos bajo autorización específica; el código actual está en modo `allow_delete=False`.
 
 **Producción, M3U, EPG, TVxx.db y ZIP: intactos.** CI/PR a main pendientes de validación de tests y puertas de integración.
+
+
+## Resultado de pruebas confirmado por el operador
+
+En Ubuntu, después de sincronizar `develop`, el operador confirma que ambos comandos de pruebas terminaron en `OK`:
+
+- `test_pvr_tag_reconcile.py`: **13/13 OK**
+- `test_pvr_tag_plan.py`: **13/13 OK**
+- Total: **26/26 OK**
+
+Esta confirmación cubre pruebas unitarias con datos de simulación; **no** valida la integración de escritura en Tvheadend real, ni el vínculo de canales a un grupo recreado, ni autoriza borrar grupos históricos. La integración automática sigue pendiente.
+
+Próximo bloque **G3-M**: adaptador autenticado de inventario/API TVH, prueba de grupo temporal y verificación de asociación de canales y reflejo en Kodi, con operaciones de borrado de grupos históricos desactivadas. Evitar doble sincronizador de categorías.
