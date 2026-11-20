@@ -28,6 +28,17 @@ el coordinador de recuperación temprana exige un orden systemd de arranque
 todavía no verificado en TX3/X96 X4. No hay servicio de recuperación
 instalado ni activación del addon v2.
 
+## Manual funcional del mantenimiento (vigente)
+
+El [README principal](../../README.md) es ahora el punto de entrada operativo:
+**qué se ejecuta al arrancar, qué se repite, qué cambia en MASTER/CLIENT,
+PVR/EPG, catálogo, MyVideos, actualización de sistema y rclone**.
+
+La [auditoría funcional de mantenimiento del 20-11-2026](AUDIT_MAINTENANCE_2026-11-20.md)
+recoge trazabilidad de los módulos, riesgos de interrupción PVR,
+diferencia entre intento y finalización de Scan/Clean y mejoras pendientes
+en [Issue #4](https://github.com/masQelec/service.cloud.masqelec/issues/4).
+
 ## Documentación mantenida (fuente de trabajo)
 
 | Documento | Cuándo consultarlo |
