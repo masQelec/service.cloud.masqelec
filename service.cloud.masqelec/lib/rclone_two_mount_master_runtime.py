@@ -116,9 +116,10 @@ def _probe_candidate(candidate, names):
         states = {name: tokens._probe(name, path) for name in names}
         checked, _ = stage._read_file(path, confidential=True)
         rotated = policy.oauth_tokens(checked)
+        from lib import rclone_conf_merge as conf
         if (not all(name in initial and name in rotated for name in names)
-                or not policy.validate_master_layout(checked)
-                == policy.validate_master_layout(candidate)):
+                or not conf.same_non_token_settings(candidate, checked)
+                or set(initial) != set(rotated)):
             return {name: "unavailable" for name in names}
         for name in names:
             if (initial[name]["refresh_token"] !=
