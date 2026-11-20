@@ -68,3 +68,15 @@ Los 26 nombres reconocidos en la lista de JSON-RPC `PVR.GetChannelGroups` llegar
 Gate siguiente G3-H, read-only: contrastar los índices `channeltag/grid` y la lista obtenida de Kodi con el orden M3U, además de comprobación visual de orden en la interfaz Kodi y ajuste efectivo de orden del cliente. **No escribir index sobre tags reales todavía**.
 
 Las seis etiquetas históricas siguen sin autorización de borrado, y `update_pvr.py`, SQLite, TVH, playlist y ZIP siguen sin cambios.
+
+
+## G3-H — orden visual real en Kodi (observación del operador)
+
+El operador inspeccionó el master y confirmó la siguiente secuencia **en la interfaz Kodi**:
+
+1. Primero, los **26 grupos que contienen canales** de la nueva lista, ordenados alfabéticamente.
+2. Después, los **seis grupos vacíos** heredados de la lista anterior, igualmente ordenados alfabéticamente.
+
+Esto confirma que en la interfaz se da una separación por ocupación y orden alfabético dentro de cada bloque. No está identificado todavía si la separación procede de Kodi, `pvr.hts` o del backend Tvheadend; el resultado JSON-RPC G3-G anterior, por sí solo, no mostraba esta agrupación visible. No afirmar que se pueda corregir modificando `index` en TVH.
+
+**Decisión de alcance:** no tocar los índices de los 26 tags activos. Priorizar el procedimiento controlado de limpieza de grupos históricos vacíos, comprobando antes propiedad y ausencia de referencias en cualquier canal/servicio/grabación y verificando después tanto TVH como Kodi. Las seis etiquetas NO están autorizadas para borrado todavía. El siguiente ensayo adecuado es eliminar un único tag temporal o un tag histórico expresamente autorizado, con snapshots y recuperación, sin editar ficheros tag ni SQLite.
