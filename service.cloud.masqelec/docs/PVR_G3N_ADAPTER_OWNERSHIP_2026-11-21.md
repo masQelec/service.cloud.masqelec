@@ -39,3 +39,17 @@ Esperados: 15 nuevos + 13 reconciliador + 13 planificador = **41 pruebas**. No a
 ## Protocolo
 
 Solo `develop`; ejecutar CI y revisión/PR a `main` cuando estén superados los gates de integración. El operador gestiona ZIP/publicación. Las seis categorías históricas y los 720 canales actuales no se modifican durante G3-N.
+
+
+## Resultado de pruebas (confirmado por el operador)
+
+El operador confirma `OK` en las tres baterías locales tras sincronizar develop:
+
+- `test_pvr_g3n_registry_adapter.py`: 15 pruebas OK.
+- `test_pvr_tag_reconcile.py`: 13 pruebas OK.
+- `test_pvr_tag_plan.py`: 13 pruebas OK.
+- **Total G3-N: 41/41 OK.**
+
+Este resultado acredita solamente los tests locales; **no** confirma pruebas reales de escritura API, persistencia tras corte, recuperación de asociación canales/grupos, ni sustitución del sincronizador activo. No modificar `update_pvr.py` en producción ni ejecutar limpieza automática de las seis categorías históricas todavía.
+
+**Próximo bloque G3-O**: integrar orquestación en develop, eliminar convivencia con el sincronizador de ficheros, controlar persistencia/caídas y ensayar asociación de canales a grupo por API tras refresco de M3U.
