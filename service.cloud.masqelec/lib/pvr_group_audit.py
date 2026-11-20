@@ -98,7 +98,7 @@ def audit(playlist, tags_grid, channel_grid):
 
 # This matcher is deliberately separate from audit(): legacy G3-E callers keep
 # their original exact-name-only diagnostics.
-_ATTR_NUMBER = re.compile(r'(?:^|\\s)(tvh-chnum|tvg-chno)\\s*=\\s*"([^"]*)"')
+_ATTR_NUMBER = re.compile(r'(?:^|\s)(tvh-chnum|tvg-chno)\s*=\s*"([^"]*)"')
 
 
 def _canonical_number(value):
@@ -106,7 +106,7 @@ def _canonical_number(value):
     if isinstance(value, bool) or value is None:
         return None
     token = str(value).strip()
-    if not re.fullmatch(r"[0-9]+(?:\\.[0-9]+)?", token):
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", token):
         return None
     whole, separator, decimals = token.partition(".")
     whole = str(int(whole))
