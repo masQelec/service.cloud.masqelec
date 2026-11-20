@@ -498,6 +498,18 @@ def _rclone_v2_autostart_worker():
     global _rclone_v2_autostart_last
     try:
         status = rclone_two_mount_autostart.tick(xbmc.executeJSONRPC)
+        # Only after the v2 engine proved 2 FUSE + 4 binds and retired
+        # legacy, strip duplicate OneDrive sections from rclone.conf.
+        # account1/2.conf remain the ONLY active OneDrive token writers.
+        if status in ("ACTIVE_VERIFIED_LEGACY_RETIRED",
+                      "ACTIVE_CLEAN_ALREADY"):
+            from lib import rclone_two_mount_config_split as split
+            compact = split.retire_once(
+                authorized=True, health_verified=True)
+            if compact not in ("CLEANED", "ALREADY_CLEAN"):
+                log("rclone v2 general config: " + compact, "WARNING")
+            elif compact == "CLEANED":
+                log("rclone v2 general config: ONEDRIVE_ISOLATED", "INFO")
         # Lista cerrada para no volcar tokens/errores de procesos externos.
         if status not in rclone_two_mount_autostart._STATUSES:
             status = "BLOCKED_LOCAL_ERROR"
