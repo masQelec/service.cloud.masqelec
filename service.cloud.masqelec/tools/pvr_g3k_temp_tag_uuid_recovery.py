@@ -135,6 +135,8 @@ def experiment():
                 safe_delete(item, name, original)
             after = {t["uuid"] for t in grid("channeltag/grid", LIMIT)}
             print("INVENTORY_RESTORED=" + ("PASS" if after == original else "FAIL"))
+            if after != original:
+                raise ValueError("BASELINE_NOT_RESTORED")
         except Exception as exc:
             print("CLEANUP=REVIEW_REQUIRED")
             print("CLEANUP_ERROR_TYPE=" + type(exc).__name__)
