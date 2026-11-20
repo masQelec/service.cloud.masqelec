@@ -33,6 +33,7 @@ from lib.update_pvr import update_pvr, update_playlist
 from lib.jsonrpc_utils import get_library_stats, get_installed_addons_filtered, format_addons_for_log
 from lib.fix_settings import fix_skin_home_menu_visibility_and_reload
 from lib import utils
+from lib import device_utils
 from lib import core_catalog
 from lib import rclone_token_sync
 from lib import constants
@@ -533,7 +534,7 @@ def _rclone_v2_oauth_worker():
     if rclone_two_mount_rollout.mode(True) != "active":
         return
     try:
-        role = utils.get_device_role()
+        role = device_utils.get_device_role()
         if (role == "MASTER"
                 and getattr(constants,
                             "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
