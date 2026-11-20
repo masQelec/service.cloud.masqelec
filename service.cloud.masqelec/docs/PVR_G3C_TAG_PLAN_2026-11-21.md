@@ -30,3 +30,18 @@ Bloqueos: M3U vacía, grupos omitidos, inventarios paginados/incompletos, recuen
 6. Los tests añadidos al repositorio no equivalen a CI pasada. Ejecutar `python3 -m unittest discover -s service.cloud.masqelec/tests -p test_pvr_tag_plan.py -v` desde la raíz del repositorio y revisar CI.
 
 Siguiente gate: G3-D, experimento `idnode/save` sobre un tag temporal de laboratorio, restauración comprobada; después añadir cliente API de lectura y verificación completa de asociaciones, y solo más adelante el aplicador protegido.
+
+
+## G3-D — prueba real del índice mediante API (operador, 21-11-2026)
+
+Ensayo contra el master Tvheadend usando exclusivamente una etiqueta temporal:
+
+- `BASELINE=PASS` — 32 etiquetas iniciales.
+- `CREATE=PASS` — alta de etiqueta temporal.
+- `INDEX_UPDATE=PASS` y `INDEX_VALUE=99` — `idnode/save` persistió y `channeltag/grid` permitió verificar el índice.
+- `TEMP_CLEANUP_REQUESTED=YES`.
+- `INVENTORY_RESTORED=PASS` — conjunto final de UUID igual al inicial.
+
+**Alcance de PASS:** creación/modificación/borrado de etiquetas **temporales** por API, con recuperación del inventario. **No probado:** efecto del índice en el orden visible en Kodi; actualizar índices de categorías reales; reconcilación completa de enlaces de 720 canales; borrado automático de etiquetas históricas; cambio/relectura instantánea de M3U. Ninguna de las seis categorías históricas ha sido borrada en esta prueba.
+
+Siguiente gate G3-E: validar `canal → categoría` para los 720 elementos y ensayar idempotencia en modo read-only. Para el orden de los grupos en Kodi, considerar piloto controlado y restauración de índices, sin extrapolar de `index=99` sobre etiqueta vacía.
