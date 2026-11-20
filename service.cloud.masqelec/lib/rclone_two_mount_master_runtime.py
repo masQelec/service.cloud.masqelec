@@ -107,7 +107,25 @@ def _probe_candidate(candidate, names):
             stream.flush()
             os.fsync(stream.fileno())
         from lib import rclone_token_sync as tokens
-        return {name: tokens._probe(name, path) for name in names}
+        from lib import rclone_token_policy as policy
+        # A private rclone lsf may itself rotate a refresh_token. We must
+        # not publish the PRE-probe token as if that fresh rotation had been
+        # durably committed by the active FUSE. Refuse to publish until the
+        # live account writer provides a stable generation.
+        initial = policy.oauth_tokens(candidate)
+        states = {name: tokens._probe(name, path) for name in names}
+        checked, _ = stage._read_file(path, confidential=True)
+        rotated = policy.oauth_tokens(checked)
+        from lib import rclone_conf_merge as conf
+        if (not all(name in initial and name in rotated for name in names)
+                or not conf.same_non_token_settings(candidate, checked)
+                or set(initial) != set(rotated)):
+            return {name: "unavailable" for name in names}
+        for name in names:
+            if (initial[name]["refresh_token"] !=
+                    rotated[name]["refresh_token"]):
+                states[name] = "unavailable"
+        return states
 
 
 
