@@ -29,14 +29,20 @@ class RunnerTests(unittest.TestCase):
 
     def test_failure_does_not_fail_kodi_boot(self):
         with mock.patch.object(runner.early, "execute",
-                               return_value="MANUAL_RECOVERY_REQUIRED"):
+                               return_value="MANUAL_RECOVERY_REQUIRED"), \
+             mock.patch.object(runner.constants,
+                               "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                               False):
             with contextlib.redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(runner.main(["--recover"]), 0)
         self.assertIn("MANUAL_RECOVERY_REQUIRED", output.getvalue())
 
     def test_unexpected_failure_does_not_print_secret_or_stop_kodi(self):
         with mock.patch.object(runner.early, "execute",
-                               side_effect=RuntimeError("secret-token")):
+                               side_effect=RuntimeError("secret-token")), \
+             mock.patch.object(runner.constants,
+                               "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                               False):
             with contextlib.redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(runner.main(["--recover"]), 0)
         self.assertIn("MANUAL_RECOVERY_REQUIRED", output.getvalue())
@@ -49,7 +55,10 @@ class RunnerTests(unittest.TestCase):
 
     def test_unknown_result_never_prints_untrusted_content(self):
         with mock.patch.object(runner.early, "execute",
-                               return_value="refresh_token=SECRET"):
+                               return_value="refresh_token=SECRET"), \
+             mock.patch.object(runner.constants,
+                               "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED",
+                               False):
             with contextlib.redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(runner.main(["--recover"]), 0)
         self.assertNotIn("SECRET", output.getvalue())
