@@ -64,8 +64,9 @@ def _read(path):
 def provision_private_journal(folder):
     """Create only a private account journal under an existing trusted base.
 
-    The base /storage/.config/masqelec must already exist at 0700 and be
-    owned by this user; never mkdir parents recursively or follow symlinks.
+    CoreELEC may ship the shared /storage/.config/masqelec base at
+    root-owned 0755; only that exact non-secret ancestor is accepted.
+    The per-account transaction root must remain 0700, with no symlinks.
     Only used by the explicitly enabled apply path.
     """
     if os.path.basename(folder) not in ("account1", "account2"):
