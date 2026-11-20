@@ -182,6 +182,51 @@ class MasterV2RuntimeTests(unittest.TestCase):
             self.assertEqual(runtime.publish_from_legacy_before_cutover(),
                              "blocked_not_authorized")
 
+    def test_real_master_probe_rejects_private_refresh_rotation(self):
+        from test_rclone_two_mount_config_split import fixture
+        from lib import rclone_token_policy as policy
+        from pathlib import Path
+        candidate, _accounts = fixture()
+        names = tuple(sorted(policy.oauth_tokens(candidate)))
+        def rotate_first(name, path):
+            if name == names[0]:
+                source = Path(path).read_bytes()
+                token = policy.oauth_tokens(source)[name]["refresh_token"]
+                Path(path).write_bytes(source.replace(
+                    token.encode("utf-8"), b"NEW-PRIVATE-ONLY-REFRESH"))
+            return "ok"
+        with mock.patch("lib.rclone_token_sync._probe",
+                        side_effect=rotate_first):
+            result = runtime._probe_candidate(candidate, names)
+        self.assertEqual(result[names[0]], "unavailable")
+        self.assertEqual(result[names[1]], "ok")
+        self.assertEqual(set(result), set(names))
+
+    def test_real_master_probe_allows_unchanged_refresh(self):
+        from test_rclone_two_mount_config_split import fixture
+        from lib import rclone_token_policy as policy
+        candidate, _accounts = fixture()
+        names = tuple(sorted(policy.oauth_tokens(candidate)))
+        with mock.patch("lib.rclone_token_sync._probe",
+                        return_value="ok"):
+            result = runtime._probe_candidate(candidate, names)
+        self.assertEqual(result, {name: "ok" for name in names})
+
+    def test_real_master_probe_rejects_static_tamper(self):
+        from test_rclone_two_mount_config_split import fixture
+        from lib import rclone_token_policy as policy
+        from pathlib import Path
+        candidate, _accounts = fixture()
+        names = tuple(sorted(policy.oauth_tokens(candidate)))
+        def tamper(name, path):
+            Path(path).write_bytes(Path(path).read_bytes().replace(
+                b"drive_type = personal", b"drive_type = business"))
+            return "ok"
+        with mock.patch("lib.rclone_token_sync._probe",
+                        side_effect=tamper):
+            result = runtime._probe_candidate(candidate, names)
+        self.assertEqual(result, {name: "unavailable" for name in names})
+
     def test_probe_callback_is_not_called_with_release_false(self):
         with mock.patch.object(runtime, "_probe_candidate",
                                side_effect=AssertionError("oauth")):
