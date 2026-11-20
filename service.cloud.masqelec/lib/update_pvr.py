@@ -2026,6 +2026,29 @@ def update_playlist() -> tuple[bool, bool]:
                 db_mismatch = (del_ch > 0) or (upd_ic > 0) or (del_gr > 0)
 
         needs_soft_reset = bool(playlist_changed or db_mismatch)
+        # G3-Q: sombra de decision sin alterar ninguna rama del flujo heredado.
+        # Ninguna evidencia parcial autoriza omitir reset, editar TVxx.db ni
+        # activar la reconciliacion API nueva.
+        try:
+            from lib.pvr_update_policy import classify as _pvr_g3q_classify
+            _g3q = _pvr_g3q_classify(
+                playlist_changed=bool(playlist_changed),
+                db_mismatch=bool(db_mismatch),
+            )
+            log_utils.write_log(
+                "[pvr][G3Q][decision] status={} reason={} "
+                "playlist_changed={} db_mismatch={} "
+                "cutover_authorized=NO".format(
+                    _g3q["status"], _g3q["reason"],
+                    bool(playlist_changed), bool(db_mismatch)
+                ), level="INFO"
+            )
+        except Exception as _g3q_error:
+            log_utils.write_log(
+                "[pvr][G3Q][decision] BLOCKED: {}".format(
+                    type(_g3q_error).__name__
+                ), level="WARNING"
+            )
         if not needs_soft_reset:
             log_utils.write_log("[pvr] Sin cambios y DB consistente con playlist.", level="INFO")
             _log_pvr_db_stats(prefix="[pvr]")
