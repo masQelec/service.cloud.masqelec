@@ -1,5 +1,12 @@
 # Documentación técnica — `service.cloud.masqelec`
 
+## Próximo desarrollo prioritario — mantenimiento IPTV/PVR de Kodi
+
+- [**Especificación definitiva: PVR / Kodi, limpieza segura de huérfanos y Scan/Clean**](PVR_KODI_MAINTENANCE_DESIGN_2026-11-20.md) — alcance vigente, hechos confirmados, fallos del código, diseño de reconciliación, gates y prompt del siguiente chat.
+- [Auditoría técnica e historial de decisiones IPTV/PVR/EPG](HANDOFF_IPTV_PVR_EPG_2026-11-20.md) — evidencia y evolución del diagnóstico; cuando haya discrepancia, prevalece la especificación definitiva.
+
+**Incidencia confirmada por el operador:** Tvheadend actualiza correctamente su M3U cada 60 minutos; Kodi incorpora canales nuevos pero retiene antiguos. La limpieza de huérfanos de TVxx.db **no debe suprimirse sin reemplazo verificado**.
+
 **Índice vigente: 20-11-2026.** Versión 2.3.2: MASTER y CLIENT
 piloto con 2 FUSE + 4 bind, `rclone.conf` general sin OneDrive y
 reproducción confirmada. Antes de limpiar se verificó 1025/1025 tests; después,

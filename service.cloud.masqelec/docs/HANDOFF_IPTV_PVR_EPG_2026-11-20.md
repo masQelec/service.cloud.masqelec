@@ -90,3 +90,73 @@ La reducción 865 → 720 no permite concluir el número de bajas reales; puede 
 ## 6. Prompt breve para otro chat
 
 > Continuamos el proyecto `masQelec/service.cloud.masqelec` (CoreELEC addon 2.3.2). Lee `service.cloud.masqelec/docs/HANDOFF_IPTV_PVR_EPG_2026-11-20.md` y `README.md` en `main` antes de tocar código. Tvheadend usa red IPTV automática que lee `/storage/.user/playlist.m3u`, generada desde IPTV Studio y publicada en `cloud.masqelec`. `CUID` es ID estable; la nueva playlist contiene 720 canales y sustituirá a la anterior de 865 mediante **migración inicial controlada**. Objetivo: sync diferencial de canales/grupos/orden/logos/URLs, eliminación segura, TVH como autoridad y Kodi como espejo vía pvr.hts; EPG desde `masQelec/epg/main/guide.xml` con `tv_grab_file`. No borrar directamente TVxx.db, ni interrumpir grabaciones, ni publicar/instalar lista nueva sin gate. Empezar con auditoría de configuración TVH solo lectura, pruebas sintéticas y plan de migración. Mantener tests y documentación en GitHub.
+
+## 7. Evidencia UI real de Tvheadend (HTML SingleFile 20-11-2026, 22:39–22:40)
+
+El operador aportó tres capturas HTML guardadas de `Tvheadend` (vista Redes, edición de red y vista Paquetes/Bouquets). Lectura **sin acceso al equipo ni modificaciones**.
+
+**Confirmado por los datos visibles:**
+- Una sola red: `IPTV LOCAL`; fuente `file:///storage/.user/playlist.m3u`.
+- Estadísticas de la red: **865 multiplexores, 865 servicios y 865 canales mapeados**.
+- Vista Paquetes/Bouquets: fila `IPTV LOCAL`, source `iptv-network://cce41e6f2d9b5d829d3af38159eea0a5`; **865 services seen** y **865 services**.
+- Los demás paquetes DVB fastscan listados tienen 0 servicios vistos; no se debe inferir que todos los 14 bouquets son redes IPTV activas.
+- La configuración de edición expone el campo URL local y opciones de numeración/escaneo, pero el texto extraído no acredita el estado efectivo de todos los checkboxes; comprobar sus valores por API antes de decidir algoritmo.
+
+**Implicación:** mantener la red `IPTV LOCAL` y su bouquet existentes; no crear otra red ni borrar indiscriminadamente. No existe evidencia todavía de cómo la red auto IPTV empareja un M3U nuevo con mux UUID antiguos, ni de que reconozca `CUID` nativamente. Exigir snapshot por API READ-ONLY de network/grid, mpegts/mux/grid, mpegts/service/grid, channel/grid, bouquet/grid y DVR antes de habilitar borrados o renumeraciones. Evitar publicar identificadores de sesiones, credenciales o URLs privadas; la URI de origen es local.
+
+## 8. Corrección de alcance por el operador — TVH ya sincroniza cada 60 minutos
+
+**Aclaración funcional confirmada:** Tvheadend lee automáticamente la M3U local cada **60 minutos**, incorpora los canales de la lista y mantiene su orden correcto. El usuario señala que la incidencia real está **en Kodi y su base de datos de TV**, no en la importación de la playlist por TVH. La auditoría/diseño debe priorizar la propagación `Tvheadend -> pvr.hts -> TVxx.db/Kodi`, evitando rediseñar un mecanismo TVH que ya funciona para este caso.
+
+**Nueva prioridad:** verificar por API en modo lectura si el inventario de TVH es correcto y si el inventario PVR/orden/grupos visto por Kodi diverge. No confiar en diferencias por nombre para concluir un canal ausente: correlacionar UUID/PVR channel unique ID según interfaces disponibles. Antes de escribir código, validar cómo `pvr.hts` recibe notificaciones de cambios y qué operaciones soporta realmente (refresh/reconnect/toggle), incluidos tiempos, seguridad durante reproducción/grabación y persistencia de agrupaciones.
+
+**Cambios propuestos al mantenimiento:** (1) impedir la edición directa recurrente de tablas `TVxx.db` (`channels`, `channelgroups`, `map_channelgroups_channels`) como mecanismo habitual de actualización de PVR; (2) separar actualización de playlist/TVH de reconciliación Kodi; (3) no reiniciar TVH cuando la discrepancia solo existe en Kodi; (4) recuperación escalonada por `pvr.hts` **únicamente** tras confirmar fallo persistente y ausencia de condiciones que la vuelvan disruptiva; (5) verificar el estado final antes de marcar éxito y mantener estado `DEFERRED` o `FAILED` si Kodi no coincide. `VideoLibrary.Scan/Clean` pertenecen a películas/series, no a la base de canales PVR.
+
+**No probado aún:** que todos los CUID, grupos y números de la nueva playlist se representen correctamente en TVH tras el primer ciclo de 60 minutos; que Kodi pueda resincronizar sin toggle; mecanismos de notificación de cambios de la versión exacta de `pvr.hts` y TVH. Esto requiere una comprobación READ-ONLY y ensayos en un piloto, no afirmaciones genéricas.
+
+## 9. Auditoría profunda PVR sobre código main — Kodi conserva canales obsoletos
+
+**Dato confirmado por el operador (20/11/2026):** Tvheadend relee la red IPTV automática cada 60 minutos, aplica correctamente canales/orden; Kodi incorpora canales nuevos pero retiene entradas antiguas en `TVxx.db` incluso cuando TVH ya no las presenta. Por tanto la limpieza SQLite existente **responde a un fallo real observado**. No eliminarla sin disponer de sustitución que demuestre eliminación de huérfanos. Esto modifica cualquier propuesta anterior de quitarla por principio.
+
+Se revisaron las 2.248 líneas de `lib/update_pvr.py`, planificación en `service.py`, preferencias Kodi y presencia de pruebas. Código de `main`, **sin ejecutar TVH/Kodi real**.
+
+### Auditoría con ubicaciones exactas
+
+| ID | Severidad | Evidencia | Consecuencia |
+| --- | --- | --- | --- |
+| P1 | CRÍTICA | `update_playlist:2050-2060` ejecuta `tvh_delete_channels_not_in_playlist_or_bad` con la **playlist local anterior**, ANTES de instalar la nueva en `2083-2090`. | Si TVH ya actualizó por su timer o existe un canal nuevo aún ausente en la playlist anterior, el addon puede borrarlo del TVH sano. Riesgo de regeneración y ciclo innecesario. |
+| P2 | ALTA | `reconcile_kodi_channels_and_groups_with_playlist:702-704` devuelve `False` si existen `TVxx.db-wal`/`-shm`; `update_playlist:2092-2097` **ignora el resultado**. | La limpieza puede no ocurrir aunque se notifique ciclo finalizado; no se verifica exclusividad real ni cierre del SQLite Kodi. |
+| P3 | ALTA | `_plan_reconcile:608-678` compara solo `sChannelName` (también `tvg-name` y nombre visible como un mismo conjunto). | Colisiones de nombres y renombrados; no detecta altas que faltan, pertenencias/grupos, orden, numeración ni actualización de URL/UUID. Con nombres duplicados pueden sobrevivir huérfanos. |
+| P4 | ALTA | `reconcile:766-795` borra en solo 3 tablas (`map_channelgroups_channels`, `channels`, `channelgroups`). | No existe verificación explícita del esquema completo ni de integridad referencial para la versión de Kodi. No se puede garantizar que no haya referencias en otras tablas. |
+| P5 | ALTA | `update_playlist:2107-2112` devuelve `True, True` aunque TVH no quede READY y deja pvr.hts deshabilitado; `2157` devuelve `True,True` incluso tras rescates fallidos. | Informe de éxito falso y posible PVR deshabilitado. |
+| P6 | ALTA | `service.py:755-760` ignora `(ok,did_something)` de `update_playlist`, marca éxito y adelanta timestamp sin excepción; en `655-659` igualmente registra `finalizado` sin inspeccionar `ok`. | Fallos internos quedan ocultos al supervisor y su cooldown. |
+| P7 | ALTA | `update_playlist:2040-2042` no revisa retorno de deshabilitación `pvr.hts` ni su confirmación; `_stop_tvheadend:151-154` ignora retorno de `_wait_service_state`; proceso prosigue a SQLite. | Riesgo de acceso concurrente y operaciones disruptivas antes de detener componentes. |
+| P8 | MEDIA | `update_playlist:2051-2068`: `bq_uuid` solo se asigna dentro del bloque condicionado por `tvh_ready` y playlist existente; la siguiente llamada puede referirlo sin inicialización, aunque el error se captura y continúa. | Limpieza TVH incompleta sin fallo propagado. |
+| P9 | MEDIA | `_tvh_find_target_bouquet_uuid:1122-1125` escoge primer IPTV incluso si hay múltiples. | Peligro de afectar bouquet no deseado; con las capturas actuales hay una red `IPTV LOCAL`, pero código no garantiza identidad. |
+| P10 | MEDIA | `tvh_delete_channels_not_in_playlist_or_bad:1492-1501` retorna éxito tras agotar rondas aunque queden canales; `tvh_delete_name_not_set_channels:1329-1335` también puede devolver éxito con residuos. | Borrado anunciado como completo sin estarlo; posible ciclo repetitivo. |
+| P11 | MEDIA | `_pick_tv_db_path:413-428` elige nombre con orden lexicográfico en lugar de extraer versión numérica, y puede elegir SQLite de versión incorrecta si conviven ficheros. | Riesgo de limpiar base no activa. |
+| P12 | MEDIA | `_wait_pvr_ready:1032-1051` declara listo si PVR está disponible y hay *algún* canal (por visibilidad o SQLite); no comprueba conteos/grupos/números contra TVH. | Comprobación demasiado débil para concluir sincronización. |
+| P13 | MEDIA | `update_playlist:1974-1989` valida playlist remota solo por tamaño (>64 bytes), ausencia de HTML y placeholders. | Un archivo truncado o incompleto pero con placeholders podría iniciar un gran borrado; falta `#EXTM3U`, pares, CUID único, límites. |
+| P14 | MEDIA | `sync_tvh_channel_tags_from_playlist:913-985` compara grupos por nombre, usa `sorted(desired_raw)` y edita archivos TVH directamente; no refleja orden original. | Puede perder orden de grupos y borrar etiquetas administradas fuera de la playlist. |
+| P15 | MEDIA | No existe `test_update_pvr.py` ni casos PVR funcionales en `tests/`; los tests existentes se centran en rclone/catálogo y un AST de arranque. | Alta regresión posible pese a CI general verde. |
+
+### Direcciones técnicas que NO deben confundirse
+
+- Los `VideoLibrary.Scan`/`VideoLibrary.Clean` de `service.py` gestionan películas/series, **no** `TVxx.db` de canales PVR.
+- Tvheadend sí incorpora altas y aplica orden; no crear una segunda rutina de reconstrucción TVH. Su estado es el esperado.
+- **Mantener una eliminación selectiva en Kodi si es indispensable**, pero únicamente con copia segura, exclusividad real de SQLite, esquema explícitamente validado, transacción, comprobación de integridad, reimportación PVR y verificación TVH↔Kodi. Antes de optar por cirugía SQLite como única vía, probar mecanismos nativos soportados en la versión `pvr.hts`/Kodi real.
+- `CUID` es estable en IPTV Studio, **pero la M3U antigua tenía CUID posicional** y Kodi PVR DB no registra necesariamente ese campo. En migración inicial no asumir vínculo CUID↔idChannel sin un mapeo verificado por origen TVH.
+- No se ha demostrado que editar exclusivamente `channels` y `channelgroups` deje la DB íntegra en todas las versiones de Kodi; las consultas SQL deben basarse en esquema real y fixtures.
+
+### Primer experimento del próximo chat (READ-ONLY)
+
+En un equipo afectado, recopilar (con secretos redactados):
+1. Versión Kodi + `pvr.hts` + Tvheadend, número de canales/grupos según APIs y `TVxx.db` activa.
+2. Identificar **2–3 canales obsoletos específicos** que TVH ya eliminó pero Kodi conserva. Capturar solo CUID/nombre/UUID/ID, sin URL privada.
+3. Esquema `PRAGMA table_info`, `PRAGMA foreign_key_list`, tabla `sqlite_master` y conteos por tabla **sobre copia/snapshot de la base**, sin escrituras.
+4. Consultas PVR JSON-RPC para inventario/orden/grupos y TVH channel/grid sobre el mismo instante; revisar diferencias en IDs y referencias.
+5. Ensayo en fixture clonada: desactivar pvr.hts, confirmar liberación SQLite, limpiar exclusivamente huérfanos, comprobar integridad y reconstrucción tras reactivar. No aplicar a producción hasta comprobar API nativa y rollback.
+
+### Orden de desarrollo propuesto
+
+PVR-01 pruebas unitarias del detector de cambios y clasificador de estados; PVR-02 snapshot SQLite y cierre/lock seguro; PVR-03 integración diferencial contra TVH, sin borrados de TVH; PVR-04 limpieza de huérfanos Kodi en SQLite compatible y validada, si necesaria; PVR-05 verificación Kodi después de reactivar `pvr.hts`; PVR-06 gestión de grupos, orden y EPG; PVR-07 protección de grabaciones, manejo de timeout, PR y piloto.
