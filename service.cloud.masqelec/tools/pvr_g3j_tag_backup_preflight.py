@@ -41,6 +41,8 @@ def _backup_tag():
     if not isinstance(obj, dict) or obj.get("name") != NAME or obj.get("internal") is not False:
         raise ValueError("TAG_IDENTITY_MISMATCH")
     # Exclusive directory creation protects against reusing old backups.
+    if BACKUP_ROOT.is_symlink():
+        raise ValueError("BACKUP_ROOT_SYMLINK")
     BACKUP_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
     if BACKUP_ROOT.is_symlink():
         raise ValueError("BACKUP_ROOT_SYMLINK")
