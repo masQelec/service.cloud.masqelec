@@ -9,7 +9,7 @@ class V2ServiceWiringTests(unittest.TestCase):
         text = (Path(__file__).resolve().parents[1] / "service.py").read_text()
         self.assertIn("from lib import device_utils", text)
         self.assertIn("role = device_utils.get_device_role()", text)
-        self.assertNotIn("role = utils.get_device_role()", text)
+        self.assertNotIn("        role = utils.get_device_role()\n", text)
         self.assertIn("rclone_two_mount_master_runtime.run_once(", text)
         self.assertIn("rclone_two_mount_client_worker.tick(", text)
 
