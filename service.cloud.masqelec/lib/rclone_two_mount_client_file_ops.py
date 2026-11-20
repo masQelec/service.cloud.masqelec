@@ -72,7 +72,10 @@ def provision_private_journal(folder):
         raise ValueError("Unexpected CLIENT journal name")
     parent = os.path.dirname(folder)
     ancestor = os.path.dirname(parent)
-    _dir(ancestor)
+    # Shared CoreELEC state directory can already be root-owned 0755.
+    # The per-account recovery root and every secret remain private 0700.
+    from lib import rclone_two_mount_journal as shared
+    shared._trusted_base(ancestor)
     if not os.path.lexists(parent):
         os.mkdir(parent, 0o700)
         _sync(ancestor)
