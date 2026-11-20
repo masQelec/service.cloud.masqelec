@@ -2,6 +2,21 @@
 
 **Ámbito:** pruebas sin corte de reproducción. Suite CI actual de `develop`: **440/440 OK** (GitHub Actions run 44358176820). Preflight real BLOCKED por refresh OneDrive divergentes tras renovación rclone confirmada. P0-B/P0-C/P0-D: laboratorios, **no** despliegue ni sincronización.
 
+> **ESTADO ACTUAL 20-11-2026 (v2.3.2):** MASTER y CLIENT piloto
+> migrados y verificados físicamente con 2 FUSE y 4 bind, playback OK,
+> OneDrive retirado de `rclone.conf`. La suite anterior a la limpieza
+> pasó 1025/1025. La recuperación OAuth con revocación real NO está
+> probada. Los recuentos inferiores y comandos para laboratorios fijados
+> a SHA antiguos se conservan como evidencia histórica; no son
+> instrucciones actuales. Consultar [limpieza del repositorio](REPO_CLEANUP_2026-11-20.md)
+> y [README principal](../../README.md).
+>
+> **Chequeo actual de servicios:**
+> `systemctl is-active rclone_library_{1,2}.service masqelec_bind_{tvshows,videos}_{1,2}.service`
+> y comprobar las seis rutas en `/proc/self/mountinfo`. Los cuatro
+> `rclone_tvshows_*.service`/`rclone_videos_*.service` antiguos
+> están retirados; no deben reiniciarse ni reinstalarse.
+>
 ## 1. Protocolo de cambios
 
 1. Leer [HANDOFF_2026-11-17.md](HANDOFF_2026-11-17.md), revisar HEAD de ambos `develop` y ejecutar `git status --short`. No asumir árbol local limpio.
