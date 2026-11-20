@@ -47,3 +47,18 @@ Esperados: 10 + 15 + 13 + 13 = **51 tests**. El operador debe aportar resultado;
 6. Ejecutar suite completa/CI/PR antes de habilitar. Publicación ZIP exclusiva del operador.
 
 **Estado:** orquestador aislado en develop, ejecución real no autorizada, producción intacta. La validación de G3-M real (720 canales, 26 grupos M3U, 32 tags TVH, 6 vacíos históricos) permanece como referencia.
+
+
+## Resultado de ejecución de tests — confirmado por el operador
+
+Tras sincronizar `develop`, el operador confirma que las cuatro baterías terminaron en `OK`:
+
+- `test_pvr_g3o_tag_cycle.py`: 10/10
+- `test_pvr_g3n_registry_adapter.py`: 15/15
+- `test_pvr_tag_reconcile.py`: 13/13
+- `test_pvr_tag_plan.py`: 13/13
+- **Total G3-O: 51/51 OK.**
+
+Resultado **unitario**, no equivale a integración funcional real ni a autorización para eliminar los grupos históricos. El orquestador no está conectado al ciclo de `update_pvr.py`; el método antiguo de modificación directa de archivos de tags sigue en la base de código.
+
+**Siguiente gate G3-P:** sustituir el sincronizador viejo por una única entrada API post-READY, con protección frente a doble ejecución; empezar en modo lectura y `allow_delete=False`, y validar convergencia de asociaciones canal-grupo en Tvheadend y Kodi antes de permitir escrituras reales. No publicar ZIP ni cambiar M3U/EPG/SQLite.
