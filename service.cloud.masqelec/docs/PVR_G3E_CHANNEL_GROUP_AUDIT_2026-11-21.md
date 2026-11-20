@@ -38,3 +38,21 @@ Pendiente: tests reales informados por el operador; no afirmar PASS de G3-E toda
 3. Capturar identidad técnica CUID → TVH UUID/servicio → Kodi, solo si la API realmente ofrece información verificable; en otro caso permanecer en diagnóstico.
 4. Verificar orden en Kodi por separado. No cambiar índices de los 26 grupos existentes.
 5. No conectar este módulo todavía con `update_playlist`; conservar el control de rollout en `develop`, sin ZIP ni live edits.
+
+
+## G3-E REAL — ejecución sobre master (operador, 21-11-2026)
+
+Captura read-only comunicada:
+- Canales M3U: 720. Canales `channel/grid`: 720. Tags TVH: 32.
+- Parejas de nombre exacto único: **696**.
+- Sin correspondencia unívoca por nombre: **24**.
+- Nombres duplicados distintos: **11 en M3U**, **11 en TVH**.
+- Asociaciones correctas de los 696 pares comparables: **696**.
+- Divergencias observadas entre pares comparables: **0**.
+- `RESULT=INCONCLUSIVE_NAME_MAPPING`; `READ_ONLY=PASS`; `APPLY_AUTHORIZED=NO`.
+
+No afirmar 720/720 categorías correctas: 24 canales siguen pendientes. La igualdad de 11 nombres duplicados en ambas fuentes **no demuestra** que los grupos correspondientes coincidan.
+
+## Próximo gate: G3-F
+
+Auditoría pasiva de `tvh-chnum`/`tvg-chno` frente al campo `number` de `channel/grid` para intentar desambiguar los 24. Comprobar unicidad global de números y coincidencias de grupo de cada par. No asumir que la numeración es identidad persistente; la comprobación es diagnóstica y queda bloqueado cualquier borrado. Evitar imprimir URL, tokens o contraseñas.
