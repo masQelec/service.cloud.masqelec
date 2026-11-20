@@ -157,8 +157,16 @@ def retire_once(*, authorized=False, conf_path=None, account_paths=None,
         info = os.lstat(conf_path)
         if (info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o600):
             return "BLOCKED_INPUT"
-        accounts = tuple(stage._read_file(path, confidential=True)[0]
-                         for path in account_paths)
+        accounts = []
+        for path in account_paths:
+            raw, _ = stage._read_file(path, confidential=True)
+            meta = os.lstat(path)
+            if (not stat.S_ISREG(meta.st_mode)
+                    or meta.st_uid != os.geteuid()
+                    or stat.S_IMODE(meta.st_mode) != 0o600):
+                return "BLOCKED_INPUT"
+            accounts.append(raw)
+        accounts = tuple(accounts)
         # Full reconstruction validates the two isolated account credentials,
         # including the legacy canonical when still present.
         full_view(canonical, accounts)
