@@ -53,3 +53,31 @@ Este ensayo crea y destruye únicamente categorías temporales. Ejecutar fuera d
 ## Próximos bloques
 
 Refresco sin reinicio: probar solo después de aislar un mecanismo demostrado de refetch M3U, no confundir `mpegts/network/scan` con relectura automática. Luego piloto 720→865→720 con snapshots, grabaciones protegidas y comparación Kodi PVR. Mantener flujo activo intacto hasta gate integral.
+
+
+## Resultado real G3-K en el master (operador, 2026-11-21)
+
+```text
+=== G3-K TEMPORARY TAG UUID RECOVERY ===
+CREATE_DELETE=PASS
+UUID_RECREATED_SAME=NO
+INVENTORY_RESTORED=PASS
+STAGE=NEW_UUID
+HISTORIC_TAG_TOUCHED=NO
+HISTORIC_DELETE_AUTHORIZED=NO
+FULL_CONFIGURATION_RESTORE_PROVEN=NO
+```
+
+**Conclusión experimental:** la API `channeltag/create` en esta instalación no conservó el `conf.uuid` solicitado. El procedimiento API por sí solo **NO** es un rollback válido para preservar el UUID de una categoría existente. Se creó, eliminó y recreó solo un tag temporal; al terminar, todos los UUID de la categoría inicial volvieron a quedar presentes y el tag temporal fue retirado.
+
+**G3-K cerrado como resultado diagnóstico negativo**, no como recuperación aprobada. El borrado histórico permanece bloqueado. No insistir en recrear con el mismo UUID vía la ruta API ensayada.
+
+## Siguiente trabajo G3-L (diseño, no operación en producción)
+
+1. Establecer la procedencia/propiedad de las categorías antiguas con evidencia del código del addon y registros disponibles. Una etiqueta vacía no prueba propiedad.
+2. Diseñar restauración **offline** de la configuración TVH, primero ensayada con una instancia aislada/snapshot controlado y Tvheadend detenido, y comprobar el UUID exacto más los campos originales; **no escribir archivos TVH mientras el servicio está activo**.
+3. Hacer backup consistente más amplio de los datos TVH vinculados a categorías, con integridad y método de recuperación documentados. Preservar M3U y credenciales.
+4. Validar visibilidad en Kodi tras cambios de TVH y comportamiento ante 720→865→720, sin tocar `TVxx.db` en el flujo normal.
+5. Solo tras recuperación reproducible, propuesta de piloto con un tag histórico por UUID y autorización explícita.
+
+`HISTORIC_DELETE_AUTHORIZED=NO`, `FULL_CONFIGURATION_RESTORE_PROVEN=NO`, `NO_KODI_SQLITE_WRITE=YES`.
