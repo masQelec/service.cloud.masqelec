@@ -621,3 +621,7 @@ Operador instaló v2.3.2 en MASTER migrado. Log al arranque: `rclone: dos montaj
 ## CLIENT piloto v2.3.2 — operador confirma actualización terminada (2026-11-20)
 
 El operador responde `cliente done` después de la prueba física MASTER v2.3.2 y solicitud de actualizar el CLIENT piloto. Confirmación explícita de **actualización realizada**, pero no se aportaron en ese mensaje salida de recuento de tipos, log `ONEDRIVE_ISOLATED` ni reproducción específica posterior a 2.3.2. `V232_CLIENT_UPDATE=OPERATOR_CONFIRMED_DONE`; `V232_CLIENT_CONFIG_SPLIT=AWAITING_EVIDENCE`, `V232_CLIENT_PLAYBACK_AFTER_UPDATE=AWAITING_EVIDENCE`; recordar que el mismo CLIENT superó 4/4 reproducción y reinicio con v2.3.1. `V232_FLEET_RELEASE=NOT_YET_FORMALLY_AUTHORIZED`.
+
+## CLIENT v2.3.2 — operador confirma limpieza y playback; gate funcional cerrado
+
+Operador confirmó explícitamente que el CLIENT piloto, tras actualizar a 2.3.2, quedó con `rclone.conf Drive=2 OneDrive=0 Crypt=0` y que **reproduce correctamente desde los cuatro bind**. En combinación con las verificaciones previas del CLIENT (2 FUSE + 4 bind, legacy retirado, reboot bajo 2.3.1), MASTER 2.3.2 (separación y playback), y regresión 1025/1025 OK, el gate funcional de separación v2.3.2 queda `MASTER_CLIENT_FUNCTIONAL_GATE=PASS`. El operador gestiona publicación de ZIP/repositorio Kodi; **ningún ZIP fue publicado por el asistente**. `FLEET_RELEASE=TECHNICALLY_READY_OPERATOR_PUBLISH_PENDING`. `CLIENT_REAL_OAUTH_REVOCATION_RECOVERY=NOT_TESTED`; no presentar esa ruta como probada.
