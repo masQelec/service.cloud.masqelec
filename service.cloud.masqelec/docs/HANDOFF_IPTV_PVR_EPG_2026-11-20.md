@@ -90,3 +90,16 @@ La reducción 865 → 720 no permite concluir el número de bajas reales; puede 
 ## 6. Prompt breve para otro chat
 
 > Continuamos el proyecto `masQelec/service.cloud.masqelec` (CoreELEC addon 2.3.2). Lee `service.cloud.masqelec/docs/HANDOFF_IPTV_PVR_EPG_2026-11-20.md` y `README.md` en `main` antes de tocar código. Tvheadend usa red IPTV automática que lee `/storage/.user/playlist.m3u`, generada desde IPTV Studio y publicada en `cloud.masqelec`. `CUID` es ID estable; la nueva playlist contiene 720 canales y sustituirá a la anterior de 865 mediante **migración inicial controlada**. Objetivo: sync diferencial de canales/grupos/orden/logos/URLs, eliminación segura, TVH como autoridad y Kodi como espejo vía pvr.hts; EPG desde `masQelec/epg/main/guide.xml` con `tv_grab_file`. No borrar directamente TVxx.db, ni interrumpir grabaciones, ni publicar/instalar lista nueva sin gate. Empezar con auditoría de configuración TVH solo lectura, pruebas sintéticas y plan de migración. Mantener tests y documentación en GitHub.
+
+## 7. Evidencia UI real de Tvheadend (HTML SingleFile 20-11-2026, 22:39–22:40)
+
+El operador aportó tres capturas HTML guardadas de `Tvheadend` (vista Redes, edición de red y vista Paquetes/Bouquets). Lectura **sin acceso al equipo ni modificaciones**.
+
+**Confirmado por los datos visibles:**
+- Una sola red: `IPTV LOCAL`; fuente `file:///storage/.user/playlist.m3u`.
+- Estadísticas de la red: **865 multiplexores, 865 servicios y 865 canales mapeados**.
+- Vista Paquetes/Bouquets: fila `IPTV LOCAL`, source `iptv-network://cce41e6f2d9b5d829d3af38159eea0a5`; **865 services seen** y **865 services**.
+- Los demás paquetes DVB fastscan listados tienen 0 servicios vistos; no se debe inferir que todos los 14 bouquets son redes IPTV activas.
+- La configuración de edición expone el campo URL local y opciones de numeración/escaneo, pero el texto extraído no acredita el estado efectivo de todos los checkboxes; comprobar sus valores por API antes de decidir algoritmo.
+
+**Implicación:** mantener la red `IPTV LOCAL` y su bouquet existentes; no crear otra red ni borrar indiscriminadamente. No existe evidencia todavía de cómo la red auto IPTV empareja un M3U nuevo con mux UUID antiguos, ni de que reconozca `CUID` nativamente. Exigir snapshot por API READ-ONLY de network/grid, mpegts/mux/grid, mpegts/service/grid, channel/grid, bouquet/grid y DVR antes de habilitar borrados o renumeraciones. Evitar publicar identificadores de sesiones, credenciales o URLs privadas; la URI de origen es local.
