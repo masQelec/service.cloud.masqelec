@@ -609,3 +609,7 @@ Pruebas nuevas `tests/test_rclone_two_mount_config_split.py`: proyección e idem
 ## Hallazgo adicional imprescindible en 2.3.2: trabajador OAuth horario del servicio
 
 En la revisión del flujo end-to-end se detectó que `service.py::_rclone_v2_oauth_worker` utilizaba `utils.get_device_role()`, que **no existe** en `lib.utils`; la excepción terminaba convertida en warning y podía impedir que el MASTER publicase renovaciones v2 y que el CLIENT entrase en su recuperación, aunque el arranque y los montajes v2 funcionasen. Corregido a `device_utils.get_device_role()`, el proveedor ya utilizado por MASTER. Añadido `tests/test_rclone_two_mount_service_wiring.py` para impedir la regresión y comprobar que la limpieza ocurre solo tras resultados v2 verificados. Esta reparación es parte integrante del candidato **2.3.2**. Ni la ejecución del trabajador corregido en hardware ni una recuperación ante fallo OAuth real se han verificado aún.
+
+## 2.3.2: regresión confirmada por operador (2026-11-20)
+
+Después de corregir el falso positivo del test de wiring en commit `0a5081e85856bc70266ede4b0d189c94e7c5e1e6`, el operador ejecutó `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q` con resultado explícito `Ran 1025 tests in 1.427s`, `OK`, `REGRESSION_EXIT=0`. `V232_REGRESSION=PASS_1025_OF_1025`. Próximo gate: ensayo físico MASTER de limpieza `rclone.conf` con copia privada y validación de 2 FUSE+4 bind/4 reproducciones; después CLIENT piloto. No se ha recibido aún log/hardware 2.3.2; `V232_PHYSICAL_PILOT=PENDING`, `V232_FLEET_RELEASE=NO`.
