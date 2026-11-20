@@ -6,6 +6,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib.pvr_tag_reconcile import reconcile_once, ReconcileBlocked
+from lib.pvr_tag_plan import PlanBlocked
 
 
 PLAYLIST = '#EXTM3U\n#EXTINF:-1 group-title="A",One\nurl1\n#EXTINF:-1 group-title="B",Two\nurl2\n'
@@ -96,12 +97,12 @@ class TagReconcileTests(unittest.TestCase):
 
     def test_delayed_refetch_blocks_all_writes(self):
         self.tvh.channels.pop()
-        with self.assertRaisesRegex(ReconcileBlocked, "REFETCH_NOT_CONVERGED"):
+        with self.assertRaisesRegex(PlanBlocked, "REFETCH_NOT_CONVERGED"):
             self.cycle(delete=True)
         self.assertFalse(self.tvh.actions)
 
     def test_stale_registry_blocks_all_writes(self):
-        with self.assertRaisesRegex(ReconcileBlocked, "STALE_OWNERSHIP_REGISTRY"):
+        with self.assertRaisesRegex(PlanBlocked, "STALE_OWNERSHIP_REGISTRY"):
             self.cycle(["unknown"], delete=True)
         self.assertFalse(self.tvh.actions)
 
@@ -134,7 +135,7 @@ class TagReconcileTests(unittest.TestCase):
 
     def test_duplicate_names_block_before_write(self):
         self.tvh.tags.append({"uuid": "a2", "name": "A", "internal": False})
-        with self.assertRaisesRegex(ReconcileBlocked, "AMBIGUOUS_TAG_NAMES"):
+        with self.assertRaisesRegex(PlanBlocked, "AMBIGUOUS_TAG_NAMES"):
             self.cycle()
         self.assertFalse(self.tvh.actions)
 
