@@ -51,3 +51,17 @@ Separar el nuevo mantenimiento de categorías del soft-reset heredado:
 - La supresión de categorías antiguas no administradas por el nuevo registro sigue bloqueada. Sus seis UUID no deben incorporarse de forma implícita.
 
 No se ha desplegado en el master ni publicado ZIP; producción, M3U y EPG sin cambios desde este trabajo de repositorio.
+
+
+## Resultado confirmado por el operador — G3-P
+
+El operador confirma que las cinco baterías de pruebas ejecutadas en Ubuntu terminaron en `OK`:
+
+- G3-P shadow: **7/7**
+- G3-O ciclo: **10/10**
+- G3-N adaptador/registro: **15/15**
+- Reconciliador: **13/13**
+- Planificador: **13/13**
+- **Total: 58/58 OK.**
+
+Se considera aprobada la batería unitaria agrupada; no implica aprobación de integración real, despliegue, cambios en Kodi/TVxx.db ni eliminación de categorías históricas. Sigue pendiente G3-Q: desacoplar el mantenimiento de grupos del soft reset heredado, preservar integridad de canales y comprobar el comportamiento con Tvheadend real antes del corte.
