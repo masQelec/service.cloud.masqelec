@@ -86,6 +86,37 @@ class ConfigSplitTests(unittest.TestCase):
                 with self.assertRaises((ValueError, TypeError)):
                     split.full_view(full, bad)
 
+    def test_master_publish_engine_accepts_compacted_sources(self):
+        from lib import rclone_two_mount_master_sync as master
+        full, accounts = fixture()
+        compact = split.general_only(full, accounts)
+        virtual = split.full_view(compact, accounts)
+        prepared = master.prepare(virtual, accounts, 404, b"",
+                                  b"test-key", repository_verified=True)
+        self.assertEqual(prepared["status"], "create_requires_health")
+        self.assertEqual(set(prepared["names"]),
+                         set(policy.oauth_tokens(full)))
+
+    def test_client_recovers_one_account_with_compacted_general(self):
+        from lib import rclone_two_mount_client_recovery as recovery
+        full, accounts = fixture()
+        compact = split.general_only(full, accounts)
+        stale = accounts[0].replace(
+            b"refresh-users_library_1", b"stale-invalid-token")
+        virtual = split.full_view(compact, (stale, accounts[1]))
+        with mock.patch.object(recovery.mqc2, "decode_remote_contents",
+                               return_value={
+                                   "sha": "b" * 40,
+                                   "canonical": full,
+                               }):
+            candidate = recovery.prepare(
+                0, virtual, stale, 200, {}, b"k" * 32,
+                auth_status="auth", release_authorized=True,
+                repository_head="a" * 40, observed_head="a" * 40)
+        self.assertEqual(candidate["status"], "candidate_requires_probe")
+        self.assertEqual(candidate["candidate_account"], accounts[0])
+        self.assertEqual(candidate["baseline_account"], stale)
+
     def test_no_cleanup_without_explicit_verified_gate(self):
         self.assertEqual(split.retire_once(), "BLOCKED_NOT_VERIFIED")
         with mock.patch.object(split.rollout, "mode", return_value="legacy"):
