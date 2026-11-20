@@ -5,12 +5,16 @@ on:
     branches:
       - develop
       - main
+  pull_request:
+    branches:
+      - develop
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: cloud-masqelec-unit-tests-${{ github.ref }}
+  group: cloud-masqelec-unit-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
