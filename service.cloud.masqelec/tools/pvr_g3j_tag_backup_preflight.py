@@ -89,11 +89,26 @@ def _scan_references():
                 seen_bytes += info.st_size
                 if seen_bytes > MAX_SCAN_BYTES:
                     raise ValueError("REFERENCE_SCAN_LIMIT_BYTES")
-                with path.open("rb") as stream:
-                    if token in stream.read(MAX_FILE + 1):
+                # Read the complete file in bounded chunks. Preserve the tail
+                # across chunk boundaries so UUID split across reads is found.
+                # Never follow a symlink substituted after lstat().
+                flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                fd = os.open(str(path), flags)
+                with os.fdopen(fd, "rb") as stream:
+                    tail = b""
+                    found = False
+                    while True:
+                        block = stream.read(64 * 1024)
+                        if not block:
+                            break
+                        if token in tail + block:
+                            found = True
+                        tail = (tail + block)[-(len(token) - 1):]
+                    if found:
                         hits.append(path)
-                    if info.st_size > MAX_FILE:
-                        skipped += 1
+                    # Detect growth beyond the initial bounded stat.
+                    if stream.tell() != info.st_size:
+                        raise ValueError("REFERENCE_SCAN_FILE_CHANGED")
             except ValueError:
                 raise
             except OSError:
@@ -103,13 +118,20 @@ def _scan_references():
 def main():
     if not TAGDIR.is_dir() or TAGDIR.is_symlink():
         raise ValueError("TAG_DIRECTORY_UNAVAILABLE")
-    backup, digest = _backup_tag()
-    print("=== G3-J PRIVATE BACKUP / NO TVH WRITES ===")
-    print("TARGET_TAG=" + NAME)
-    print("BACKUP_CREATED=YES")
-    print("BACKUP_PATH=" + str(backup))
-    print("BACKUP_SHA256=" + digest)
-    print("BACKUP_VERIFIED=YES")
+    scan_only = len(sys.argv) == 2 and sys.argv[1] == "--scan-only"
+    if len(sys.argv) > 2 or (len(sys.argv) == 2 and not scan_only):
+        raise ValueError("INVALID_ARGUMENTS")
+    if not scan_only:
+        backup, digest = _backup_tag()
+        print("=== G3-J PRIVATE BACKUP / NO TVH WRITES ===")
+        print("TARGET_TAG=" + NAME)
+        print("BACKUP_CREATED=YES")
+        print("BACKUP_PATH=" + str(backup))
+        print("BACKUP_SHA256=" + digest)
+        print("BACKUP_VERIFIED=YES")
+    else:
+        print("=== G3-J REFERENCE SCAN ONLY ===")
+        print("BACKUP_CREATED=NO")
     hits, examined, unreadable, skipped = _scan_references()
     print("CONFIG_REFERENCES_FOUND=" + str(hits))
     print("CONFIG_FILES_EXAMINED=" + str(examined))
