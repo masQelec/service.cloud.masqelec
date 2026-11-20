@@ -1,8 +1,17 @@
 # Documentación técnica — `service.cloud.masqelec`
 
-**Índice para desarrolladores y nuevos chats.** Última suite CI confirmada: **530/530 OK** (18-11-2026). P0-B generaciones/ABA, P0-C simulación de flota y P0-D readback: laboratorios sin instalación; preflight real con ambas OneDrive divergentes tras renovación rclone comunicada por el operador. OAuth v2 y 2 FUSE + 4 bind **sin desplegar**.
+**Índice vigente: 20-11-2026.** Versión 2.3.2: MASTER y CLIENT
+piloto con 2 FUSE + 4 bind, `rclone.conf` general sin OneDrive y
+reproducción confirmada. Antes de la limpieza se verificó 1025/1025
+tests. La recuperación OAuth después de una revocación real sigue
+**sin validar**. El mantenimiento de pruebas y herramientas se describe
+en [REPO_CLEANUP_2026-11-20.md](REPO_CLEANUP_2026-11-20.md).
 
-## Estado MASTER / recuperación (19-11-2026)
+**Documentos fechados del 17–19 de noviembre:** son un historial de
+decisiones y resultados de laboratorio. Cuando digan `NO DEPLOY` o
+`PENDING` se refieren a la fecha indicada, no al estado actual.
+
+## Estado MASTER / recuperación — archivo de situación del 19-11-2026
 
 La regresión confirmada por el operador antes del candidato de recuperación
 temprana es **798/798 PASS**. MASTER: `MASTER_READINESS=PASS_READ_ONLY`,
@@ -14,7 +23,7 @@ no se ha ejecutado.
 - [Recuperación temprana previa a Kodi — candidato sin instalar](EARLY_BOOT_RECOVERY_KODIELEC_2026-11-19.md).
 - [**Handoff 19-11-2026: cutover automático de addon**](HANDOFF_AUTO_CUTOVER_2026-11-19.md) — código, riesgos, gates y comandos de prueba.
 
-**No confundir nuevo código en `develop` con gates PASS de hardware**:
+**Nota histórica del 19-11 (ya superada en el piloto)**:
 el coordinador de recuperación temprana exige un orden systemd de arranque
 todavía no verificado en TX3/X96 X4. No hay servicio de recuperación
 instalado ni activación del addon v2.
@@ -23,6 +32,7 @@ instalado ni activación del addon v2.
 
 | Documento | Cuándo consultarlo |
 | --- | --- |
+| [Limpieza de herramientas y tests (20-11)](REPO_CLEANUP_2026-11-20.md) | Criterios de retirada, dependencias, límites y gate CI |
 | [README principal](../../README.md) | Qué hace el addon, instalación conceptual, status y reglas básicas |
 | [Arquitectura, MASTER/CLIENT y LEGACY/v2](ARCHITECTURE_AND_MODES.md) | Diagrama de procesos, roles, ficheros, rutas y cifrado |
 | [Operaciones, pruebas y gates](OPERATIONS_AND_TESTING.md) | Comandos seguros Ubuntu/KodiELEC, matriz PASS/PENDING y resolución de errores |
