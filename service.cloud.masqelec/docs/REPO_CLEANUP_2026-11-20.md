@@ -66,8 +66,21 @@ de laboratorio explícito.
 
 ## Estado de verificación de la limpieza
 
-La primera CI con el script systemd local retirado falló **solo por dos
-importaciones** desde pruebas que lo necesitan. Se restauró el fichero.
-La última suite exitosa previa a la limpieza fue 1025/1025. La nueva
-suite requiere ejecución/confirmación del workflow y no debe darse por
-aprobada de antemano.
+- Antes de limpiar: 1025/1025 tests PASS (operador).
+- Primera CI de limpieza: dos errores de importación tras retirar un
+  helper systemd aún utilizado. Se restauró el helper.
+- Siguiente CI: tres pruebas de early boot dependían del valor global del
+  flag CLIENT, en vez de establecerlo explícitamente. Tests corregidos;
+  la implementación del runner de producción no se modificó.
+- CI final verificada en commit `df025f9d`:
+  **957/957 tests PASS**, Python 3.11, build y unittest en verde:
+  [GitHub Actions 44807388207](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44807388207).
+- Se añadió `.gitignore` para impedir añadir por accidente compilados,
+  logs, backups y configuraciones OAuth locales. Requiere nueva CI verde
+  en el HEAD definitivo (no altera código ejecutado).
+
+**Balance:** 8 archivos retirados (5 herramientas de laboratorio, 3 tests
+específicos); archivos de producción y pruebas de OAuth/rollback
+conservados. La diferencia de 68 pruebas corresponde a retirar tests
+de laboratorios antiguos, no a un fallo en código operativo. No se ha
+validado una revocación real OAuth en hardware.
