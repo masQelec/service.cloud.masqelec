@@ -79,5 +79,37 @@ class BackupPreflightTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "REFERENCE_SCAN_LIMIT_FILES"):
                 M._scan_references()
 
+    def test_large_file_full_scan_without_truncation(self):
+        folder = self.root / "dvr"
+        folder.mkdir()
+        (folder / "large").write_bytes(b"x" * (M.MAX_FILE + 256))
+        hits, scanned, unreadable, skipped = M._scan_references()
+        self.assertEqual((hits, unreadable, skipped), (0, 0, 0))
+
+    def test_reference_beyond_first_megabyte(self):
+        folder = self.root / "dvr"
+        folder.mkdir()
+        (folder / "large").write_bytes(b"x" * (M.MAX_FILE + 256) + M.UUID.encode())
+        hits, _, unreadable, skipped = M._scan_references()
+        self.assertEqual((hits, unreadable, skipped), (1, 0, 0))
+
+    def test_reference_split_across_read_boundary(self):
+        folder = self.root / "dvr"
+        folder.mkdir()
+        (folder / "split").write_bytes(b"x" * (64 * 1024 - 10) + M.UUID.encode())
+        hits, _, unreadable, skipped = M._scan_references()
+        self.assertEqual((hits, unreadable, skipped), (1, 0, 0))
+
+    def test_scan_only_does_not_create_another_backup(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        import sys
+        with patch.object(sys, "argv", ["tool.py", "--scan-only"]), \
+             patch.object(M, "_backup_tag", side_effect=AssertionError("backup invoked")):
+            with redirect_stdout(StringIO()) as buffer:
+                code = M.main()
+        self.assertEqual(code, 0)
+        self.assertIn("BACKUP_CREATED=NO", buffer.getvalue())
+
 if __name__ == "__main__":
     unittest.main()
