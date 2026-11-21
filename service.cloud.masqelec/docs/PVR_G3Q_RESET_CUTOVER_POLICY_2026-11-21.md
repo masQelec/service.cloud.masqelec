@@ -48,3 +48,12 @@ Se esperan **70 pruebas** (12 nuevas y 58 previamente confirmadas por el operado
 `G3Q_AUTO_DELETE_HISTORIC_TAGS=NO`
 `G3Q_KODI_SQLITE_WRITES_IN_LEGACY_CODE=YES`
 `G3Q_PRODUCTION_DEPLOY=NO`
+
+
+## Validación confirmada por el operador
+
+El operador confirma que el lote G3-Q y sus dependencias terminó en `OK`: **70/70 tests** (12 G3-Q, 7 G3-P, 10 G3-O, 15 G3-N, 13 reconciliador, 13 planificador).
+
+**Gate de pruebas unitarias G3-Q: PASS.** No implica pruebas reales de refetch, convergencia Kodi/PVR, corte sin reset, activación del reconciliador o despliegue. El flujo heredado sigue sin cambios operativos; `G3Q_NEW_RESET_FREE_PATH_ACTIVE=NO`.
+
+Próximo G3-R: verificar con fuentes y prueba acotada el mecanismo real de actualización M3U por Tvheadend, sin reiniciar y sin modificar `TVxx.db`, antes de diseñar la transición.
