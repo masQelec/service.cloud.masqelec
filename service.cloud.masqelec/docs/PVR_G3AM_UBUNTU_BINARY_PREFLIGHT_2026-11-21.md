@@ -131,3 +131,24 @@ G3AM_RUNTIME_IMAGE_BUILT=NO_OPERATOR_RESULT
 G3AM_RUNTIME_BINARY_SMOKE=NOT_TESTED
 G3AM_PARALLEL_TVH=NOT_STARTED
 ```
+
+## G3-AM — runtime smoke Docker confirmado por operador (21/11/2026)
+
+Tras construir la imagen de laboratorio definida en `lab/pvr_g3ab/g3am/Dockerfile.runtime`, el operador comunicó:
+
+```text
+G3AM_BINARY_HASH=PASS
+/opt/g3al/tvheadend: version 4.3-2897~g8837853a-dirty
+G3AM_RUNTIME_BINARY_SMOKE=PASS
+```
+
+El binario Ubuntu parcheado se ejecutó con `--version` dentro del contenedor Ubuntu 24.04, con `--network none`, rootfs `--read-only`, `--cap-drop ALL`, `no-new-privileges` y bind mount del ejecutable en lectura. Esto demuestra compatibilidad suficiente para **esa ejecución de versión**, no capacidad de inicializar la configuración ni comportamiento HTTP/HTSP real.
+
+**Gate siguiente (aún read-only):** inspeccionar sin revelar secretos el tipo de origen de la M3U en configuración original de IPTV Auto, rutas y presencia de un servidor de playlist HTTP accesible desde red Docker, y el estado del perfil de Kodi independiente. Evitar copiar indiscriminadamente configuraciones con credenciales; planificar copia coherente y redacción de destinos. Si el origen actual es `file://`, preparar playlist HTTP propia en G3-AM; el parche restringe eventos a HTTP(S).
+
+```text
+G3AM_BINARY_IN_CONTAINER_VERSION=PASS
+G3AM_PARALLEL_TVH_BOOT=NOT_TESTED
+G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
+G3AM_KODI_HOT_UPDATE=NOT_TESTED
+```
