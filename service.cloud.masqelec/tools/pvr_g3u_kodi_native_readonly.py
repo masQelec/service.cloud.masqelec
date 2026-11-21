@@ -59,16 +59,11 @@ def tvh_channels():
 
 
 def kodi_all_tv():
-    groups = kodi("PVR.GetChannelGroups", {"channeltype": "tv"}).get("channelgroups")
-    if not isinstance(groups, list):
-        raise Blocked("KODI_GROUPS_UNAVAILABLE")
-    # Kodi uses the special group identifier "alltv" for all TV channels.
-    candidates = [g for g in groups if isinstance(g, dict)
-                  and g.get("channelgroupid") == "alltv"]
-    if len(candidates) != 1:
-        raise Blocked("KODI_ALLTV_NOT_UNAMBIGUOUS")
+    # Kodi's documented PVR.ChannelGroup.Id permits the special string
+    # "alltv" directly. It need not appear as an enumerated group in
+    # PVR.GetChannelGroups; that list can contain numeric IDs only.
     result = kodi("PVR.GetChannels", {
-        "channelgroupid": candidates[0]["channelgroupid"],
+        "channelgroupid": "alltv",
         "properties": ["channelnumber", "subchannelnumber"],
         "limits": {"start": 0, "end": 20000},
     })
