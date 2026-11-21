@@ -31,10 +31,10 @@ def _preflight():
         folder.mkdir(exist_ok=True)
     if GUARD.is_symlink():
         raise RuntimeError("SYMLINK_MARKER_DENIED")
-    if GUARD.exists() and GUARD.read_text() != "masqelec-g3w-synthetic-v1\\n":
+    if GUARD.exists() and GUARD.read_text() != "masqelec-g3w-synthetic-v1\n":
         raise RuntimeError("INVALID_LAB_MARKER")
     if not GUARD.exists():
-        GUARD.write_text("masqelec-g3w-synthetic-v1\\n")
+        GUARD.write_text("masqelec-g3w-synthetic-v1\n")
 
 
 def _playlist(stage):
@@ -45,7 +45,7 @@ def _playlist(stage):
             'group-title="G3W TEST",G3W Synthetic {0}'.format(number),
             "http://streams/ch{0}.ts".format(number)
         ))
-    return "#EXTM3U\\n" + "\\n".join(entries) + "\\n"
+    return "#EXTM3U\n" + "\n".join(entries) + "\n"
 
 
 def _write_atomic(dest, content):
