@@ -211,3 +211,16 @@ LIBREELEC_PROJECT="Amlogic-ce"
 No apareció línea `<version>` de addon.xml en las dos rutas inicialmente inspeccionadas del master: **la versión `pvr.hts` CoreELEC sigue desconocida**. Kodi Ubuntu 21.3 y CoreELEC 21.2.5 son cercanos pero no idénticos. `G3W_VERSION_EQUIVALENCE=NOT_PROVEN`; `G3W_CORELEC_NATIVE_REMOVE=NOT_TESTED`; no activar corte del mantenimiento legado por este parecido.
 
 Para identificar la versión del addon sin alterar master, buscar en rutas Kodi propias del sistema (solo metadatos de addon.xml) o usar JSON-RPC `Addons.GetAddonDetails` en lectura. La clave SSH del operador solicitó passphrase tres veces; los resultados de `os-release` prueban conexión efectiva, no la ubicación de pvr.hts.
+
+
+## Versión pvr.hts CoreELEC identificada (2026-11-21)
+
+La inspección read-only de `/storage/.kodi/addons/pvr.hts/addon.xml` en el master aportó:
+
+```xml
+<addon id="pvr.hts" version="21.2.6.1" name="Tvheadend HTSP Client" ... >
+```
+
+Valores verificados: `kodi-pvr-hts` Ubuntu `21.2.6+ds-1.1`, `pvr.hts` CoreELEC `21.2.6.1`; Kodi Ubuntu `21.3` y CoreELEC `21.2.5-Omega_devel_20250919152246`.
+
+Conclusión: comparten línea de versión del cliente PVR, pero no demuestran igualdad binaria o comportamiento. No confundir las versiones auxiliares extraídas por grep (`1.0`, `2.0.0`, etc.) con la versión principal del addon. El ensayo TVH/Kodi Ubuntu 2→3→2 es favorable al uso de la sincronización nativa por defecto. **No eliminar el corrector de huérfanos anterior sin plan de recuperación validado**. Evitar ensayos destructivos en TVH/Kodi del master; mantener 720 canales y seis grupos históricos protegidos.
