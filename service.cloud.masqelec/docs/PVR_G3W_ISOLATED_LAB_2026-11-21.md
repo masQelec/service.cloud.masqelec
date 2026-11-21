@@ -121,3 +121,25 @@ El operador ha habilitado JSON-RPC en el Kodi de Ubuntu de laboratorio y ejecuta
 ```
 
 `G3W_KODI_BASELINE_NATIVE=PASS_2_OF_2`. Identificadores Kodi que **deben persistir**: Synthetic 1 → `channelid=1`; Synthetic 2 → `channelid=2`. `G3W_TVH_UUID_BASELINE=PENDING`; obtener UUID de TVH con `/api/channel/grid` antes del alta. No afirmar que Kodi borrará el tercer canal hasta observar la baja real. Los IDs de Kodi son enteros y el gate G3-V usa cadenas; convertirlos explícitamente al generar el informe de validación.
+
+
+## Alta preparada, pendiente de propagación real
+
+Operador aporta línea base TVH GET `channel/grid`:
+
+```text
+UUID: 01acdb29035f6789d905cfd14f8ef5b0 NOMBRE: G3W Synthetic 1
+UUID: 918d272bf55884716e5fff5177ee8b08 NOMBRE: G3W Synthetic 2
+TOTAL: 2
+```
+
+Posteriormente ejecutó el generador de etapa `added`, que informa:
+
+```text
+G3W_STAGE=ADDED
+G3W_CHANNELS=3
+G3W_PLAYLIST_ONLY_IN_LAB=YES
+G3W_MASTER_UNTOUCHED=YES
+```
+
+Interpretación precisa: **playlist de laboratorio escrita con tres entradas**, todavía **NO** comprobado que TVH haya hecho refetch ni que Kodi haya recibido canal 3. Solicitar ambos snapshots de sólo lectura. No pasar a `removed` hasta registrar TVH 3/Kodi 3 y estabilidad de UUID/IDs originales.
