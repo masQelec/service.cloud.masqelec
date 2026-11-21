@@ -70,3 +70,18 @@ No ejecutar este evaluador sobre un reporte fabricado para justificar cambios de
 M3U 720, TVH 720, Kodi 720, 26 grupos deseados y 6 tags históricos preservados. No se ha ejecutado delta 2→3→2 en master, ni demostrado supresión nativa de huérfanos. `update_pvr.py` sigue con soft reset/SQLite/ficheros históricos: no hacer corte a producción antes de un sustituto probado. La publicación ZIP es responsabilidad del operador.
 
 **Estado:** `G3V_OFFLINE_GATE_IMPLEMENTED=YES`; `G3V_REAL_LAB_DELTA=NOT_EXECUTED`; `LEGACY_REPLACED=NO`; `MASTER_TOUCHED=NO`.
+
+
+## Confirmación del operador — tests G3-V
+
+El operador comunica la siguiente salida:
+
+```text
+Ran 10 tests in 0.001s
+
+OK
+```
+
+Resultado: `G3V_UNIT_TESTS=PASS_10_OF_10`.
+
+El pase cubre exclusivamente el evaluador offline con escenarios simulados. **No se han proporcionado capturas reales de TVH/Kodi del laboratorio**; por tanto `G3V_REAL_LAB_DELTA=NOT_EXECUTED`, `KODI_NATIVE_ORPHAN_REMOVAL_PROVEN=NO`, `LEGACY_REPLACED=NO`. Los 720 canales de producción y los seis tags históricos permanecen fuera del ensayo. El próximo gate es montar el laboratorio independiente y observar el ciclo real 2→3→2, sin editar la M3U ni TVxx.db del master.
