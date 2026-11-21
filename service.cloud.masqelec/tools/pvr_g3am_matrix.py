@@ -147,10 +147,10 @@ def wait_for(stage, max_seconds=WAIT):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preflight", action="store_true")
-    parser.add_argument("--run", choices=["safe", "all"])
+    parser.add_argument("--run", choices=["safe", "url-probe"])
     args = parser.parse_args()
     if not (args.preflight or args.run):
-        parser.error("choose --preflight or --run safe|all")
+        parser.error("choose --preflight or --run safe|url-probe")
     cs, ks = guard()
     good, reason = identity(cs, ks)
     if not good:
@@ -174,12 +174,12 @@ def main():
         return 0
     # Risky stages: observe one at a time, stop on first ambiguous/disruptive result.
     # Never automatically delete/recreate TVH channels or SQLite entries.
-    for stage in ("url", "add", "remove"):
-        atomic_publish(stage)
-        outcome = wait_for(stage)
-        print("STAGE=%s RESULT=%s" % (stage, outcome), flush=True)
-        print("G3AM_MATRIX=STOP_FOR_OPERATOR_REVIEW", flush=True)
-        return 3
+    stage = "url"
+    atomic_publish(stage)
+    outcome = wait_for(stage)
+    print("STAGE=%s RESULT=%s" % (stage, outcome), flush=True)
+    print("G3AM_MATRIX=STOP_FOR_OPERATOR_REVIEW", flush=True)
+    return 3
     return 0
 
 if __name__ == "__main__":
