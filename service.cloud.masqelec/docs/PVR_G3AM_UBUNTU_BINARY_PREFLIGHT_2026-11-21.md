@@ -791,3 +791,28 @@ G3AM_CHANNELS=0
 G3AM_STATIC_ICON_HTTP_500=OBSERVED
 G3AM_G3AL_HTSP_RENAME=NOT_TESTED
 ```
+
+## G3-AM — Detalle de la red existente: URL incorrecta (22/11/2026)
+
+Salida del operador de `GET /api/idnode/load?uuid=cc090ea0e9bf9e8670520252e4c23306`, analizando `params` como lista:
+
+```text
+G3AM_NETWORK_CLASS=iptv_auto_network
+G3AM_FIELDS_FORMAT=list
+enabled=True
+networkname=IPTV LOCAL
+refetch_period=1
+scan_create=True
+url_is_expected=False
+```
+
+Observación crítica: la API grid anterior indicaba `enabled=false` mientras que el detalle más reciente indica `enabled=True`. El campo URL no coincide con `http://g3am-playlist/playlist.m3u`; no se conoce el valor real porque la consulta evita imprimir potenciales credenciales. Ya hay una red, no crear duplicados. Instrucción operador: editar únicamente `IPTV LOCAL` en GUI, fijar URL interna exacta HTTP, confirmar Enabled y refetch 1, guardar, después volver a medir URL y COUNT de networks/muxes/services/channels por API. No ejecutar prepare.py rename, no tocar G3-AB. Pendiente validar importación, mapeo, identidad y eventos HTSP. Esto es un diagnóstico de configuración, no una prueba de que el parser o parche G3-AL falle.
+
+```text
+G3AM_IPTV_NETWORK_CLASS=iptv_auto_network
+G3AM_IPTV_ENABLED_DETAIL=True
+G3AM_IPTV_URL_MATCH=False
+G3AM_IPTV_REFETCH_MINUTES=1
+G3AM_IPTV_SCAN_CREATE=True
+G3AM_IPTV_URL_FIXED=NOT_CONFIRMED
+```
