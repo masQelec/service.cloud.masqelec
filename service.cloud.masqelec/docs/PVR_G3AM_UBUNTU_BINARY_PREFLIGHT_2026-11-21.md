@@ -720,3 +720,17 @@ G3AN_GUI_CONSOLE_GATE=NOT_CAPTURED
 G3AM_IPTV_AUTO_NETWORK=NOT_CONFIGURED
 G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — Nginx 403 al descargar M3U HTTP: defecto de modo de archivo (22/11/2026)
+
+Operador ejecutó `docker run --rm --network masqelec-pvr-g3ab_pvr_g3ab --entrypoint wget busybox:1.36 -qO- http://g3am-playlist/playlist.m3u`: respuesta HTTP 403 Forbidden. El contenedor TVH experimental no tiene curl, lo que no implica fallo de conectividad. El comando previo mostraba `TEST FINISHED` incluso tras fallo de wget por falta de `set -e`; futuras pruebas deben abortar ante HTTP 403.
+
+Auditoría del código privado `g3am/prepare.py`: `tempfile.mkstemp()` crea temporal con permisos 0600; `os.replace(temp,target)` conserva esos permisos y no hay chmod. nginx:alpine sirve volumen privado `../runtime/g3am/playlist:/usr/share/nginx/html:ro`, normalmente con usuario trabajador distinto del dueño de host, lo que hace probable HTTP 403 por acceso denegado. Aún no se confirmó el modo real del archivo ni permisos de carpetas en host ni log de nginx. Se corrigió el generador para ejecutar `os.fchmod(fd,0o644)` antes de escribir/reemplazar; afecta solamente al archivo M3U sintético (contenido no secreto) y no a configuración TVH. **No ejecutar `prepare.py baseline` o `rename` para reparar el permiso**, porque se alteraría el estado de prueba de la playlist; usar ajuste de permisos puntual del archivo existente, después de verificar marca sintética, ruta real, propietario y rechazo de symlinks. Diagnóstico adicional: `stat` de directorios y archivo, `docker logs --tail 20 masqelec-pvr-g3am-playlist-1`, y reintento HTTP con `wget` que detenga la ejecución si falla. Prohibido modificar G3-AB.
+
+```text
+G3AM_HTTP_PLAYLIST=403_OPERATOR
+G3AM_PREPARE_MKSTEMP_0600_BUG=CONFIRMED_BY_SOURCE
+G3AM_PREPARE_FCHMOD_0644_PATCH=COMMITTED
+G3AM_EXISTING_PLAYLIST_PERMISSIONS=UNKNOWN
+G3AM_HTTP_PLAYLIST_AFTER_FIX=NOT_TESTED
+```
