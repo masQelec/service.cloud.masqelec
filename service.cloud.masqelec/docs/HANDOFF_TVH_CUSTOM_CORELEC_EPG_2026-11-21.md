@@ -162,3 +162,53 @@ EPG01_FIX_IMPLEMENTED=NO
 ## 9. Texto sugerido para iniciar el próximo chat
 
 > Continuamos el proyecto masQelec `service.cloud.masqelec` en rama `develop`. Lee primero `service.cloud.masqelec/docs/HANDOFF_TVH_CUSTOM_CORELEC_EPG_2026-11-21.md` y el handoff G3-W→G3-AL. Hemos probado en G3-AH que TVH no notificó rename M3U sobre conexión HTSP existente en la ventana capturada y que dos reconexiones sí entregaron `channelAdd` + `initialSyncCompleted` (12/12 tests Ubuntu PASS). Parche `tvheadend-8837853a6-g3al-channel-notify.patch` aplicado a checkout upstream aislado, `make -j2` PASS en Ubuntu, NO probado en runtime. Próximo gate G3-AM: `file/ldd/--version`, preparar segundo TVH aislado y ensayo de `channelUpdate` sin reconexión, preservar IDs y grupos. **Tengo entorno de build CoreELEC preparado** para compilar luego versión personalizada; no asumir ruta ni arquitectura ni tocar master sin permiso. Tras corregir PVR, investigar EPG-01: géneros de guía siempre salen «Otros»/«Desconocidos»; causa XML/TVH/HTSP/Kodi todavía no diagnosticada. Documentar y commitear cada gate, sin dar por probado lo pendiente.
+
+
+## 10. FORMA DE TRABAJO OBLIGATORIA — metodología acordada en este proyecto
+
+La continuidad **incluye el método de desarrollo**, no solo el estado técnico. El siguiente chat debe aplicar esta sección desde el inicio.
+
+### A. Fuente de verdad y ámbito
+
+- Repositorio `masQelec/service.cloud.masqelec`, rama activa `develop`. Reabrir los archivos exactos de GitHub antes de analizarlos o editarlos. El handoff y los commits son registros verificables; el contexto conversacional no reemplaza el código.
+- Trabajar sobre los componentes existentes, respetando el diseño/instalación y la identidad CUID/UUID/ID. No inventar rutas o funciones, no extrapolar fuentes de versiones distintas.
+- No cambiar `main` o `master` ni producción sin autorización expresa; tampoco publicar paquetes en el repositorio de addons (lo gestiona el usuario). Para CoreELEC reutilizar el entorno de build ya preparado, después de identificar versión/arquitectura/toolchain.
+
+### B. Ciclo de desarrollo por gate
+
+1. **Objetivo preciso**: definir un fallo concreto, invariantes (datos que deben mantenerse), alcance y criterios de éxito/fracaso.
+2. **Auditoría previa**: abrir código y configuración reales, identificar versión/commit, dependencias y ruta de ejecución. Separar hechos, hipótesis y desconocidos; buscar causas, no workarounds apresurados.
+3. **Diseño conservador**: elegir el cambio mínimo que actúe en la causa; estudiar riesgos, compatibilidad y reversión antes de escribir. Evitar cambios simultáneos que impidan atribuir causas.
+4. **Implementación trazable**: código, pruebas y documentación vinculados a gate; preferir cambios acotados. Revisar sintaxis/diff y **no declarar PASS solo por generar archivos**.
+5. **Validación escalonada**: tests unitarios/sintéticos; `git apply --check` para patches; compilación reproducible; después ensayos aislados de comportamiento real y comprobación explícita de invariantes. Un test o build PASS **no implica runtime PASS**.
+6. **Operador y evidencia**: cuando una prueba requiere Ubuntu, Kodi, TVH, CoreELEC o Docker del usuario, entregar comandos exactos con `cd`, preflight y límite de efectos; esperar la salida real antes de concluir sobre lo ejecutado. No decir que se han lanzado comandos remotos que no se han ejecutado.
+7. **Registro inmediatamente después**: actualizar README/handoff específico, estados PASS/FAIL/BLOCKED/NOT_TESTED y riesgos, hacer commit en `develop` y comunicar SHA. No sobreescribir evidencia incómoda o discrepancias numéricas sin investigación.
+8. **Paso siguiente**: proponer solo el siguiente gate con una finalidad concreta y una condición de cierre; no repetir pruebas innecesarias ni perder tiempo con microdiagnósticos si ya existe evidencia suficiente.
+
+### C. Reglas de seguridad, rollback y honestidad técnica
+
+- **Prueba aislada primero**: config/volúmenes/copias y puertos exclusivos; nunca dos TVH con la misma configuración en escritura. Registrar estado anterior y plan de vuelta antes de reemplazar servicios.
+- **No destructivo por defecto**: nada de SQL sobre `TVxx.db`, borrado masivo, recarga destructiva de bouquets, reset/reinicio de PVR como atajo, ni cambio de CUID/UUID/identidad sin análisis.
+- **Cambios de configuración sensibles**: proteger `autoname=True`, canales/bouquets/grupos históricos, favoritos, asociaciones de servicios y estado estable de Kodi. Verificar snapshots antes/después.
+- **No exponer secretos**: nada de PCAP bruto, tokens OAuth, credenciales M3U/HTSP, claves, URLs con query sensible o volcado completo de configuración en GitHub/chat.
+- **No confundir niveles de evidencia**: `source_verified`, `static_pass`, `unit_pass`, `build_pass`, `runtime_pass`, `production_pass` son distintos. No atribuir causalidad por correlación temporal.
+- **Errores propios**: reconocer y corregir scripts, parsers y parches defectuosos; registrar la corrección. No presentar `NO_DISPONIBLE` causado por parseo erróneo como dato del servidor.
+- **No instalar dependencias ni editar entornos ajenos automáticamente** sin valorar alternativas; usar el entorno CoreELEC ya disponible si se necesita compilar producto final.
+- **Cambios externos en código**: los forks o parches de Tvheadend requieren plan de mantenimiento, compatibilidad y pruebas en la versión real; compilación Ubuntu no permite concluir compatibilidad CoreELEC.
+
+### D. Entregables y handoff entre chats
+
+Cada fase importante debe dejar: objetivo, código/referencia/commit, versiones y entorno, comandos reproducibles, resultados observados con fuente, riesgos, qué queda sin demostrar, siguiente prueba y restricciones vigentes. Crear o actualizar documento de transferencia antes de cerrar chat. El nuevo chat debe **leer este handoff y el código fuente actual**, seguir desde el siguiente gate sin reiniciar la investigación ni pedir datos que ya consten.
+
+**Aplicación a la fase actual**: G3-AL está en `BUILD_PASS` en Ubuntu, `RUNTIME_NOT_TESTED`, `CORELEC_BUILD_NOT_STARTED`, `PRODUCTION_NOT_MODIFIED`. Siguiente gate G3-AM es comprobar ABI/versión y preparar un segundo TVH aislado. Después del PVR, EPG-01 es investigación separada, con causa actualmente desconocida.
+
+```text
+WORKFLOW_BRANCH=develop
+WORKFLOW_GATE_DRIVEN=YES
+WORKFLOW_AUDIT_BEFORE_EDIT=YES
+WORKFLOW_REAL_EVIDENCE_REQUIRED=YES
+WORKFLOW_GITHUB_DOCUMENT_AND_COMMIT_EACH_PHASE=YES
+WORKFLOW_PRODUCTION_NO_CHANGE_WITHOUT_APPROVAL=YES
+WORKFLOW_CORELEC_EXISTING_BUILDER_REUSE=YES
+WORKFLOW_HANDOFF_REQUIRED=YES
+```
