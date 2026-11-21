@@ -44,3 +44,26 @@ Si `STABLE_TWO_SNAPSHOTS`, representa exclusivamente integridad y estabilidad co
 Para confirmar relectura real se necesitará evidencia independiente del instante del refetch en registros o una prueba aislada con una M3U de laboratorio y cambios controlados, sin manipular la M3U real. Para conectar el nuevo sincronizador habrá que comprobar el vínculo entre canal M3U y canal TVH a nivel identificador; el recuento de 720 no basta. Kodi debe evaluarse por JSON-RPC o estado nativo, sin modificar SQLite.
 
 `WRITE_EXECUTED=NO`, `TVH_RESTART=NO`, `REFETCH_EVENT_PROVEN=NO`, `KODI_CONVERGENCE_PROVEN=NO`, `AUTO_TAG_DELETE=NO`, `DEPLOY=NO`.
+
+
+## Resultado real G3-S comunicado por el operador
+
+```text
+=== G3-S TVH TWO-SNAPSHOT OBSERVATION ===
+STATUS=STABLE_TWO_SNAPSHOTS
+M3U_CHANNELS=720
+TVH_CHANNELS=720
+M3U_GROUPS=26
+TVH_TAGS=32
+UNMATCHED_HISTORIC_TAGS=6
+INTERVAL_SECONDS=75
+GET_ONLY=YES
+WRITE_EXECUTED=NO
+REFETCH_EVENT_PROVEN=NO
+CHANNEL_CUID_MAPPING_PROVEN=NO
+KODI_CONVERGENCE_PROVEN=NO
+```
+
+**Resultado: G3S_MASTER_STABILITY=PASS** (solo estabilidad observada). Sin escrituras y sin evidencia todavía de evento de refetch, correspondencia CUID o convergencia Kodi. No inferir que los seis tags históricos puedan borrarse automáticamente. Los 20 tests del conjunto G3-S/G3-R no están explícitamente confirmados en esta comunicación y se mantienen pendientes.
+
+**Siguiente gate G3-T:** obtener evidencia de re-fetch real y trazabilidad de identidades canal (M3U CUID → TVH), seguida de convergencia Kodi mediante lectura no destructiva. Evitar prueba de deltas sobre playlist real.
