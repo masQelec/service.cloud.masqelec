@@ -1,0 +1,16 @@
+diff --git a/src/main.c b/src/main.c
+--- a/src/main.c
++++ b/src/main.c
+@@ -154,7 +154,12 @@
+ const char      *tvheadend_cwd;
+ const char      *tvheadend_webroot;
+ const tvh_caps_t tvheadend_capabilities[] = {
+-#if ENABLE_CWC || ENABLE_CAPMT || ENABLE_CONSTCW || ENABLE_CCCAM || ENABLE_LINUXDVB_CA
++/* G3-AN: advertise caclient to ExtJS only when Makefile.webui also
++ * embeds app/caclient.js (CONFIG_CWC, CONFIG_CCCAM or CONFIG_CAPMT).
++ * Other CA compile switches alone do not include that JS module;
++ * advertising it makes the legacy Configuration tab throw before
++ * it is inserted into the tab panel. */
++#if ENABLE_CWC || ENABLE_CAPMT || ENABLE_CCCAM
+   { "caclient", NULL },
+ #endif
