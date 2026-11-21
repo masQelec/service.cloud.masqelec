@@ -75,3 +75,10 @@ SERVICIO_3_SIN_CANAL: False
 ```
 
 **Interpretación acotada:** hay una entrada de `service/list` sin referencia de canal, pero el texto de su `val` no contiene literalmente `G3W Synthetic 3`. `False` no identifica la procedencia del servicio, ni prueba que no sea residual del ensayo. Tampoco autoriza eliminarlo; un servicio no asociado a un canal puede seguir perteneciendo a un mux de TVH. Siguiente gate: inspección de metadatos de `service/grid` y relación con muxes en lectura, con privacidad (no imprimir URLs, UUID ni credenciales); no realizar `idnode/delete`.
+
+
+## Corrección del endpoint de diagnóstico (2026-11-21)
+
+El operador ejecutó la consulta diagnóstica posterior y obtuvo `SERVICE_GRID_ERROR: HTTPError` al solicitar `/api/service/grid`. La documentación oficial de Tvheadend **no enumera** `service/grid` como API del inventario MPEGts; la ruta documentada es **`/api/mpegts/service/grid`**. Los muxes se consultan mediante `/api/mpegts/mux/grid`. Fuentes: https://docs.tvheadend.org/documentation/development/json-api/api-description/mpegts y https://docs.tvheadend.org/documentation/development/json-api/api-description/service.
+
+`HTTPError` es genérico: no consta si fue 404, 401, 403, 400 u otro código. No inferir corrupción de TVH ni afirmar el código hasta verlo. Corregir la consulta de metadatos de servicio y mantener exclusivamente GET. La posible presencia de un servicio no vinculado a un canal no justifica eliminarlo. `PRODUCTION_TOUCHED=NO`.
