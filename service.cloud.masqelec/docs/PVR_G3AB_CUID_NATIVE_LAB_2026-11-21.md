@@ -86,3 +86,20 @@ TOTAL: 3
 La playlist sintética generada tiene **2** entradas con CUID distintos. El TVH aislado presenta **3** UUID de canal, con dos nombres Beta idénticos. `G3AB_TVH_BASELINE=BLOCKED_3_FOR_2`, `G3AB_TVH_DUPLICATE_NAME=YES`, `G3AB_TVH_DUPLICATE_CUID_PROVEN=NO`. El duplicado de nombre no demuestra que ambos canales estén asociados al mismo servicio, ni que TVH lea CUID, ni que uno sea eliminable.
 
 **Gate cerrado:** no ejecutar `prepare.py rename`, no conectar Kodi todavía, no borrar canal por nombre, no tocar master ni SQLite. Investigar por GET los campos `channel/grid` (`uuid`, `name`, `number`, `services`, `bouquet`, `enabled`, `tags`) y comparar las referencias contra `mpegts/service/grid`; imprimir solo campos de laboratorio, nunca URL o credenciales. Diferenciar mapeo duplicado manual/automático, persistencia de un servicio y dos canales distintos. No corregir manualmente sin documentar primero causa y mecanismo.
+
+
+## Segunda consulta G3-AB: 3→2 canales observados; causa aún no probada
+
+El operador repitió GET `channel/grid` y `mpegts/service/grid` tras observar inicialmente dos `G3AB Beta`. Esta vez informó:
+
+```text
+G3AB Beta  UUID=f08f75aa26b58386630d4b225adbb34f  number=2  enabled=True  service=afe6f317e9b95eb03f6d91691e80f537  SID=2  MUX=355a43f5f4c718478b87d3b6a1bc8408
+G3AB Alpha UUID=185e5bdda6aafa6aa1aad2bb94ee703a number=1 enabled=True service=18cd0031a734c2342ac3956d754fb63e SID=1 MUX=4d3f4f0b654e570dc39029bebaf5c555
+CANALES=2
+SERVICIOS_MPEGTS=3
+SERVICIOS_COMPARTIDOS_POR_VARIOS_CANALES=0
+```
+
+El UUID `e2bf26af3bd98f7ac3f11acb11ce12cc` (segundo Beta en el primer GET) **ya no aparece en channel/grid**. No se acreditó cuándo ni por qué desapareció. Es compatible con convergencia asíncrona, pero no demuestra causalidad ni confirma que una sola ejecución de la playlist produzca un canal por CUID. Hay 3 servicios MPEG-TS, sin información todavía de cuál está huérfano. `G3AB_TVH_CURRENT_INVENTORY=2`, `G3AB_TVH_BASELINE_STABILITY=NOT_YET_PROVEN`, `G3AB_KODI_BASELINE=NOT_TESTED`.
+
+Antes de avanzar: comparar varias instantáneas READ-ONLY de 2 canales, los mismos UUID, mismas referencias de servicio, misma M3U baseline; investigar si tercer servicio está sin canal; y comprobar que las 16 pruebas unitarias pasan. No borrar canales/servicios/muxes ni activar variante `rename` hasta fijar la línea base.
