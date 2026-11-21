@@ -689,3 +689,19 @@ Siguiente acción estrictamente local/read-only: `sudo tcpdump -nn -tt -r runtim
 `G3AF_PCAP_PAYLOAD_VALID=NOT_VERIFIED`
 `G3AF_TVH_RESTORED_APPLIED=NOT_CHECKED`
 `G3AF_KODI_RESTORED_APPLIED=NOT_CHECKED`
+
+
+## G3-AF: PCAP de 352 bytes contiene solo 14 TCP ACK sin payload; consulta posterior interrumpida (2026-11-21)
+
+El operador analizó localmente `g3af_htsp.pcap` con `tcpdump -nn -tt -r`. Los 14 registros de la conexión loopback `127.0.0.1:19992 ↔ 127.0.0.1:46266` tenían **todos `length 0`**, flags `[.]` (ACK), sin carga HTSP. Marcas de captura aproximadas Unix 1795285191–1795285283 (~92 s entre primer y último paquete). Los metadatos muestran tráfico TCP de conexión establecida, pero **no prueba ninguna emisión/recepción HTSP `channelUpdate`**. La ausencia de payload en la captura no demuestra ausencia de evento a lo largo de toda la prueba o ausencia de notificación en otro enlace. El evento podría haberse generado fuera de la ventana, o el backend no haberlo emitido; ambos escenarios siguen abiertos.
+
+Después el operador intentó una consulta heredoc Python de TVH/Kodi y la shell mostró prompt secundario `>` repetidamente; terminó con `^C`. **No hay salida de ese script ni evidencia posterior del estado efectivo TVH/Kodi**. Probable delimitador heredoc no cerrado por el pegado: no declarar ejecución ni error de las API.
+
+`G3AF_PCAP_PACKETS=14`
+`G3AF_PCAP_PAYLOAD_PACKETS=0`
+`G3AF_HTSP_CHANNELUPDATE_CAPTURED=NO`
+`G3AF_TVH_RESTORED_NAME_CONFIRMED=NO`
+`G3AF_KODI_RESTORED_NAME_CONFIRMED=NO`
+`G3AF_POST_CAPTURE_READ=NOT_EXECUTED_HEREDOC_INTERRUPTED`
+
+Próximo gate: volver a consultar por separado TVH y Kodi con comandos de una línea o scripts versionados para evitar heredoc interactivo; comprobar proceso captura iniciado ANTES del cambio y mantenerlo vivo al menos dos ciclos de refetch; confirmar que se capturan paquetes de payload con una operación de laboratorio que genere un mensaje HTSP verificable (sin reiniciar PVR). Si la conexión a loopback no ve payload aunque exista actividad, verificar interfaz/punto captura y puerto antes de atribuir fallo al servidor. No subir PCAP o logs sin sanitizar ni tocar master/SQLite.
