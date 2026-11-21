@@ -2,7 +2,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from contextlib import redirect_stdout
 from io import StringIO
 
@@ -28,8 +28,7 @@ class RefetchInspectionTests(unittest.TestCase):
                     if endpoint == "mpegts/network/grid" else
                     {"entries": [self.node]})
         with patch.object(M, "_request", side_effect=getter), \
-             patch.object(M.PLAYLIST, "is_file", return_value=True), \
-             patch.object(M.PLAYLIST, "is_symlink", return_value=False):
+             patch.object(M, "PLAYLIST", Mock(is_file=Mock(return_value=True), is_symlink=Mock(return_value=False))):
             with redirect_stdout(StringIO()) as buffer:
                 code = M.inspect()
         return code, buffer.getvalue()
