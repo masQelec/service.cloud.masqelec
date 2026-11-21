@@ -3,7 +3,7 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, MagicMock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pvr_g3s_tvh_two_snapshots.py"
 spec = importlib.util.spec_from_file_location("g3s", SCRIPT)
@@ -28,7 +28,7 @@ class TwoSnapshotTests(unittest.TestCase):
             calls.append(endpoint)
             return copy.deepcopy(
                 self.tags if endpoint == "channeltag/grid" else self.channels)
-        fake_path = Mock()
+        fake_path = MagicMock()
         fake_path.is_file.return_value = True
         fake_path.is_symlink.return_value = False
         fake_path.open.return_value.__enter__.return_value.read.return_value = raw
