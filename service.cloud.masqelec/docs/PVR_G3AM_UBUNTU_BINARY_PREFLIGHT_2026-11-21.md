@@ -659,3 +659,33 @@ G3AN_BUILD_GATE=PASS
 G3AN_GUI_GATE=FAIL
 G3AN_COMPRESSED_JS_REGENERATED=UNKNOWN
 ```
+
+## G3-AN — bandera CA comprobada y artefacto JS posiblemente obsoleto (22/11/2026)
+
+Datos de la auditoría del operador:
+```text
+CONFIG_CWC=no
+CONFIG_CCCAM=no
+CONFIG_CAPMT=no
+CONFIG_CONSTCW=no
+CONFIG_LINUXDVB_CA=yes
+Makefile.webui contiene CACLIENT-$(CONFIG_LINUXDVB_CA) = yes
+src/webui/static/tvh.js.gz: gzip válido, 1097516 bytes descomprimidos
+b'tvheadend.caclient' in bundle=True
+b'tvheadend.codec_tab' in bundle=True
+make -n -f Makefile.webui WEBUI=std src/webui/static/tvh.js.gz -> ya actualizado
+```
+
+El token caclient aparece también en tvheadend.js en su llamada (sin garantizar que exista la declaración). Lo mismo ocurre con codec_tab, pese a CONFIG_LIBAV deshabilitado, por lo que la búsqueda de subcadena es insuficiente. En la versión upstream exacta, Makefile.webui regenera tvh.js.gz a partir de JAVASCRIPT_SRC; cambiar Makefile.webui solamente no fuerza la reconstrucción por depender de los .js, no del Makefile. No concluir aún si el bundle tiene la definición: usar patrón de asignación `tvheadend.caclient = function` tolerante a espacios sobre el contenido descomprimido.
+
+Próximo gate experimental dirigido: ejecutar `make -f Makefile.webui WEBUI=std -W src/webui/static/app/caclient.js src/webui/static/tvh.js.gz` en checkout upstream (fuerza solo el artefacto JS dejando el fuente intacto); verificar con Python gzip+regex la definición, no únicamente la referencia; como el árbol src/webui/static está montado en RO en el contenedor G3-AM, verificar `GET /static/tvh.js.gz` local y forzar recarga sin caché del navegador. No reiniciar G3-AB, G3-AM ni recompilar todo hasta comprobar resultado. No alterar el SHA del binario salvo que se recompilara por separado.
+
+```text
+G3AN_LINUXDVB_CA=yes
+G3AN_CACLIENT_MAKE_RULE=PATCHED
+G3AN_JS_GZIP=VALID
+G3AN_JS_CACLIENT_TOKEN=FOUND_NOT_PROOF_OF_DEFINITION
+G3AN_JS_CACLIENT_DEFINITION=NOT_VERIFIED
+G3AN_JS_TARGET=REPORTED_UP_TO_DATE
+G3AN_GUI_GATE=FAIL
+```
