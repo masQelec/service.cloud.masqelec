@@ -242,3 +242,20 @@ KODI_ALPHA_RENAMED: False
 `G3AB_RENAME_TVH_UUID_STABLE=PASS`, `G3AB_RENAME_TVH_NAME=PASS`, `G3AB_RENAME_KODI_CHANNELID_STABLE=PASS`, `G3AB_RENAME_KODI_LABEL=FAIL_CURRENT_SNAPSHOT`. Se confirma preservación observada de UUID/canal ID ante rename con CUID estable, **pero no** que CUID sea la causa. No afirmar convergencia global ni que Kodi refresque automáticamente los metadatos: la identidad y el nombre se comportan de forma distinta. Se requiere examinar la etiqueta efectiva, el estado de propagación y las opciones de Kodi/pvr.hts sin modificar `TVxx.db` ni saltar al escenario `url`.
 
 El diagnóstico seguro es consultar otra vez Kodi y TVH, verificar socket HTSP 19992 si necesario, y revisar si el nombre está fijado en Kodi o si requiere una actualización no destructiva de la conexión PVR. Evitar recomendaciones de desactivar/habilitar pvr.hts hasta saber si la sincronización eventual actualiza por sí sola; documentar el resultado de cada intervención.
+
+
+## G3-AB: Kodi etiqueta anterior confirmada; investigar HTSP channelUpdate (2026-11-21)
+
+Última salida reportada por el operador a través de JSON-RPC del perfil Kodi G3-AB:
+
+```text
+ID: 2
+NOMBRE: G3AB Alpha
+---
+ID: 1
+NOMBRE: G3AB Beta
+```
+
+El TVH de laboratorio ya presentaba `G3AB Alpha Renamed` y su UUID preservado. **No hay convergencia de etiqueta en Kodi**, aunque se conservaron 2 canales y el ID 2. El protocolo HTSP documenta la notificación **`channelUpdate`** con campo opcional `channelName`, así como el mecanismo de metadatos asíncronos: https://docs.tvheadend.org/documentation/development/htsp/server-to-client-methods y https://docs.tvheadend.org/documentation/development/htsp/client-to-server-rpc-methods. La existencia del mecanismo **no demuestra** que TVH emitiera efectivamente el evento ni que pvr.hts lo procesara.
+
+`G3AB_RENAME_TVH=PASS`; `G3AB_RENAME_KODI_LABEL=FAIL_CURRENT_STATE`; `G3AB_RENAME_KODI_ID=STABLE`; `G3AB_HTSP_CHANNEL_UPDATE_SEEN=NOT_TESTED`. Próxima prueba de diagnóstico **sin limpiar base de datos ni resetear el cliente**: cerrar solo Kodi de laboratorio y reiniciarlo con el mismo HOME G3-AB, verificar el socket al puerto 19992 y consultar otra vez PVR.GetChannels para distinguir reimportación inicial de actualización en vivo. No seguir con `prepare.py url` mientras el rename no se resuelva. Si reiniciar Kodi corrige la etiqueta, hay un fallo de actualización en vivo o notificación (no necesariamente del lado TVH); si sigue incorrecta, investigar opciones de nombres locales y persistencia de metadatos de Kodi sin borrar `TVxx.db`.
