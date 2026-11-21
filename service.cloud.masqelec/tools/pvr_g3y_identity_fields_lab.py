@@ -9,6 +9,8 @@ import argparse
 import json
 import sys
 import urllib.request
+import urllib.error
+import socket
 
 MAX_REPLY = 16 * 1024 * 1024
 MAX_CHANNELS = 20000
@@ -20,16 +22,32 @@ class Blocked(ValueError):
     pass
 
 
-def _fetch(request):
-    with urllib.request.urlopen(request, timeout=12) as response:
-        if response.status != 200:
-            raise Blocked("HTTP_NOT_OK")
-        content = response.read(MAX_REPLY + 1)
+def _fetch(request, source):
+    """Fail closed, with non-sensitive failure categories per endpoint."""
+    if source not in ("TVH", "KODI"):
+        raise Blocked("INVALID_SOURCE")
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            if response.status != 200:
+                raise Blocked(source + "_HTTP_ERROR")
+            content = response.read(MAX_REPLY + 1)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            raise Blocked(source + "_AUTH_REQUIRED") from None
+        if exc.code == 404:
+            raise Blocked(source + "_ENDPOINT_NOT_FOUND") from None
+        raise Blocked(source + "_HTTP_ERROR") from None
+    except (urllib.error.URLError, socket.timeout, TimeoutError,
+            ConnectionError, OSError):
+        raise Blocked(source + "_UNREACHABLE") from None
     if len(content) > MAX_REPLY:
-        raise Blocked("RESPONSE_TOO_LARGE")
-    value = json.loads(content)
+        raise Blocked(source + "_RESPONSE_TOO_LARGE")
+    try:
+        value = json.loads(content)
+    except (ValueError, UnicodeDecodeError):
+        raise Blocked(source + "_INVALID_JSON") from None
     if not isinstance(value, dict):
-        raise Blocked("INVALID_API_RESPONSE")
+        raise Blocked(source + "_INVALID_RESPONSE")
     return value
 
 
@@ -73,7 +91,7 @@ def probe(tvh_url, kodi_url):
         raise Blocked("UNAPPROVED_ENDPOINT")
     tvh = _fetch(urllib.request.Request(
         tvh_url + "/api/channel/grid?start=0&limit=20000",
-        method="GET", headers={"Accept": "application/json"}))
+        method="GET", headers={"Accept": "application/json"}), "TVH")
     rpc = {"jsonrpc": "2.0", "id": 1, "method": "PVR.GetChannels",
            "params": {"channelgroupid": "alltv",
                       "properties": ["channelnumber", "subchannelnumber"],
@@ -81,7 +99,7 @@ def probe(tvh_url, kodi_url):
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
     kodi = _fetch(urllib.request.Request(
         kodi_url + "/jsonrpc", data=json.dumps(rpc).encode(),
-        headers=headers, method="POST"))
+        headers=headers, method="POST"), "KODI")
     if "error" in kodi or not isinstance(kodi.get("result"), dict):
         raise Blocked("KODI_RPC_ERROR")
     return _summary(_rows(tvh, "entries"), _rows(kodi["result"], "channels"))
