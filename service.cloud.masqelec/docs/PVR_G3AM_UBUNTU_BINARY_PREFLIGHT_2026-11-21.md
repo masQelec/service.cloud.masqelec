@@ -601,3 +601,33 @@ Revisión código upstream exacto `8837853a6`:
 Se versiona parche incremental `lab/pvr_g3ab/patches/tvheadend-8837853a6-g3an-caclient-ui-capability.patch` que modifica **solo** la guarda del array `tvheadend_capabilities` en `src/main.c` para anunciar caclient únicamente cuando `ENABLE_CWC || ENABLE_CAPMT || ENABLE_CCCAM` (igual que la inclusión JS). No cambia backend, ACL, fuentes M3U, ni canal. Se debe comprobar `git apply --check` en checkout upstream del operador **que ya tiene parche G3-AL** y recompilar `make -j2` en el host para aplicar a binario. No reejecutar `./configure`; conservar flags configurados. Antes de compilar parar únicamente contenedor experimental G3-AM TVH y guardar copia binaria rollback fuera del proyecto versionado; levantar de nuevo con `--force-recreate` (bind mount del ejecutable, evita old inode). Nunca parar G3-AB.
 
 Gates pendientes: `G3AN_PATCH_CHECK`, `G3AN_BUILD`, `G3AN_HTTP_API`, `G3AN_CAPABILITIES_NO_CACLIENT`, `G3AN_GUI_CONFIGURATION_STATUS`. No declarar éxito hasta output de operador.
+
+## G3-AN — diagnóstico concreto de ExtJS incompleto y parche de compilación (operador, 22/11/2026)
+
+Consola del operador tras reinicio de Ubuntu:
+```text
+G3AM_MISSING_METHODS=["codec_tab","caclient"]
+G3AM_MISSING_COUNT=2
+G3AM_CAPABILITIES=["caclient","tvadapters","satip_client","satip_server","timeshift","trace"]
+```
+
+Análisis fuente upstream exacta TVH `8837853a6`:
+- `src/webui/static/app/tvheadend.js:1192` invoca `codec_tab` solo con capacidad `libav`, **ausente**, por tanto no es anomalía.
+- `src/webui/static/app/tvheadend.js:1214-1215` invoca `tvheadend.caclient(cp,6)` cuando capability `caclient` existe; su ausencia aborta la construcción de Configuration antes de asignar `confpanel` y crear Status.
+- `src/main.c:157-159` anuncia `caclient` cuando CWC/CAPMT/CONSTCW/CCCAM/**LINUXDVB_CA** estén habilitadas.
+- `Makefile.webui:131-136` incluye `app/caclient.js` **solo** con CONFIG_CWC, CONFIG_CCCAM o CONFIG_CAPMT. No contempla CONSTCW ni LINUXDVB_CA.
+- `src/webui/static/app/caclient.js:5` define la función que falta.
+- El build lab había desactivado CWC/CAPMT/CONSTCW/CCCAM pero aparentemente sigue anunciando acceso condicional, probablemente por LINUXDVB_CA; verificar flag explícita en `.config.mk` antes de ejecutar rebuild, no afirmar qué flag exacta causa capability sin lectura de configuración.
+
+Corrección fuente preparada en rama `develop`, archivo `lab/pvr_g3ab/patches/tvheadend-8837853a6-g3an-caclient-webui-capability.patch`: añadir `CACLIENT-$(CONFIG_CONSTCW) = yes` y `CACLIENT-$(CONFIG_LINUXDVB_CA) = yes` para alinear WebUI con los flags que usa `main.c`. No se ha aplicado al checkout host, ni recompilado ni arrancado la UI reparada. G3-AL permanece separado y no se toca; no propagar --noacl a producción.
+
+Siguiente gate del operador: actualizar repo `develop`, inspeccionar 5 CONFIG_* de CA en `.config.mk`, `git apply --check`, `git apply` (solo Makefile.webui), parar exclusivamente G3-AM TVH antes de reconstruir el binario montado, `make -j2` en checkout upstream y validar, arrancar solo G3-AM TVH, verificar API y comprobar en consola `typeof tvheadend.caclient === "function"` y `confpanel/statuspanel`. Registrar resultado y nuevo checksum del binario para futuros arranques; el checksum histórico anterior dejará de ser válido. No ejecutar gate de renombrado hasta entonces.
+
+```text
+G3AM_MISSING_CODEC_TAB=EXPECTED_NO_LIBAV
+G3AM_MISSING_CACLIENT=BUG_CONFIRMED_CAPABILITY_UI_MISMATCH
+G3AN_PATCH_REPOSITORY=COMMITTED
+G3AN_PATCH_HOST=NOT_APPLIED
+G3AN_NEW_BINARY=NOT_BUILT
+G3AM_GUI_REPAIRED=NOT_VERIFIED
+```
