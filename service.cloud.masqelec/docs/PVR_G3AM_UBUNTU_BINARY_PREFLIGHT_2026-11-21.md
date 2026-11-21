@@ -1016,3 +1016,21 @@ G3AM_KODI_HTSP_TARGET_PORT=9982_WRONG
 G3AM_KODI_HTSP_CONNECTED=NO
 G3AM_KODI_PVR_RENAME=NOT_TESTED
 ```
+
+## G3-AM — pvr.hts Kodi real conectado y actualizaciones async iniciadas (22/11/2026)
+
+Operador corrigió en UI puerto HTSP `9982` → `29992`. Evidencia de socket:
+
+```text
+ESTAB 127.0.0.1:29992 127.0.0.1:34174
+ESTAB 127.0.0.1:34174 127.0.0.1:29992 users:(("kodi.bin",pid=25626,fd=32))
+```
+
+Kodi log 00:33:30: cliente pvr.hts reconstruido, `Received permissions` (administrador, streaming y DVR), `Request async EPG (3 days)`, `Async updates requested`, `Async updates initialised`. Errores previos 9982 son anteriores al cambio; no representan estado actual. Resultado: **conexión TCP/HTSP y suscripción async PASS**; no equivale todavía a sincronización de nombres/IDs en PVR. Próximo: confirmar visualización de Alpha Renamed/Beta en Kodi y obtener baseline de la BD `TV*.db` del perfil exclusivo G3-AM mediante introspección SQLite READ-ONLY; no asumir esquema, no manipular ni copiar base. Luego ejecutar dos fases baseline→rename con Kodi abierto, registrar `idChannel`, `iUniqueId` y número de registros, comprobar ausencia de duplicados y socket persistente.
+
+```text
+G3AM_KODI_HTSP_SOCKET_ESTABLISHED=PASS
+G3AM_KODI_HTSP_ASYNC_INITIALISED=PASS
+G3AM_KODI_CHANNEL_DB_BASELINE=NOT_YET_VERIFIED
+G3AM_KODI_RENAME_PUSH=NOT_TESTED
+```
