@@ -1,0 +1,15 @@
+# G3-AM: isolated runtime for the Ubuntu x86-64 G3-AL binary.
+# Build context: lab/pvr_g3ab/g3am. Never builds or overwrites the active TVH.
+# The binary is deliberately NOT included in this image: mount it read-only at run time.
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libssl3t64 zlib1g libzstd1 ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Do not run TVH as root; never reuse the original TVH config directory.
+USER 1000:1000
+WORKDIR /tmp
+ENTRYPOINT ["/opt/g3al/tvheadend"]
