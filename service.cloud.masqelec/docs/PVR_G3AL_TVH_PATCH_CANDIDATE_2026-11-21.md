@@ -158,3 +158,36 @@ CC              tvheadend
 ```
 
 Indican llegada a etapa de enlace final, sin error en el fragmento recibido. **No se ha recibido código de salida, ni verificación del binario, ni informe completo**. Estado `G3AL_BUILD_LINK_REACHED=YES`, `G3AL_COMPILE_PASS=PENDING_EXIT_CHECK`. El build reducido no asegura paridad funcional ni ABI con imagen LinuxServer `latest`, por lo que no usar el binario para sustituir servicio. Siguiente comando en checkout experimental: `make -j2 && test -x build.linux/tvheadend && echo G3AL_COMPILE=PASS` con comprobación de ruta del ejecutable antes de asumir el destino concreto; si ruta distinta, consultar `find build.* -type f -name tvheadend`. No arranque ni deploy.
+
+## G3-AL compilación confirmada por operador y planificación de aislamiento (21/11/2026)
+
+El operador comunica:
+
+```text
+G3AL_MAKE=PASS
+./build.linux/tvheadend
+```
+
+**Gate comprobado**: `make -j2` finaliza correctamente; se produjo ejecutable en checkout separado `/home/ubuntu/tvheadend-g3al-upstream/build.linux/tvheadend` con parche aplicado. No hay evidencias de arranque de ese ejecutable o modificación del contenedor principal. La compilación se hizo **en Ubuntu host con funciones desactivadas**, por lo que **NO** garantiza ABI compatible con `lscr.io/linuxserver/tvheadend:latest` ni equivalencia completa de funcionalidades.
+
+Se revisó el fichero de `lab/pvr_g3ab/compose.yaml` de `develop`:
+- `tvh` imagen LinuxServer `latest`, puertos publicados loopback 19991/19992, config `./runtime/tvh_config:/config` de lectura/escritura y playlist `./runtime/playlist:/lab_playlist:ro`.
+- `streams` nginx:alpine en red Docker `pvr_g3ab`, generador M3U sintético usa `http://streams/ch1.ts`.
+- Existe biblioteca de Kodi en host con HTSP al puerto 19992; **nunca montar la configuración original de TVH en escritura en un segundo proceso** (corrupción/race de config y UUID), ni sustituir sin backup.
+- Una segunda instancia necesitará copia privada de configuración y su propia ruta de playlist, puertos 29991/29992, identidad/estado verificables y clientes HTSP de prueba. El binario compilado en host no debe insertarse sin comprobación de `ldd`, `--version` y base de imagen compatible.
+
+**Gate próximo G3-AM, read-only:** verificar ejecutable y dependencias desde host:
+```bash
+cd /home/ubuntu/tvheadend-g3al-upstream
+file ./build.linux/tvheadend
+ldd ./build.linux/tvheadend
+./build.linux/tvheadend --version
+```
+Estas operaciones no arrancan el servidor ni alteran la biblioteca. Evitar mostrar valores confidenciales de config. Para confirmar URL de playlist del contenedor, inspeccionar solo esquema y nombre de red, no tokens ni rutas con querys secretas. Si aparece dependencia ausente, `G3AM_BLOCKED`.
+
+`G3AL_UBUNTU_COMPILE=PASS`
+`G3AL_BINARY_PATH=./build.linux/tvheadend`
+`G3AL_BUILD_OPTIONS=REDUCED_NOT_PARITY`
+`G3AL_BINARY_RUN=NO`
+`G3AL_CONTAINER_REPLACED=NO`
+`G3AL_NEXT_GATE=G3AM_BINARY_ABI_AND_ISOLATED_CONFIG`
