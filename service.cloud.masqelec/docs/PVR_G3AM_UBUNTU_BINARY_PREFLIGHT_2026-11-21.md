@@ -519,3 +519,26 @@ G3AM_NOACL_COMPOSE=COMMITTED
 G3AM_NOACL_RUNTIME=NOT_TESTED
 G3AB_ORIGINAL_AUTH=UNCHANGED_BY_PATCH
 ```
+
+## G3-AM — HTTP API 200 sin ACL, pero interfaz web en blanco (operador, 21/11/2026)
+
+El operador confirmó `docker compose ... up -d --no-deps tvh`, ambos contenedores `Up` a 5s/19min, y `GET /api/serverinfo => G3AM_HTTP_NOAUTH=200`. La interfaz visual aparece vacía en navegador (sin captura de consola/red, **no se atribuye categóricamente la causa**).
+
+Auditoría código fuente exacto TVH `8837853a6`:
+- `CONFIG_BUNDLE=no` confirmado previamente.
+- `src/main.c:982-983` determina `tvheadend_cwd=/opt` con binario `/opt/g3al/tvheadend`.
+- `src/webui/webui.c:107-124` redirige raíz a `extjs.html` cuando `ENABLE_VUE_UI` deshabilitado; `webui_static_content("/static", "src/webui/static")` en línea 2901.
+- `src/filebundle.c:165-169` busca rutas `src/webui/static` bajo `tvheadend_cwd` o `TVHEADEND_DATADIR`.
+- Makefile declara `src/webui/static` como assets de bundle pero este build deshabilita bundle.
+- G3-AM tenía montaje de perfiles `/opt/data/conf` pero no de archivos estáticos `/opt/src/webui/static`; por tanto es plausible que API funcione y la UI no cargue.
+
+Cambio **solo** `lab/pvr_g3ab/g3am/compose.yaml`: montar `/home/ubuntu/tvheadend-g3al-upstream/src/webui/static:/opt/src/webui/static:ro`. Mantener intacto compose G3-AB, su configuración, playlists, Kodi y el parche G3-AL. No confundir API 200 con GUI PASS.
+
+Próximo gate operador: verificar que origen `src/webui/static` es directorio real, `docker compose config --quiet`, `up -d --no-deps tvh`, esperar 5s, comprobar estado, `GET /extjs.html` y `GET /static/... ` tras identificar una ruta del HTML, con resultados HTTP y sin imprimir cuerpo HTML; recargar navegador con caché deshabilitada. `ENABLE_VUE_UI` no se ha confirmado directamente para este build; no afirmar que Vue está ausente solo por las banderas de build indicadas.
+
+```text
+G3AM_API_NOACL_HTTP=200
+G3AM_GUI_BROWSER=BLANK_REPORTED
+G3AM_WEB_STATIC_MOUNT=COMMITTED_NOT_APPLIED
+G3AM_GUI_AFTER_FIX=NOT_TESTED
+```
