@@ -663,3 +663,29 @@ Para generar un nuevo evento con el estado actual TVH `G3AB Alpha Renamed` y Kod
 `G3AF_CAPTURE_EXECUTED=NO`
 `G3AF_CHANNELUPDATE_OBSERVED=NO`
 `G3AF_CAPTURE_REQUIRES_OPERATOR_ACTION=YES`
+
+
+## G3-AF: transición RESTORED y PCAP mínimo, captura HTSP aún sin validar (operador, 2026-11-21)
+
+El operador confirmó desde el laboratorio G3-AB:
+
+```text
+RENAMED: True
+URL_ORIGINAL: True
+URL_ALTERNATIVA: False
+G3AB_STAGE=RESTORED
+G3AB_CUID_COUNT=2
+G3AB_MASTER_UNTOUCHED=YES
+G3AB_G3W_UNTOUCHED=YES
+PCAP_BYTES=352
+```
+
+La transición `rename → restored` ha sido solicitada por `prepare.py restored` con URL original conservada. **No se ha demostrado todavía** que Tvheadend haya aplicado `restored`, que Kodi lo haya visto ni que la captura contenga datos útiles. El archivo `runtime/htsp_capture/g3af_htsp.pcap` mide solo **352 bytes**, demasiado pequeño para afirmar presencia/ausencia de evento `channelUpdate`. Tampoco sabemos con certeza cuándo se inició o detuvo `tcpdump`, ni el número/dirección de sus paquetes, ni si el enlace existente permaneció activo durante la captura. Puede contener encabezado y paquetes de control, o tráfico breve. No interpretar captura vacía como HTSP sin emisión.
+
+Siguiente acción estrictamente local/read-only: `sudo tcpdump -nn -tt -r runtime/htsp_capture/g3af_htsp.pcap 'tcp and port 19992'` **sin `-A` ni `-X`** para ver metadatos y longitudes de los pocos paquetes; **no publicar paquetes crudos/PCAP ni tokens**. Consulta API TVH y JSONRPC Kodi para comprobar estado tras RESTORED. Si no aparecen paquetes de datos relevantes, planificar nueva captura iniciada antes de nueva transición de nombre y verificar actividad real del proceso `tcpdump`, duración y coincidencia de puerto.
+`G3AF_STAGE_RESTORED_WRITE=YES`
+`G3AF_PCAP_SIZE_BYTES=352`
+`G3AF_PCAP_HAS_CHANNELUPDATE=UNPROVEN`
+`G3AF_PCAP_PAYLOAD_VALID=NOT_VERIFIED`
+`G3AF_TVH_RESTORED_APPLIED=NOT_CHECKED`
+`G3AF_KODI_RESTORED_APPLIED=NOT_CHECKED`
