@@ -67,3 +67,15 @@ G3AK_NEXT=VERIFY_DOWNLOAD_THREAD_LOCK_AND_SERVICE_NAME_PATH
 ```
 
 Referencias: https://github.com/tvheadend/tvheadend/blob/8837853a6/src/input/mpegts/iptv/iptv_auto.c ; https://github.com/tvheadend/tvheadend/blob/8837853a6/src/input/mpegts/mpegts_mux.c ; https://github.com/tvheadend/tvheadend/blob/8837853a6/src/channels.c ; https://github.com/tvheadend/tvheadend/blob/8837853a6/src/htsp_server.c ; https://github.com/tvheadend/tvheadend/blob/8837853a6/src/bouquet.c
+
+## Revisión posterior: lock del callback HTTP en la revisión exacta
+
+En `src/download.c` de Tvheadend `8837853a6`, `download_fetch_complete` hace explícitamente `tvh_mutex_lock(&global_lock)` antes de llamar a `dn->process(...)` para respuesta HTTP válida, y `tvh_mutex_unlock(&global_lock)` después. `iptv_auto_network_init` configura `dn->process = iptv_auto_network_process`. **Para playlists de transporte HTTP, el callback procesador entra con `global_lock` retenido según esta ruta fuente.** El laboratorio usa actualización periódica de playlist por servidor HTTP; confirmar `in_url` exacta solo si se necesita discriminar esquemas. Otras rutas `download_file` y `download_pipe_read` también llaman a `dn->process`, pero la inspección localizada no muestra el lock en esos mismos cuerpos; falta inspeccionar bloqueo de timers para su seguridad. Por ello, **no generalizar el preflight de lock a URLs `file://` o `pipe://` sin verificar contexto de timer**.
+
+Esto reduce un bloqueador de diseño **solo para HTTP**; no equivale a autorización de parche. Falta confirmar la actualización efectiva de `service_get_channel_name` y las condiciones de múltiples servicios, nombres manuales y duplicados antes de implementar el bucle de notificación.
+
+Fuente: https://github.com/tvheadend/tvheadend/blob/8837853a6/src/download.c
+
+`G3AK_HTTP_CALLBACK_GLOBAL_LOCK=SOURCE_VERIFIED`
+`G3AK_FILE_PIPE_CALLBACK_LOCK=NOT_FULLY_VERIFIED`
+`G3AK_PATCH_BUILD=NOT_EXECUTED`
