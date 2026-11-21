@@ -1188,3 +1188,7 @@ Hechos desde `tvheadend/tvheadend@8837853a6`:
 - La documentación incluye preflight lock/servicio, pruebas de nombre reversible, ausencia de eventos en no-change, invariantes de UUID/servicio/Kodi, y evaluación del coste de mantener fork TVH. No suponer que API idnode no-op dispara HTSP.
 
 Siguiente objetivo G3-AL: verificar contexto de lock del callback descarga y mecanismo de propagación de nombre efectivo; solo después preparar parche candidato `git apply --check` + imagen docker **distinta de latest** en laboratorio. Nunca tocar master CoreELEC / SQLite / grupos protegidos.
+
+### G3-AK continuación: callback HTTP TVH bloqueado por global_lock
+
+Revisión `tvheadend/tvheadend@8837853a6` `src/download.c` en `download_fetch_complete`: obtiene `tvh_mutex_lock(&global_lock)`, invoca `dn->process` para HTTP 200 con datos, luego libera lock. `iptv_auto_network_init` asigna `ap->in_download.process=iptv_auto_network_process`. Para **playlist importada por HTTP**, el procesamiento del nombre y una hipotética notificación de canal suceden bajo `global_lock` según esta ruta. **No generalizar** a rutas file/pipe sin auditar las callbacks del timer. Documento detallado G3-AK actualizado. Todavía **NO** existe parche compilado ni gate de emisión selectiva; producción intacta.
