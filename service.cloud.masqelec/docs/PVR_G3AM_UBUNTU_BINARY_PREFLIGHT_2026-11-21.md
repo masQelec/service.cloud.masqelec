@@ -386,3 +386,25 @@ G3AM_TVH_STABLE_RUNTIME=NOT_VERIFIED
 G3AM_HTSP_PROTOCOL=NOT_TESTED
 G3AM_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — perfiles locales ausentes y error del diagnóstico Compose (21/11/2026)
+
+Operador:
+```text
+CONFIG_profiles=ABSENT
+CONFIG_profile=ABSENT
+Mount /opt/g3al/tvheadend RW=false
+Mount /tmp/data/conf RW=false
+Mount /config RW=true
+docker compose run --network none => unknown flag: --network
+G3AM_PROFILE_VISIBILITY=COMPLETED
+```
+
+Los mounts reportados como `RO=false` provenían de plantilla `RO={{.RW}}`; **son de solo lectura** (`RW=false`). La ausencia de `profiles` y `profile` locales elimina un posible override local como causa inmediata. **Error propio del script:** Compose `run` no admite `--network` en el entorno 2.40.3; la lectura del perfil dentro del contenedor **nunca se ejecutó**, y el marcador `COMPLETED` era incondicional. No declararla PASS. Corregir usando `docker run --network none --entrypoint /bin/sh` sobre imagen `masqelec/tvh-g3am-runtime:noble` con montaje explícito del origen `/home/ubuntu/tvheadend-g3al-upstream/data/conf` a `/tmp/data/conf:ro`, usuario 1000 y comando de solo lectura; comprobar `test -r`, sha256 y JSON de perfiles. Alternativamente Compose run sin --network para verificar solo visibilidad, pero conectaría brevemente a la red compartida: preferir Docker run con network none.
+
+```text
+G3AM_CONFIG_PROFILES_OVERRIDE=ABSENT
+G3AM_PROFILE_MOUNT_RW=FALSE
+G3AM_PROFILE_VISIBILITY=NOT_TESTED_BAD_DIAGNOSTIC_COMMAND
+G3AM_TVH_BOOT=FAIL_EXIT_134
+```
