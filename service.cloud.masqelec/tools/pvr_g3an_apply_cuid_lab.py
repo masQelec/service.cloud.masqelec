@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""G3-AN source candidate applied only to a G3-AL-patched Tvheadend tree.
+"""G3-AN source candidate for a SEPARATE G3-AL-patched Tvheadend worktree.
 
 Never runs make, never starts services, never touches Tvheadend runtime state.
 Operator must separately review git diff, compile and gate in fresh isolated lab.
@@ -18,6 +18,8 @@ def patch(root, dry_run):
     mux = root / "src/input/mpegts/iptv/iptv_mux.c"
     head = root / "src/input/mpegts/iptv/iptv_private.h"
     original = {p: p.read_text() for p in (auto, mux, head)}
+    if "G3-AL laboratory candidate" not in original[auto]:
+        raise RuntimeError("G3AL_BASE_PATCH_MISSING")
     data = dict(original)
 
     data[head] = replace_one(data[head],
@@ -221,7 +223,7 @@ def main():
     p.add_argument("--apply", action="store_true")
     args = p.parse_args()
     root = args.tree.resolve()
-    if root != Path("/home/ubuntu/tvheadend-g3al-upstream"):
+    if root != Path("/home/ubuntu/tvheadend-g3an-upstream"):
         raise RuntimeError("WRONG_SOURCE_TREE")
     if not (root / ".git").exists():
         raise RuntimeError("NOT_GIT_CHECKOUT")
