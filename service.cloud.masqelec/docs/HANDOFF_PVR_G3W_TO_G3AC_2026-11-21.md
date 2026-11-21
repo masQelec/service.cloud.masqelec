@@ -1004,3 +1004,23 @@ PUERTO: 49262 MENSAJE: subscriptionStart VECES: 1
 `G3AG_REFETCH_M3U_HTSP_PUSH_ABSENT=LIKELY_NOT_SERVER_INSTRUMENTED`
 
 **Próxima fase G3-AH**: construir decodificador PCAP/HTSP offline local read-only limitado a las capturas sintéticas, con separación por puerto/dirección, reensamblado TCP seguro, framing HTSP prefijado, identificación estructural `method`, `channelId`, `channelName` y eventos `channelAdd` / `channelUpdate`, sin imprimir ni subir bytes, credenciales, URL, tokens o pcap. Verificar tests sintéticos antes de ejecutar sobre captura real. Luego diseñar prueba causal del refetch Tvheadend sin tocar Kodi/PVR/master. No introducir reproducción forzada ni reconexiones periódicas como workaround.
+
+
+## G3-AH: analizador binario HTSP/PCAP en develop (2026-11-21)
+
+**Nuevos archivos:**
+- `tools/pvr_g3ah_htsp_pcap.py`: PCAP clásico Ethernet/IPv4/TCP → reensamblado secuencial por sesión y dirección → validación de framing y campos binarios HTSP → contadores de métodos seguros, sin salida de payload/secretos. No decodifica flujos iniciados antes del SYN (evita falsas interpretaciones).
+- `tests/test_pvr_g3ah_htsp_pcap.py`: **12 tests sintéticos** de seguridad, decodificación, retransmisiones y errores; pendientes de ejecución por operador en Ubuntu. Una versión equivalente del algoritmo pasó 12 tests en contenedor de desarrollo, pero debe comprobarse exactamente el código publicado.
+- `docs/PVR_G3AH_HTSP_PCAP_DECODER_2026-11-21.md`: especificación, protocolo consultado en fuente Tvheadend, limitaciones y comandos.
+
+**Ejecutar sin alterar laboratorio ni producción:**
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec
+git pull --ff-only origin develop
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_g3ah_htsp_pcap.py' -v
+cd service.cloud.masqelec/lab/pvr_g3ab
+sudo python3 ../../tools/pvr_g3ah_htsp_pcap.py runtime/htsp_capture/g3af_rename.pcap
+sudo python3 ../../tools/pvr_g3ah_htsp_pcap.py runtime/htsp_capture/g3af_playback.pcap
+```
+
+**Gates**: `G3AH_TESTS_UBUNTU=PENDING`, `G3AH_RENAME_PARSED=PENDING`, `G3AH_PLAYBACK_PARSED=PENDING`, `G3AH_HTSP_NEW_SESSION_CHANNELADD_VALIDATED=UNPROVEN`. Si el decoder reporta huecos/frames inválidos, detener inferencias y depurar parsing, no declarar ausencia de evento. No subir PCAP ni imprimir payload. No modificar SQLite, IPTV producción, PVR nativo ni master CoreELEC.
