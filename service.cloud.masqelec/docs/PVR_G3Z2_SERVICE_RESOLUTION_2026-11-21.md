@@ -61,3 +61,17 @@ PRODUCTION_TOUCHED=NO
 `G3Z2_UNIT=PASS_13` y `G3Z2_LAB_TVH_SERVICE_UUID_RELATION=PASS`. Las dos referencias se resuelven en catálogo service/list de TVH. Este gate **no** acredita una vinculación CUID→servicio, ni TVH UUID→Kodi ID, ni eliminación segura.
 
 **Observación adicional importante:** 3 servicios descubiertos, 2 referenciados por los 2 canales, sin referencias pendientes. Puede tratarse de un servicio residual del paso 2→3→2, pero **no está demostrado**: contar disponibles menos referenciados no identifica por sí solo un huérfano que debiera eliminarse. Siguiente gate: estudiar por API GET la relación de servicios no vinculados con muxes y con el conjunto IPTV sintético, sin borrar ni alterar configuración, y distinguir limpieza de canales frente a retención legítima de servicios/muxes.
+
+
+## Verificación posterior: servicio no vinculado, origen desconocido
+
+El operador consultó `channel/grid` y `service/list?enum=1` mediante GET y obtuvo:
+
+```text
+CANALES: 2
+SERVICIOS: 3
+SERVICIOS_SIN_CANAL: 1
+SERVICIO_3_SIN_CANAL: False
+```
+
+**Interpretación acotada:** hay una entrada de `service/list` sin referencia de canal, pero el texto de su `val` no contiene literalmente `G3W Synthetic 3`. `False` no identifica la procedencia del servicio, ni prueba que no sea residual del ensayo. Tampoco autoriza eliminarlo; un servicio no asociado a un canal puede seguir perteneciendo a un mux de TVH. Siguiente gate: inspección de metadatos de `service/grid` y relación con muxes en lectura, con privacidad (no imprimir URLs, UUID ni credenciales); no realizar `idnode/delete`.
