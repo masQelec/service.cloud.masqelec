@@ -64,3 +64,20 @@ python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_g3y_id
 python3 service.cloud.masqelec/tools/pvr_g3y_identity_fields_lab.py
 ```
 Si el error es `KODI_UNREACHABLE`, comprobar que sigue abierto Kodi y que su JSON-RPC local escucha en 8080. Si `KODI_AUTH_REQUIRED`, detener aquí: no enviar contraseñas en línea de comandos ni desactivar autenticación de servicios expuestos. Si es `TVH_UNREACHABLE`, inspeccionar contenedores con `docker compose ps` en el directorio G3-W y la publicación loopback 19981. No alterar producción.
+
+
+## Segundo ensayo del operador: fallo localizado en Kodi HTTP
+
+```text
+Ran 17 tests in 0.002s
+OK
+docker compose ps:
+masqelec-pvr-g3w-streams-1  Up
+masqelec-pvr-g3w-tvh-1      Up 127.0.0.1:19981->9981/tcp, 127.0.0.1:19982->9982/tcp
+G3Y=BLOCKED
+REASON=KODI_UNREACHABLE
+```
+
+`G3Y_UNIT=PASS_17`. La lectura de TVH sí avanzó hasta intentar Kodi; el bloqueo se produce en el acceso HTTP al servidor JSON-RPC de Kodi `127.0.0.1:8080`, sin evidencia de fallo del cliente HTSP. El estado `docker compose ps` solo acredita contenedores y publicación de puertos, no las tres capas funcionando. No se autoriza ningún cutover.
+
+Próxima comprobación en Ubuntu: comprobar proceso Kodi, socket 8080 y `curl` JSON-RPC read-only; si Kodi se cerró, reabrir el perfil de laboratorio y habilitar servidor HTTP solo local. No tocar master.
