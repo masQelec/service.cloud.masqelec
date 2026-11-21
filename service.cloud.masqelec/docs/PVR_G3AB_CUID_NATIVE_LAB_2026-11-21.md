@@ -215,3 +215,12 @@ MUX_HABILITADO: 1
 ```
 
 **Corrección de la interpretación previa:** `G3AB_RENAME_PROPAGATED=YES_TVH_OBSERVED`. En el snapshot inmediatamente posterior a `prepare.py rename` no había cambiado ningún nombre, pero en la consulta posterior el canal ya aparece renombrado. No está demostrado el instante exacto, el trigger de relectura ni el tiempo hasta convergencia. `autoname=True` y `bouquet=True` en ambos canales; **el nombre del mux Alpha permanece con la etiqueta anterior**, lo que no implica falta de propagación al canal. Este diagnóstico no imprimió UUID de canales ni estado Kodi; por tanto `G3AB_RENAME_TVH_UUID_STABLE=NOT_RECHECKED` y `G3AB_RENAME_KODI_ID_STABLE=NOT_RECHECKED` en el punto actual. Próximo gate: obtener snapshots TVH UUID+nombre y Kodi ID+nombre; no ejecutar etapa URL hasta confirmación de ambos.
+
+
+## G3-AB: logs TVH durante rename, refetch periódico observado (2026-11-21)
+
+El operador aportó logs de Tvheadend con entradas `iptv: m3u parse: 0 new mux(es) in network 'IPTV LOCAL' (total 2)` aproximadamente cada minuto, de **11:51:09 a 12:05:09**. Esto confirma procesamiento periódico de la playlist y ausencia de nuevos muxes en esos instantes; no mide el momento exacto en que el nuevo nombre apareció ni por sí mismo prueba identidad de TVH/Kodi o reconocimiento de CUID.
+
+Aparecen además avisos `epggrab: EIT/PSIP data completion timeout` para G3AB Beta (11:56:50) y errores HTTP `/imagecache/1` y `/imagecache/2` con estado 404 (11:58). Son señales secundarias de EPG/imágenes sintéticas; no está demostrado que tengan relación con el rename. No corregirlas con cambios destructivos ni confundirlas con el gate de identidad.
+
+Estado: `G3AB_REFETCH_PERIODIC_LOG=OBSERVED`; `G3AB_NEW_MUXES=0`; `G3AB_RENAME_TVH_VISIBLE=YES` por lectura anterior; `G3AB_RENAME_UUID_STABLE=NOT_YET_RECHECKED`; `G3AB_RENAME_KODI_ID_STABLE=NOT_YET_RECHECKED`; `G3AB_CUID_CAUSALITY=NOT_PROVEN`. Próximo paso: consulta puntual UUID+nombre del TVH y channelid+nombre del Kodi sin cambiar etapas.
