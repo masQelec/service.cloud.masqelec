@@ -256,3 +256,34 @@ G3AM_TVH_PROCESS_STATUS=UNKNOWN
 G3AM_G3AB_ORIGINAL_MODIFIED=NOT_REPORTED
 G3AM_HTSP_HOT_RENAME=NOT_TESTED
 ```
+
+## G3-AM — clasificación de primer arranque TVH (operador, 21/11/2026)
+
+Resultado de inspección de solo lectura, posterior a `HTTP_CODE=000`:
+
+```text
+G3AM_PLAYLIST_CONTAINER=running EXIT=0 RESTARTS=0
+G3AM_TVH_CONTAINER=exited EXIT=134 OOM=false RESTARTS=0
+PORT_29991=NOT_CONNECTABLE
+PORT_29992=NOT_CONNECTABLE
+G3AM_TVH_LOG_LINES=21 LOG_QUERY_RC=0
+G3AM_PLAYLIST_LOG_LINES=26 LOG_QUERY_RC=0
+PERMISSION_DENIED=0
+CONFIG_ERROR=0
+BIND_ERROR=0
+MISSING_LIBRARY=0
+SEGFAULT=0
+FATAL_ERROR=0
+PROCESS_EXIT=0
+G3AM_DIAGNOSTIC=COMPLETED
+```
+
+**Diagnóstico:** Tvheadend no arranca como servidor; Docker exit 134 es **compatible** con SIGABRT, pero sin mensaje de abort/assert ni señal confirmada no atribuir a parche, permisos, memoria, configuración o dependencias. El clasificador anterior solo buscó patrones parciales y puede omitir assertion/abort/stack traces. Nginx sí continúa activo. No hacer `up/restart/down`, no borrar configuración ni cambiar permisos hasta recuperar evidencia concreta. Siguiente gate: capturar **solo** log TVH (21 líneas) con sanitización local de URLs, tokens y credenciales, extracto de mensajes assertion/abort y últimas líneas relevantes; verificar identidad UID/mode del directorio privado sin modificaciones. Compartir logs sanitizados, no completos en bruto.
+
+```text
+G3AM_TVH_BOOT=FAIL_EXIT_134
+G3AM_PLAYLIST_SERVICE=RUNNING
+G3AM_TVH_PORTS=NOT_CONNECTABLE
+G3AM_ABORT_CAUSE=UNKNOWN
+G3AM_HTTP_CHANNELUPDATE=NOT_TESTED
+```
