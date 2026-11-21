@@ -504,3 +504,18 @@ G3AM_SUPERUSER_FILE_CREATED=NOT_CONFIRMED
 G3AM_HTTP_AUTHENTICATED=NOT_TESTED
 G3AM_ACL_BYPASS=FORBIDDEN
 ```
+
+## G3-AM — acceso sin autenticación solicitado para laboratorio sintético (21/11/2026)
+
+El operador solicitó expresamente eliminar la autenticación para el entorno G3-AM. Tvheadend upstream exacto `8837853a6` documenta `--noacl` en `src/main.c:960-961` y `access_init` concede acceso sin controles de ACL (`src/access.c`). Se ha añadido **solo** a `lab/pvr_g3ab/g3am/compose.yaml`; ni G3-AB ni CoreELEC se cambian. Puertos host permanecen ligados a `127.0.0.1:29991,29992`; **advertencia**: el servicio dentro del contenedor usa `--bindaddr 0.0.0.0` y comparte la red `masqelec-pvr-g3ab_pvr_g3ab`, por lo que otros contenedores en ese segmento podrían acceder sin autenticación. No usar fuera del laboratorio sintético; no exponer en interfaces externas, no añadir a producción.
+
+Nota: el archivo `runtime/g3am/tvh_config/superuser` podría contener una contraseña creada en un paso anterior. `--noacl` deja de exigir autorización pero **no borra** esa contraseña persistida; no se solicita enviarla ni subirla a GitHub. Puede retirarse con un procedimiento privado de inspección y backup, separado del cambio actual, si se confirma presente. No promover secretos al repositorio.
+
+Prueba del operador pendiente: `git pull --ff-only origin develop`, `docker compose -f g3am/compose.yaml config --quiet`, `up -d --no-deps tvh` y confirmar HTTP `GET /api/serverinfo` sin credenciales. `--noacl` se considera configurado en GitHub pero **no desplegado ni validado** hasta que el operador informe resultados.
+
+```text
+G3AM_NOACL_SOURCE_FLAG=UPSTREAM_VERIFIED
+G3AM_NOACL_COMPOSE=COMMITTED
+G3AM_NOACL_RUNTIME=NOT_TESTED
+G3AB_ORIGINAL_AUTH=UNCHANGED_BY_PATCH
+```
