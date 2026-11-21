@@ -2054,7 +2054,10 @@ def update_playlist() -> tuple[bool, bool]:
         if needs_soft_reset:
             try:
                 from lib.pvr_native_convergence import classify as _g3x_classify
-                _tvh_ok, _tvh_rows, _tvh_code, _tvh_raw = _tvh_channel_grid_fetch(limit=20000)
+                _tvh_ok, _tvh_code, _tvh_json, _tvh_raw = _tvh_api_get_json(
+                    "channel/grid", query={"start": 0, "limit": 20000}, timeout_s=12
+                )
+                _tvh_rows = _tvh_json.get("entries") if _tvh_ok and isinstance(_tvh_json, dict) else None
                 _kodi_ok, _kodi_reply, _kodi_error = jsonrpc_utils.jsonrpc_try(
                     "PVR.GetChannels",
                     params={
@@ -2069,12 +2072,8 @@ def update_playlist() -> tuple[bool, bool]:
                 _kodi_data = _kodi_reply if (_kodi_ok and isinstance(_kodi_reply, dict)) else {}
                 _kodi_rows = _kodi_data.get("channels")
                 _kodi_limits = _kodi_data.get("limits") or {}
-                _tvh_meta_ok, _tvh_code2, _tvh_json, _tvh_raw2 = (
-                    _tvh_api_get_json("channel/grid", query={"start": 0, "limit": 20000},
-                                      timeout_s=12)
-                )
                 _g3x = _g3x_classify(
-                    _tvh_rows if _tvh_ok and _tvh_meta_ok else None,
+                    _tvh_rows,
                     _kodi_rows,
                     tvh_total=_tvh_json.get("total") if isinstance(_tvh_json, dict) else None,
                     kodi_total=_kodi_limits.get("total") if isinstance(_kodi_limits, dict) else None,
