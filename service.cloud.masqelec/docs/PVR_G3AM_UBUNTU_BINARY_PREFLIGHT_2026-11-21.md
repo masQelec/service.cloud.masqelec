@@ -872,3 +872,18 @@ G3AM_ACTIVE_SERVICE_CHANNEL_LINKS=EMPTY
 G3AM_MAPPER_SAVE_CONFIRMED=NO
 G3AM_MAPPER_STATUS=UNKNOWN
 ```
+
+## G3-AM — mapper 0/0/0/0, propuesta API controlada (22/11/2026)
+
+El operador midió `api/service/mapper/status` -> `{total:0,ok:0,fail:0,ignore:0}` y `api/channel/grid?all=1` -> 0. Esto **no prueba** si el POST fue enviado ni la causa de falta de actividad. Código upstream verificado: `servicemapper.js` `Map Selected` abre diálogo y guarda vía `api/service/mapper/save`; `src/api/api_service.c` enruta a `api_idnode_save_simple`; `src/api/api_idnode.c` exige parámetro POST `node` tipo mapa; `src/service_mapper.c` guarda lista `services`, y en `ic_save` inicia `service_mapper_start()` si no está vacía. `service_mapper_start` filtra por UUID, omite servicio ya mapeado, deshabilitado, no-tv/no-radio o cifrado (si no está habilitado). La opción `check_availability=false` permite proceso síncrono.
+
+Siguiente ensayo propuesto (todavía NO ejecutado): operador ejecuta Python local contra puerto 29991, preflight de network/mux/service/channel y UUIDs, POST a mapper/save con exactamente los UUID activos Signal 1/Signal 2, sin Beta provisional; `node` JSON con `services` y `check_availability:false`, leer estadísticas y canales y parar si no se cumplen gates; sin tocar G3-AB. Mantener baseline de playlist, sin rename.
+
+```text
+G3AM_MAPPER_STATUS_TOTAL=0
+G3AM_MAPPER_STATUS_OK=0
+G3AM_MAPPER_STATUS_FAIL=0
+G3AM_MAPPER_STATUS_IGNORE=0
+G3AM_CHANNELS=0
+G3AM_DIRECT_API_MAPPER=NOT_EXECUTED
+```
