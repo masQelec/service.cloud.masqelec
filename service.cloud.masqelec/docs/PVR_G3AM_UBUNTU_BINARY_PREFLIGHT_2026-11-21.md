@@ -542,3 +542,17 @@ G3AM_GUI_BROWSER=BLANK_REPORTED
 G3AM_WEB_STATIC_MOUNT=COMMITTED_NOT_APPLIED
 G3AM_GUI_AFTER_FIX=NOT_TESTED
 ```
+
+## G3-AM — ExtJS parcial con pestañas de administración ausentes (21/11/2026)
+
+El operador adjuntó HTML SingleFile de `http://127.0.0.1:29991/extjs.html` a las 22:03:47 CET. El DOM generado contiene pestañas `Electronic Program Guide`, `Digital Video Recorder`, guía con tabla vacía y footer `No events to display`, pero **no** `Configuration` ni `Status`. Se había observado `GET /api/serverinfo HTTP=200` con `--noacl`. No se ha mostrado consola de JS ni prueba de permisos emitidos a cliente.
+
+Auditoría upstream exacta `src/webui/static/app/tvheadend.js:1042-1050,1085-1107,1254+`: función `accessUpdate(o)` crea EPG y DVR, luego `Configuration` y `Status` **solo si `o.admin == true`**. También es posible una excepción JS durante la creación de Configuration después de renderizar las primeras pestañas. `src/webui/webui.c` registra ruta ExtJS y `src/webui/extjs.c` genera la plantilla HTML. El documento SingleFile guardado elimina scripts y no demuestra errores de red en el momento de carga: evitar deducir 404 o ACL sin evidencia. Próximo gate sin cambios de contenedores: inspección de consola JS en pestaña navegador G3-AM (valores no sensibles `tvheadend.accessUpdate?.admin`, `tvheadend.capabilities` disponible, `tvheadend.confpanel`/statuspanel creados) y errores de Console tras hard reload; revisar códigos HTTP de JS y `/api/config/capabilities`. Si admin=false a pesar de `--noacl`, auditar envío de `accessUpdate` por comet y autorización; si admin=true y config no existe, priorizar traza JS/fichero ausente. No tocar G3-AB.
+
+```text
+G3AM_GUI_RENDERED_PARTIALLY=YES
+G3AM_GUI_EPG_DVR_TABS=YES
+G3AM_GUI_CONFIG_STATUS_TABS=MISSING
+G3AM_ACCESSUPDATE_ADMIN=UNKNOWN
+G3AM_CLIENT_JS_EXCEPTION=UNKNOWN
+```
