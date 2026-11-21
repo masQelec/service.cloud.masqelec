@@ -976,3 +976,31 @@ G3AM_BETA_NAME=G3AM Beta
 G3AM_PERSISTENT_HTSP_CHANNELUPDATE=PASS
 G3AM_KODI_G3AM_PROFILE=NOT_STARTED
 ```
+
+## G3-AM — Kodi local disponible, aislamiento preparado (22/11/2026)
+
+Preflight operador:
+
+```text
+/usr/bin/kodi
+/usr/bin/kodi-standalone
+kodi 2:21.3+dfsg-1ubuntu1
+kodi-bin 2:21.3+dfsg-1ubuntu1
+kodi-pvr-hts 21.2.6+ds-1.1
+KODI_PROCESSES=NONE
+/usr/lib/x86_64-linux-gnu/kodi/addons/pvr.hts/pvr.hts.so.21.2.6
+/usr/share/kodi/addons/pvr.hts
+DISPLAY=:0
+WAYLAND_DISPLAY=wayland-0
+XDG_SESSION_TYPE=wayland
+```
+
+Kodi sistema disponible y complemento instalado globalmente; no se requiere instalar ni copiar los archivos de addon. Aún no existe perfil G3-AM: crear exclusivamente `runtime/g3am/kodi_home` con modo 0700 y guardas de marca sintética, dueño, no symlink, sin tocar perfil G3-AB `runtime/kodi_home/.kodi`. Inicio propuesto con `env HOME=$PWD/runtime/g3am/kodi_home kodi --windowing=wayland` desde shell con sesión gráfica; el perfil Linux reside en `$HOME/.kodi` (documentación Kodi wiki). No usar --portable para Linux. Solo un proceso Kodi a la vez (ninguno previo activo), UI PVR HTSP endpoint host 127.0.0.1 port 29992, credenciales vacías solo en este TVH G3-AM --noacl. Activar complemento global `pvr.hts` mediante UI. Verificar explícitamente `runtime/g3am/kodi_home/.kodi` creado y que G3-AB sigue intacto, luego snapshot PVR.GetChannels; Kodi HTTP JSON-RPC no habilitado inicialmente (puertos 8080/8081 no escuchan). La playlist está en estado `rename` y Alpha `G3AM Alpha Renamed`: para prueba de sincronización cambiar a baseline y luego rename con Kodi arrancado, preservando CUID, channel UUID Tvheadend y Kodi channelid.
+
+```text
+G3AM_KODI_BINARY=AVAILABLE_21.3
+G3AM_PVR_HTS_ADDON=AVAILABLE_21.2.6
+G3AM_KODI_RUNNING=NO_AT_PREFLIGHT
+G3AM_KODI_PROFILE_CREATED=NOT_YET_CONFIRMED
+G3AM_KODI_PVR_SYNC=NOT_TESTED
+```
