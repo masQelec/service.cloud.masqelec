@@ -426,3 +426,25 @@ No reiniciar ni alternar el bouquet ni PVR durante la captura. La reimportación
 `G3AD_RENAME_WATCHER_UNIT=NOT_YET_RUN_BY_OPERATOR`
 `G3AD_HOT_RENAME_RESULT=PENDING`
 `G3AD_MASTER_UNTOUCHED=YES`
+
+
+## G3-AD: etapa RENAME generada por operador, propagación aún pendiente (2026-11-21)
+
+El operador comunicó la salida del generador `lab/pvr_g3ab/prepare.py rename`:
+
+```text
+G3AB_STAGE=RENAME
+G3AB_CUID_COUNT=2
+G3AB_MASTER_UNTOUCHED=YES
+G3AB_G3W_UNTOUCHED=YES
+```
+
+Esta evidencia acredita solamente que el generador sintético realizó la escritura de la M3U de laboratorio de etapa `rename`; **no** prueba que Tvheadend haya importado el cambio ni que `pvr.hts`/Kodi hayan actualizado el canal. No consta todavía el resultado de las 17 pruebas unitarias del nuevo observador `test_pvr_g3ad_rename_watch.py` ni la salida de la **terminal 1** de `pvr_g3ad_rename_watch.py`; no afirmar que el ensayo observacional haya sido iniciado o completado.
+
+`G3AD_RENAME_PLAYLIST_WRITE=REPORTED_SUCCESS`
+`G3AD_RENAME_WATCHER_UNIT=UNREPORTED`
+`G3AD_RENAME_WATCHER_OUTPUT=PENDING`
+`G3AD_TVH_RENAME_PROPAGATED=UNPROVEN`
+`G3AD_KODI_HOT_RENAME_PROPAGATED=UNPROVEN`
+
+**No reiniciar PVR/bouquet ni restaurar M3U** mientras se intenta recopilar el resultado de la observación de la terminal 1; pedir salida desde `G3AD_SAMPLE=1` hasta último estado/código de salida. Si watcher no se inició antes de `prepare.py rename`, declararlo y repetir en otra ocasión desde baseline restaurado, sin fingir medición antes/durante.
