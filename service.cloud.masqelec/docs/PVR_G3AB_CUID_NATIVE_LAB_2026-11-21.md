@@ -224,3 +224,21 @@ El operador aportó logs de Tvheadend con entradas `iptv: m3u parse: 0 new mux(e
 Aparecen además avisos `epggrab: EIT/PSIP data completion timeout` para G3AB Beta (11:56:50) y errores HTTP `/imagecache/1` y `/imagecache/2` con estado 404 (11:58). Son señales secundarias de EPG/imágenes sintéticas; no está demostrado que tengan relación con el rename. No corregirlas con cambios destructivos ni confundirlas con el gate de identidad.
 
 Estado: `G3AB_REFETCH_PERIODIC_LOG=OBSERVED`; `G3AB_NEW_MUXES=0`; `G3AB_RENAME_TVH_VISIBLE=YES` por lectura anterior; `G3AB_RENAME_UUID_STABLE=NOT_YET_RECHECKED`; `G3AB_RENAME_KODI_ID_STABLE=NOT_YET_RECHECKED`; `G3AB_CUID_CAUSALITY=NOT_PROVEN`. Próximo paso: consulta puntual UUID+nombre del TVH y channelid+nombre del Kodi sin cambiar etapas.
+
+
+## G3-AB rename: TVH OK, Kodi mantiene channelid pero no refleja nuevo nombre (2026-11-21)
+
+El operador ejecutó lectura conjunta y reportó:
+
+```text
+TVH_TOTAL: 2
+KODI_TOTAL: 2
+TVH_ALPHA_UUID_STABLE: True
+TVH_ALPHA_RENAMED: True
+KODI_ALPHA_ID_STABLE: True
+KODI_ALPHA_RENAMED: False
+```
+
+`G3AB_RENAME_TVH_UUID_STABLE=PASS`, `G3AB_RENAME_TVH_NAME=PASS`, `G3AB_RENAME_KODI_CHANNELID_STABLE=PASS`, `G3AB_RENAME_KODI_LABEL=FAIL_CURRENT_SNAPSHOT`. Se confirma preservación observada de UUID/canal ID ante rename con CUID estable, **pero no** que CUID sea la causa. No afirmar convergencia global ni que Kodi refresque automáticamente los metadatos: la identidad y el nombre se comportan de forma distinta. Se requiere examinar la etiqueta efectiva, el estado de propagación y las opciones de Kodi/pvr.hts sin modificar `TVxx.db` ni saltar al escenario `url`.
+
+El diagnóstico seguro es consultar otra vez Kodi y TVH, verificar socket HTSP 19992 si necesario, y revisar si el nombre está fijado en Kodi o si requiere una actualización no destructiva de la conexión PVR. Evitar recomendaciones de desactivar/habilitar pvr.hts hasta saber si la sincronización eventual actualiza por sí sola; documentar el resultado de cada intervención.
