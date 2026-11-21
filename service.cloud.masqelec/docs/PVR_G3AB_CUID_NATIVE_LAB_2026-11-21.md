@@ -337,3 +337,24 @@ Hipótesis a contrastar secuencialmente (sin cambios destructivos): (a) ¿TVH em
 Fuentes consultadas: Kodi builtin list https://kodi.wiki/view/List_of_built-in_functions y JSON-RPC API https://kodi.wiki/view/JSON-RPC_API/v12. **No se ha identificado un JSON-RPC público documentado `PVR.UpdateChannels`**; `PVR.Scan` no es un refresco genérico de metadatos, sino búsqueda/scan. No prometer comandos no comprobados.
 
 Criterio de éxito futuro: actualización sin reiniciar Kodi, sin toggles deshabilitar/habilitar el addon, sin escrituras SQLite, sin afectar reproducción activa, conservando UUID TVH, Kodi IDs, grupos y preferencias; fallback de reinicio del cliente solo tras validación y fuera de reproducción. `G3AB_HOT_REFRESH_IMPLEMENTED=NO`, `G3AB_HTSP_NOTIFICATION_DIAGNOSIS=PENDING`, `MASTER_TOUCHED=NO`.
+
+
+## Snapshot posterior: UUID TVH de canal, servicio y mux sin cambios; URL sin acreditar
+
+El operador comunicó un snapshot de solo lectura:
+
+```text
+CANAL: G3AB Alpha
+UUID: 185e5bdda6aafa6aa1aad2bb94ee703a
+SERVICIO_UUID: 18cd0031a734c2342ac3956d754fb63e
+MUX_UUID: 4d3f4f0b654e570dc39029bebaf5c555
+CANAL: G3AB Beta
+UUID: f08f75aa26b58386630d4b225adbb34f
+SERVICIO_UUID: afe6f317e9b95eb03f6d91691e80f537
+MUX_UUID: 355a43f5f4c718478b87d3b6a1bc8408
+CANALES: 2
+SERVICIOS: 3
+MUXES: 2
+```
+
+Estos son los UUID ya observados en el baseline anterior al ensayo de URL. Por tanto `G3AB_TVH_CHANNEL_UUID_STABLE=YES_OBSERVED`, `G3AB_TVH_SERVICE_UUID_STABLE=YES_OBSERVED`, `G3AB_TVH_MUX_UUID_STABLE=YES_OBSERVED`, **pero** `G3AB_URL_FILE_CHANGED=NOT_REPORTED` y `G3AB_URL_APPLIED_TO_MUX=UNPROVEN`: la salida no incluye confirmación de `prepare.py url` ni comprobación del campo URL del mux. No inferir que TVH conserva los muxes ante un cambio de URL real hasta probar que se aplicó. Prioridad de arquitectura sigue en refresco nativo cliente PVR; no tocar SQLite, no eliminar servicios ni ejecutar en master.
