@@ -880,3 +880,43 @@ Frente al renombrado anterior, donde TVH ya reportaba `G3AB Alpha Renamed`, Kodi
 `G3AF_PVR_REFRESH_WITHOUT_EXPLICIT_RESTART=OBSERVED`
 
 **Siguiente gate G3-AG**: análisis **local y privado** de ambos PCAP, inicialmente inspección direccional y búsqueda de términos HTSP solo en payload (no compartir bruto), idealmente reensamblar TCP, separar mensajes HTSP por longitud y decodificar `htsmsg` con verificación de estructura y dirección para identificar `channelUpdate`/ `channelAdd`/ `channelDelete`, diferenciando `subscriptionStart` y stream packets. No asumir que texto ASCII hallado entre bytes constituye mensaje HTSP válido. Comparar contra paso rename y reproducir otra vez solo si instrumentación resulta insuficiente. Preferir código stdlib sin instalación de `tshark`, no alterar master/SQLite, no alternar bouquet ni reiniciar PVR.
+
+
+## G3-AG: búsqueda ASCII privada de nombres HTSP en ambos PCAP (operador, 21/11/2026)
+
+El operador leyó los bytes de `g3af_rename.pcap` y `g3af_playback.pcap` en su máquina y **solo comunicó contadores**, sin publicar capturas:
+
+```text
+=== RENAME ===
+BYTES: 2648
+channelUpdate_COUNT: 0
+channelAdd_COUNT: 0
+channelDelete_COUNT: 0
+channelName_COUNT: 0
+subscriptionStart_COUNT: 0
+subscribe_COUNT: 0
+=== PLAYBACK ===
+BYTES: 2794985
+channelUpdate_COUNT: 0
+channelAdd_COUNT: 4
+channelDelete_COUNT: 0
+channelName_COUNT: 4
+subscriptionStart_COUNT: 3
+subscribe_COUNT: 5
+```
+
+**Hallazgo:** únicamente el PCAP de reproducción tiene coincidencias de cadenas que corresponden a mensajes/metadatos HTSP de canales, en particular `channelAdd` (4) y `channelName` (4); en el ensayo de renombrado no aparecen y tampoco hubo segmentos TCP con payload. Concor­dantemente, tras playback Kodi actualizó el label Alpha a `G3AB Alpha Renamed` conservando `channelid=3`; Beta conservó `2`.
+
+**Alcance estricto**: contar substrings en archivos PCAP binarios **no equivale a decodificar mensajes HTSP válidos ni a demostrar dirección servidor→cliente**; puede contar duplicaciones de segmentos TCP/retransmisiones y aparecer en campos no relevantes. Tampoco se ha determinado si hubo una nueva conexión/reconexión/sincronización completa de `pvr.hts` durante playback. `channelUpdate_COUNT=0` no demuestra ausencia de mensajes de actualización en otro momento o sin texto contiguo por fragmentación.
+
+`G3AG_PLAYBACK_RAW_CHANNELADD_MATCHES=4`
+`G3AG_PLAYBACK_RAW_CHANNELNAME_MATCHES=4`
+`G3AG_PLAYBACK_RAW_SUBSCRIPTIONSTART_MATCHES=3`
+`G3AG_PLAYBACK_RAW_SUBSCRIBE_MATCHES=5`
+`G3AG_RENAME_RAW_MESSAGE_MATCHES=0`
+`G3AG_PARSED_HTSP_CHANNELADD=NOT_PROVEN`
+`G3AG_HTSP_MESSAGE_DIRECTION=UNPROVEN`
+`G3AG_PVR_RECONNECT_DURING_PLAYBACK=UNPROVEN`
+`G3AG_ROOT_CAUSE=UNPROVEN`
+
+**Siguiente gate:** construir analizador de PCAP offline estrictamente local que (1) lea cabecera PCAP y paquetes IP/TCP, (2) clasifique dirección 9982/19992→Kodi y Kodi→servidor, (3) reensamble TCP por sequence y descarte retransmisiones, (4) recupere frames HTSP longitud prefijada y parse `htsmsg` al menos `method`, `channelName`, `channelId` de forma segura, (5) emita solo estadísticas de eventos y reconstrucción nunca payload/tokens, y (6) compare con TCP SYN/FIN/RST y sesiones para saber si playback coincidió con nueva sincronización. **No subir PCAP** al repo ni compartir datos de autenticación. La alternativa de cliente pvr.hts sigue **sin modificación**; master y SQLite no tocados por estas pruebas.
