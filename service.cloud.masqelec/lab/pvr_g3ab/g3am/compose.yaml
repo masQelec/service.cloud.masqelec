@@ -26,6 +26,8 @@ services:
       - "127.0.0.1:29992:9982"
     volumes:
       - /home/ubuntu/tvheadend-g3al-upstream/build.linux/tvheadend:/opt/g3al/tvheadend:ro
+      # CONFIG_BUNDLE=no: settings.c looks for data/conf/profiles relative to /tmp.
+      - /home/ubuntu/tvheadend-g3al-upstream/data/conf:/tmp/data/conf:ro
       - ../runtime/g3am/tvh_config:/config
     networks: [pvr_g3ab]
     depends_on: [playlist]
