@@ -8,7 +8,7 @@ La M3U de producción tiene 720 canales, TVH 720 y Kodi 720 (coincidencia descri
 
 Este bloque prepara un laboratorio separado en Ubuntu:
 - Compose `masqelec-pvr-g3w`, imagen `lscr.io/linuxserver/tvheadend:latest` con **configuración nueva en runtime/tvh_config**. Solo puertos loopback **127.0.0.1:19981** (web) y **127.0.0.1:19982** (HTSP), NO 9981/9982 de producción. Imagen y ajustes siguiendo documentación de LinuxServer: https://docs.linuxserver.io/images/docker-tvheadend/
-- Nginx sirve archivos MPEGTS sintéticos dentro de la red Docker. No se publica ningún puerto de Nginx al host.
+- Nginx sirve archivos MPEGTS sintéticos dentro de la red Docker. No se publica ningún puerto de Nginx al host. La red de Compose emplea bridge estándar; no usar `internal: true` porque impide acceder a la web desde el host en esta instalación. Los únicos puertos publicados de TVH están enlazados a 127.0.0.1.
 - `prepare.py before|added|removed` instala playlist **solo** en `lab/pvr_g3w/runtime/playlist/playlist.m3u`. La M3U generada referencia `http://streams/ch1.ts`, `ch2.ts`, `ch3.ts` en la red privada, con 2→3→2 entradas y nombres `G3W Synthetic N`. Flujos de 12 segundos generados mediante ffmpeg local; sirven para descubrimiento de servicios y pruebas, **no** para reproducción sostenida ni medición de calidad.
 - `runtime/` ignorado por Git. Sin credenciales IPTV reales. No usar puertos del master.
 - El contenedor no recibe montajes de `/storage/.user`, `/storage/.kodi` ni configuración existente de Tvheadend.
@@ -65,3 +65,26 @@ Esperados **20 tests** (10 G3-W + 10 G3-V); no afirmar PASS antes de salida real
 `PRODUCTION_MODIFIED=NO`
 
 La eliminación del mantenimiento heredado no está autorizada por este scaffold: depende del ensayo funcional, la auditoría de SQLite activa y la estrategia de recuperación.
+
+
+## Incidencia real: publicación de puertos Docker (2026-11-21)
+
+El operador ha creado la M3U de 2 canales y arrancado ambos contenedores, pero informó `docker compose port tvh 9981=:0`, `9982=:0` y `curl http://127.0.0.1:19981` con conexión rehusada. Los logs muestran TVH iniciado y escuchando en 9981 **dentro del contenedor**. `docker compose config` sí reflejaba `127.0.0.1:19981→9981` y `127.0.0.1:19982→9982`. Recrear solo TVH no cambió el resultado.
+
+Se ha cambiado exclusivamente la red de laboratorio de `internal: true` a `driver: bridge` (estándar). Según la documentación de Docker, `internal` crea una red sin conexión a interfaces del host, mientras que bridge estándar permite publicar puertos con NAT. Fuentes: https://docs.docker.com/compose/how-tos/networking/ y https://docs.docker.com/engine/network/port-publishing/.
+
+Para que Docker aplique el cambio de tipo de red **hay que recrear la red del proyecto**, no solo el contenedor TVH:
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec
+git pull --ff-only origin develop
+cd service.cloud.masqelec/lab/pvr_g3w
+docker compose config --quiet
+docker compose down
+docker compose up -d
+docker compose ps
+docker compose port tvh 9981
+curl -sS -o /dev/null -w 'HTTP=%{http_code}\n' --max-time 10 http://127.0.0.1:19981/
+```
+
+`docker compose down` sin `-v` no borra los datos del laboratorio en `runtime/`. Sigue sin tocar TVH/CoreELEC reales. Si la publicación continúa fallando, revisar `docker inspect masqelec-pvr-g3w-tvh-1 --format '{{json .HostConfig.PortBindings}} {{json .NetworkSettings.Ports}}'` y configuración del daemon antes de cambiar otras opciones. **Este parche no ha sido aún validado por el operador**. No abrir puertos a `0.0.0.0` ni usar `network_mode: host` como solución rápida.
