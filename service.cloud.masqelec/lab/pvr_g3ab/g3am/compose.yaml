@@ -31,6 +31,8 @@ services:
       # CONFIG_BUNDLE=no: main.c derives tvheadend_cwd=/opt from /opt/g3al/tvheadend.
       # filebundle.c resolves data/conf/profiles under tvheadend_cwd.
       - /home/ubuntu/tvheadend-g3al-upstream/data/conf:/opt/data/conf:ro
+      # CONFIG_BUNDLE=no: legacy ExtJS assets live under executable-derived /opt/src/webui/static.
+      - /home/ubuntu/tvheadend-g3al-upstream/src/webui/static:/opt/src/webui/static:ro
       - ../runtime/g3am/tvh_config:/config
     networks: [pvr_g3ab]
     depends_on: [playlist]
