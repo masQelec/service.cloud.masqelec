@@ -1214,3 +1214,16 @@ G3AL_PRODUCTION_MODIFIED=NO
 ```
 
 Para probar solo aplicabilidad del patch, usar checkout upstream **fuera** del repo addon en `/home/ubuntu/tvheadend-g3al-upstream`; ver documento G3-AL para comandos que finalizan en `git apply --check`. No ejecutar `git apply` ni sustituir `lscr.io/linuxserver/tvheadend:latest` hasta gate de build y rollback. Importante: corregir nombre en Kodi es solo **una parte** del mantenimiento PVR (también importan eliminaciones, orden y grupos).
+
+## G3-AL BUILT: confirmación `make` y siguiente gate G3-AM sin despliegue
+
+El operador ha validado **`G3AL_MAKE=PASS`** y `find` muestra ejecutable **`./build.linux/tvheadend`** dentro de checkout parcheado `/home/ubuntu/tvheadend-g3al-upstream`. Previamente `git apply --check`, `git apply`, `git diff --check` resultaron PASS. Esto confirma compilación del parche con opciones de funcionalidades reducidas **en Ubuntu host**, no equivalencia ABI ni éxito del refresco en producción.
+
+Inspección de Compose original `lab/pvr_g3ab/compose.yaml`: contenedor TVH LinuxServer usa puertos 19991/19992, monta `runtime/tvh_config` en modo escritura y `runtime/playlist` ro. **No iniciar un segundo TVH compartiendo esa configuración en escritura** ni reemplazar la imagen en ejecución; necesita copia aislada, puertos distintos y rollback documentado. No mezclar host glibc con Alpine/otro ABI sin verificar `file`, `ldd` y `--version`.
+
+Siguiente G3-AM solo lectura: comprobar `file ./build.linux/tvheadend`, `ldd ./build.linux/tvheadend` y `./build.linux/tvheadend --version` desde checkout upstream antes de definir contenedor runtime aislado. No se ha arrancado binario ni tocado contenedor existente.
+
+`G3AL_UBUNTU_BUILD=PASS`
+`G3AL_KODI_HOT_RENAME=UNTESTED`
+`G3AL_TEST_ISOLATION=PENDING`
+`G3AL_PRODUCTION_TOUCHED=NO`
