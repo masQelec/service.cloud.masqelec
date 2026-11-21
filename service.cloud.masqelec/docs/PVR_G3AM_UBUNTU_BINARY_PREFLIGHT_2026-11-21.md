@@ -474,3 +474,22 @@ G3AM_IPTV_NETWORK=NOT_CONFIGURED
 G3AM_HTSP_PROTOCOL=NOT_TESTED
 G3AM_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — verificación posterior de uptime y playlist (operador, 21/11/2026)
+
+```text
+G3AM_TVH=Up About a minute
+G3AM_PLAYLIST_SERVICE=Up 12 minutes
+G3AM_CHANNEL_COUNT=2
+G3AM_CUID_001=True
+G3AM_CUID_002=True
+```
+
+Se acredita servidor activo al minuto, lista local privada con dos EXTINF y CUIDs esperados; la prueba no acredita que TVH haya leído la lista, importado canales, que funcionen los streams, ni renombrado caliente HTSP. Se requiere configurar/red IPTV automática solo en G3-AM, validar autenticación Web/HTSP y extraer baseline real de channel UUID/service identity antes de modificaciones M3U. Original G3-AB no se ha operado en los comandos actuales; no convertirlo en prueba de su estado actual.
+
+```text
+G3AM_TVH_UPTIME_1_MINUTE=PASS
+G3AM_PLAYLIST_LOCAL_TWO_CUIDS=PASS
+G3AM_IPTV_NETWORK_IMPORT=NOT_TESTED
+G3AM_CHANNELUPDATE=NOT_TESTED
+```
