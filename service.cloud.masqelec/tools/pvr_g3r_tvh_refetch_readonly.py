@@ -55,32 +55,45 @@ def inspect():
     node = nodes[0]
     if node.get("uuid") != TARGET:
         raise ValueError("IDNODE_UUID_MISMATCH")
-    # TVH builds differ in exposing properties under 'props'; do not infer
-    # absent keys as default values.
-    props = node.get("props")
-    if not isinstance(props, list):
-        raise ValueError("NETWORK_PROPERTIES_UNAVAILABLE")
+    # Tvheadend versions may expose idnode fields under "params" rather
+    # than "props", or directly in the grid. Never assume absent values.
     by_name = {}
-    for prop in props:
-        if not isinstance(prop, dict):
-            continue
-        key = prop.get("id")
-        if isinstance(key, str):
-            by_name[key] = prop.get("value")
-    network_url = by_name.get("url", network.get("url"))
-    if network_url is None:
-        url_status = "UNKNOWN"
-    else:
-        url_status = ("EXPECTED_LOCAL_FILE" if
-                      network_url == "file:///storage/.user/playlist.m3u"
-                      else "UNEXPECTED_OR_CHANGED")
-    period = by_name.get("refetch_period", network.get("refetch_period"))
-    if type(period) is int and 1 <= period <= 1440:
-        period_text = str(period)
-    else:
-        period_text = "UNKNOWN"
+    schema = "UNAVAILABLE"
+    for key in ("params", "props"):
+        fields = node.get(key)
+        if isinstance(fields, list):
+            schema = key.upper()
+            for prop in fields:
+                if isinstance(prop, dict) and isinstance(prop.get("id"), str):
+                    by_name[prop["id"]] = prop.get("value")
+            break
+    # Scalar fields can be present in the grid or the loaded object.
+    # Limit lookup to named safe keys; do not print any value except minutes.
+    network_url = by_name.get("url", node.get("url", network.get("url")))
+    period = by_name.get("refetch_period",
+                         node.get("refetch_period", network.get("refetch_period")))
+    if schema == "UNAVAILABLE" and network_url is None and period is None:
+        print("IDNODE_HAS_PARAMS_LIST=" +
+              ("YES" if isinstance(node.get("params"), list) else "NO"))
+        print("IDNODE_HAS_PROPS_LIST=" +
+              ("YES" if isinstance(node.get("props"), list) else "NO"))
+        print("IDNODE_HAS_DIRECT_URL=" +
+              ("YES" if "url" in node else "NO"))
+        print("GRID_HAS_DIRECT_URL=" +
+              ("YES" if "url" in network else "NO"))
+        print("IDNODE_HAS_DIRECT_REFETCH_PERIOD=" +
+              ("YES" if "refetch_period" in node else "NO"))
+        print("GRID_HAS_DIRECT_REFETCH_PERIOD=" +
+              ("YES" if "refetch_period" in network else "NO"))
+        raise ValueError("NETWORK_PROPERTIES_UNAVAILABLE")
+    url_status = ("UNKNOWN" if network_url is None else
+                  "EXPECTED_LOCAL_FILE" if
+                  network_url == "file:///storage/.user/playlist.m3u"
+                  else "UNEXPECTED_OR_CHANGED")
+    period_text = str(period) if type(period) is int and 1 <= period <= 1440 else "UNKNOWN"
     print("=== G3-R TVH IPTV NETWORK / GET ONLY ===")
     print("TARGET_NETWORK_FOUND=YES")
+    print("PROPERTY_SCHEMA=" + schema)
     print("PLAYLIST_PATH_EXISTS=YES")
     print("SOURCE_URL_STATUS=" + url_status)
     print("REFETCH_PERIOD_MINUTES=" + period_text)
