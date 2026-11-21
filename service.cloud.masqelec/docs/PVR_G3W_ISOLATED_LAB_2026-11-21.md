@@ -110,3 +110,14 @@ El operador confirmó **web funcional y M3U configurada** y aportó una captura 
 El operador aporta captura de **TV → Canales → Todos los canales** en Kodi de Ubuntu, mostrando exclusivamente `G3W Synthetic 1` (número 1) y `G3W Synthetic 2` (número 2), indicador `1 / 2`. TVH de laboratorio ya había mostrado 2/2.
 
 `G3W_KODI_LAB_BASELINE_VISUAL=PASS_2_OF_2`. Todavía **no** constan IDs internos Kodi `channelid` ni UUID de TVH, ni se ha observado alta/baja. Registrar IDs por APIs de solo lectura antes de ejecutar `prepare.py added`, para validar identidad persistente. Kodi JSON-RPC HTTP local debe habilitarse solo en perfil Ubuntu de laboratorio, sin exponerlo a la LAN.
+
+
+## Baseline Kodi JSON-RPC real — 2026-11-21
+
+El operador ha habilitado JSON-RPC en el Kodi de Ubuntu de laboratorio y ejecutado correctamente `PVR.GetChannels` con `channelgroupid=alltv`. Respuesta real:
+
+```json
+{"channels":[{"channelid":1,"label":"G3W Synthetic 1"},{"channelid":2,"label":"G3W Synthetic 2"}],"limits":{"end":2,"start":0,"total":2}}
+```
+
+`G3W_KODI_BASELINE_NATIVE=PASS_2_OF_2`. Identificadores Kodi que **deben persistir**: Synthetic 1 → `channelid=1`; Synthetic 2 → `channelid=2`. `G3W_TVH_UUID_BASELINE=PENDING`; obtener UUID de TVH con `/api/channel/grid` antes del alta. No afirmar que Kodi borrará el tercer canal hasta observar la baja real. Los IDs de Kodi son enteros y el gate G3-V usa cadenas; convertirlos explícitamente al generar el informe de validación.
