@@ -12,7 +12,7 @@ spec.loader.exec_module(M)
 
 def report():
     def stage(tvh, kodi):
-        return {"tvh": tvh, "kodi": kodi, "tvh_refetch_observed": True}
+        return {"tvh": copy.deepcopy(tvh), "kodi": copy.deepcopy(kodi), "tvh_refetch_observed": True}
     t0 = [{"id": "tvh-1", "name": "One"}, {"id": "tvh-2", "name": "Two"}]
     k0 = [{"id": "kodi-1", "name": "One"}, {"id": "kodi-2", "name": "Two"}]
     t1 = t0 + [{"id": "tvh-3", "name": "Three"}]
