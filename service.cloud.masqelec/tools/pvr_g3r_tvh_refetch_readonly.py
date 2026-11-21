@@ -97,8 +97,21 @@ if __name__ == "__main__":
     try:
         sys.exit(inspect())
     except (Exception, KeyboardInterrupt) as err:
+        # Only locally defined, pre-approved error codes are printable.
+        # Never echo arbitrary exception text (HTTP responses may contain URLs).
+        safe_reasons = {
+            "UNAPPROVED_ENDPOINT", "HTTP_NOT_OK", "OVERSIZED_RESPONSE",
+            "INVALID_RESPONSE", "PLAYLIST_UNAVAILABLE",
+            "INCOMPLETE_NETWORK_GRID", "TARGET_NETWORK_AMBIGUOUS",
+            "NETWORK_IDNODE_NOT_UNIQUE", "IDNODE_UUID_MISMATCH",
+            "NETWORK_PROPERTIES_UNAVAILABLE",
+        }
+        reason = str(err) if type(err) is ValueError else ""
+        if reason not in safe_reasons:
+            reason = "UNCLASSIFIED"
         print("G3R=BLOCKED")
         print("ERROR_TYPE=" + type(err).__name__)
+        print("REASON=" + reason)
         print("GET_ONLY=YES")
         print("TRIGGER_EXECUTED=NO")
         sys.exit(2)
