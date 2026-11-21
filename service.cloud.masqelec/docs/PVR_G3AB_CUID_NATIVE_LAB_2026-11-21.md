@@ -70,3 +70,19 @@ masqelec-pvr-g3ab-tvh-1 Up (127.0.0.1:19991->9981/tcp, 127.0.0.1:19992->9982/tcp
 ```
 
 Estado `G3AB_COMPOSE_STARTED=YES`, `G3AB_BASELINE_FILE_WRITTEN=YES`, `G3AB_UNIT_TESTS=NOT_REPORTED`, `G3AB_TVH_CHANNELS=NOT_YET_VERIFIED`, `G3AB_KODI_CHANNELS=NOT_YET_VERIFIED`. Puertos publicados en localhost, sin evidencia de lectura efectiva por TVH o mapeo a canales. Siguiente paso: configurar Automatic IPTV apuntando exclusivamente a `file:///lab_playlist/playlist.m3u`, mapear dos servicios, consultar el baseline de TVH por API y luego conectar perfil Kodi aislado. No ejecutar etapa `rename` antes de registrar ambos snapshots.
+
+
+## Baseline real: BLOQUEADO por duplicado de canal (2026-11-21)
+
+Tras configurar IPTV automático en el TVH aislado G3-AB, el operador consultó `GET /api/channel/grid` y observó:
+
+```text
+UUID: f08f75aa26b58386630d4b225adbb34f NOMBRE: G3AB Beta
+UUID: e2bf26af3bd98f7ac3f11acb11ce12cc NOMBRE: G3AB Beta
+UUID: 185e5bdda6aafa6aa1aad2bb94ee703a NOMBRE: G3AB Alpha
+TOTAL: 3
+```
+
+La playlist sintética generada tiene **2** entradas con CUID distintos. El TVH aislado presenta **3** UUID de canal, con dos nombres Beta idénticos. `G3AB_TVH_BASELINE=BLOCKED_3_FOR_2`, `G3AB_TVH_DUPLICATE_NAME=YES`, `G3AB_TVH_DUPLICATE_CUID_PROVEN=NO`. El duplicado de nombre no demuestra que ambos canales estén asociados al mismo servicio, ni que TVH lea CUID, ni que uno sea eliminable.
+
+**Gate cerrado:** no ejecutar `prepare.py rename`, no conectar Kodi todavía, no borrar canal por nombre, no tocar master ni SQLite. Investigar por GET los campos `channel/grid` (`uuid`, `name`, `number`, `services`, `bouquet`, `enabled`, `tags`) y comparar las referencias contra `mpegts/service/grid`; imprimir solo campos de laboratorio, nunca URL o credenciales. Diferenciar mapeo duplicado manual/automático, persistencia de un servicio y dos canales distintos. No corregir manualmente sin documentar primero causa y mecanismo.
