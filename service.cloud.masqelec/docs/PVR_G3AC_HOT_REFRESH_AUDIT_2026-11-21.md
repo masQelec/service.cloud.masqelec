@@ -420,3 +420,26 @@ KODI_ID_STABLE=true
 `G3AD_WATCHER_FINAL_STATUS=PENDING`
 
 No reiniciar Kodi/PVR, no alternar bouquet ni restaurar playlist hasta capturar salida final. Después investigar logs nativos sin publicar secretos. No usar este resultado como prueba de que no llega el evento HTSP.
+
+
+## G3-AD: resultado final de renombrado en caliente — Kodi NO converge (operador, 2026-11-21)
+
+Después de observar el renombrado de Alpha en TVH en la muestra 16 manteniendo UUID TVH de Alpha/Beta y channelid Kodi 3/2, el operador confirmó que el proceso finalizó por sí mismo con:
+
+```text
+G3AD=TVH_RENAMED_KODI_NOT_OBSERVED
+```
+
+El observador `pvr_g3ad_rename_watch.py` devuelve este marcador al agotar su ventana configurada (`--samples 40 --interval 5`), cuando ha visto `tvh_alpha_renamed=true` en alguna muestra y **nunca** ha observado `kodi_alpha_renamed=true`. Equivale a unos 195 segundos entre la primera y última muestra (40 muestras espaciadas por 5 segundos), más tiempo de consultas. No se ha compartido la salida textual exacta de la muestra 40 ni el código de salida, pero el marcador final del propio proceso sí se ha comunicado.
+
+`G3AD_RENAME_TVH_ACCEPTED=YES`
+`G3AD_RENAME_KODI_HOT_CONVERGENCE=NO_IN_OBSERVATION_WINDOW`
+`G3AD_RENAME_40_SAMPLES=REPORTED_FINAL_MARKER`
+`G3AD_TVH_UUIDS_STABLE_AT_SAMPLE16=YES`
+`G3AD_KODI_IDS_STABLE_AT_SAMPLE16=YES`
+`G3AD_RENAME_WATCHER_EXIT_CODE=NOT_REPORTED`
+`G3AD_HTSP_CHANNELUPDATE_EMITTED=NOT_MEASURED`
+`G3AD_PVR_NATIVE_TRIGGER_CALLED=NOT_MEASURED`
+`G3AD_HOT_REFRESH_ROOT_CAUSE=UNPROVEN`
+
+**Diagnóstico concluyente en alcance estricto:** la actualización de nombre se refleja en TVH pero no en el nombre de Kodi dentro del intervalo observado **sin reinicio PVR reportado**. Con el código inspeccionado de pvr.hts Omega, hay un recorrido `channelUpdate → ParseChannelAddOrUpdate → TriggerChannelUpdate`; falta saber si el mensaje es emitido, recibido y si produce trigger. No saltar a soluciones destructivas (borrar SQLite, recrear canales, alternar bouquet, reiniciar PVR automáticamente). Conservar temporalmente el estado Alpha Renamed en TVH frente a Alpha en Kodi para una inspección del log y, si es necesario, una medición HTSP pasiva; no imprimir tokens, secretos ni URL del master.
