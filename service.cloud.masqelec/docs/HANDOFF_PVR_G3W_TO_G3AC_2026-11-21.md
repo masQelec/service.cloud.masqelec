@@ -705,3 +705,27 @@ Después el operador intentó una consulta heredoc Python de TVH/Kodi y la shell
 `G3AF_POST_CAPTURE_READ=NOT_EXECUTED_HEREDOC_INTERRUPTED`
 
 Próximo gate: volver a consultar por separado TVH y Kodi con comandos de una línea o scripts versionados para evitar heredoc interactivo; comprobar proceso captura iniciado ANTES del cambio y mantenerlo vivo al menos dos ciclos de refetch; confirmar que se capturan paquetes de payload con una operación de laboratorio que genere un mensaje HTSP verificable (sin reiniciar PVR). Si la conexión a loopback no ve payload aunque exista actividad, verificar interfaz/punto captura y puerto antes de atribuir fallo al servidor. No subir PCAP o logs sin sanitizar ni tocar master/SQLite.
+
+
+## G3-AF: RESTORED confirmado en TVH, Kodi ya mostraba el mismo nombre (2026-11-21)
+
+El operador ejecutó dos consultas de una sola línea después de la captura `g3af_htsp.pcap` de 352 bytes (solo 14 paquetes ACK sin payload):
+
+```text
+TVH: G3AB Alpha UUID: dba29285ca808eb6486d364f994b05db
+TVH: G3AB Beta UUID: 3bf90ae8eb828a6e4961902724a1f380
+ERROR: None
+KODI: G3AB Alpha ID: 3
+KODI: G3AB Beta ID: 2
+```
+
+TVH aplicó el estado `restored` (nombre Alpha original), conservó los dos UUID registrados antes de G3-AF, y Kodi devuelve dos canales con IDs 3 y 2. **Crítico:** Kodi ya mostraba `G3AB Alpha` durante la divergencia anterior, antes de restaurar TVH; por tanto, que ahora los nombres coincidan NO prueba ningún refresco Kodi ni mensaje HTSP. El PCAP anterior no detectó ningún paquete de payload en el enlace existente durante su ventana, pero no autoriza concluir que nunca hubo notificación. Nuevo experimento debe comenzar captura antes de `prepare.py rename` y comprobar el tiempo de cambio efectivo en TVH con varias consultas antes/después, con puerto y filtro bien delimitados y sin publicar datos de autenticación.
+
+`G3AF_RESTORE_TVH_APPLIED=YES`
+`G3AF_TVH_UUID_ALPHA_STABLE=YES`
+`G3AF_TVH_UUID_BETA_STABLE=YES`
+`G3AF_KODI_JSONRPC_VALID=YES`
+`G3AF_KODI_IDS_STABLE=YES`
+`G3AF_KODI_UPDATED_BECAUSE_OF_RESTORE=NOT_PROVEN`
+`G3AF_PCAP_HTSP_PAYLOAD_PACKETS=0`
+`G3AF_HTSP_CHANNELUPDATE_EMITTED=NOT_MEASURED`
