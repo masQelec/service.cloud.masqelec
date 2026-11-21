@@ -452,3 +452,18 @@ KODI_TOTAL: 2
 `G3AB_URL_TVH_APPLIED=YES`, `G3AB_URL_ALPHA_CHANNEL_UUID_REPLACED=YES`, `G3AB_URL_ALPHA_SERVICE_UUID_REPLACED=YES`, `G3AB_URL_ALPHA_MUX_UUID_REPLACED=YES`, `G3AB_URL_BETA_STABLE=YES`, `G3AB_KODI_ALPHA_CHANNELID_CURRENT=2`, pero **`G3AB_KODI_NEW_BACKEND_CHANNEL_ACCEPTED=UNPROVEN`**: mostrar ID 2 y nombre Alpha sin verificar la correspondencia backend puede ser estado previo/caché. `CUID` estable en M3U no evitó recreación en TVH. No afirmar persistencia Kodi ni corrección nativa ante cambios URL hasta reconexión PVR y captura posterior.
 
 Siguiente prueba aislada, controlada por operador: observar estado Kodi PVR tras un refresco manual del cliente que anteriormente funcionó (mecanismo exacto aún no documentado). Registrar ambos channelid, nombres y número total. No borrar DB ni activar borrados, no tocar producción, y no declarar reparación si no se comprueba que Kodi tiene el nuevo canal backend; idealmente contrastar el identificador HTSP con el UUID TVH mediante diagnóstico del cliente en un gate aparte.
+
+
+## G3-AB URL: Kodi conserva channelid tras refresco manual PVR, backend sin verificar (2026-11-21)
+
+Después de la lectura previa al refresco, el operador realizó la acción solicitada de actualización/reinicio PVR y consultó `PVR.GetChannels`:
+
+```text
+ID: 2 NOMBRE: G3AB Alpha
+ID: 1 NOMBRE: G3AB Beta
+TOTAL: 2
+```
+
+**Observación:** tras el refresco manual no hay duplicados visibles y Kodi mantiene ambos `channelid` originales, a pesar de que TVH ya había sustituido canal, servicio y mux de Alpha al cambiar la URL. `G3AB_URL_KODI_AFTER_PVR_REFRESH_COUNT=2`, `G3AB_URL_KODI_AFTER_PVR_REFRESH_ALPHA_ID=2`, `G3AB_URL_KODI_AFTER_PVR_REFRESH_BETA_ID=1`. Esto **no demuestra aún** que el Kodi Alpha resuelva al nuevo backend TVH ni reproduzca desde `http://streams/ch1-alt.ts`; tampoco demuestra que CUID mantenga la identidad (TVH sustituyó el UUID).
+
+**Nuevo gate:** abrir Alpha G3-AB desde GUI Kodi de laboratorio, comprobar la reproducción audiovisual y observar por GET `/api/status/subscriptions` del TVH G3-AB durante la sesión para relacionar servicio/mux nuevo con el canal reproducido. Si el status no incluye identificador explícito de servicio, limitar la conclusión a observación audiovisual y no inferir un vínculo UUID. Evitar invocar un comando de reproducción JSON-RPC sin prueba de disponibilidad y no alterar TVxx.db ni servicios. Cuidar duración del TS sintético (12 s) y errores EPG/imagecache ajenos. No emplear en master.
