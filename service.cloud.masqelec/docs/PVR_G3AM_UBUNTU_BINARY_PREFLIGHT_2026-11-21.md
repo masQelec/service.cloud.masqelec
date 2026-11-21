@@ -163,3 +163,25 @@ G3AM_PREVIOUS_PATH_ASSUMPTION=INVALID
 G3AM_ORIGINAL_CONFIG_MISSING=NOT_PROVEN
 G3AM_LAB_MODIFIED=NO
 ```
+
+## G3-AM — estructura IPTV localizada (operador, 21/11/2026)
+
+La comprobación de estructura, sin lecturas de secretos, devolvió:
+
+```text
+IPTV_DIRECTORIES=4
+IPTV_DIR=input/iptv
+IPTV_DIR=input/iptv/networks
+IPTV_DIR=input/iptv/networks/4a86445d515cfeb6dda45f45e2ee561d
+IPTV_DIR=input/iptv/networks/4a86445d515cfeb6dda45f45e2ee561d/muxes
+G3AM_CONFIG_DISCOVERY=COMPLETED
+```
+
+**Corrección cerrada**: la raíz IPTV real es `runtime/tvh_config/input/iptv/networks`, no `runtime/tvh_config/iptv`. Hay una carpeta de red identificada; el contenido y validez de sus ficheros aún deben verificarse. Siguiente auditoría limitada: leer únicamente metadatos no sensibles del fichero de red (o del esquema de nivel superior que realmente exista); emitir nombres de claves permitidas y esquema de URL, nunca URL completa ni tokens. Contar muxes sin volcar su contenido. No modificar ni copiar el volumen original en escritura.
+
+```text
+G3AM_IPTV_DIRECTORY_DISCOVERY=PASS
+G3AM_IPTV_NETWORK_CONFIG_VALUES=NOT_TESTED
+G3AM_HTTP_PLAYLIST_SOURCE=NOT_VERIFIED
+G3AM_PARALLEL_TVH=NOT_STARTED
+```
