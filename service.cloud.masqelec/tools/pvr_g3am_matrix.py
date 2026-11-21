@@ -147,10 +147,10 @@ def wait_for(stage, max_seconds=WAIT):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preflight", action="store_true")
-    parser.add_argument("--run", choices=["safe", "url-probe"])
+    parser.add_argument("--run", choices=["safe", "url-probe", "url-only"])
     args = parser.parse_args()
     if not (args.preflight or args.run):
-        parser.error("choose --preflight or --run safe|url-probe")
+        parser.error("choose --preflight or --run safe|url-probe|url-only")
     cs, ks = guard()
     good, reason = identity(cs, ks)
     if not good:
@@ -159,7 +159,7 @@ def main():
     if args.preflight:
         return 0
     # Safe stages are a churn smoke test: they assert only identity, never false PASS for group/order.
-    for stage in ("reorder", "group", "restore"):
+    for stage in (() if args.run == "url-only" else ("reorder", "group", "restore")):
         atomic_publish(stage)
         # Wait for a full 75s to include one expected 60s IPTV refetch.
         time.sleep(75)
@@ -168,8 +168,9 @@ def main():
         if outcome != "IDENTITY_ONLY":
             print("G3AM_MATRIX=STOP_" + stage, flush=True)
             return 2
-    print("G3AM_SAFE_IDENTITY=PASS", flush=True)
-    print("G3AM_GROUP_AND_ORDER_PROPAGATION=UNVERIFIED", flush=True)
+    if args.run != "url-only":
+        print("G3AM_SAFE_IDENTITY=PASS", flush=True)
+        print("G3AM_GROUP_AND_ORDER_PROPAGATION=UNVERIFIED", flush=True)
     if args.run == "safe":
         return 0
     # Risky stages: observe one at a time, stop on first ambiguous/disruptive result.
