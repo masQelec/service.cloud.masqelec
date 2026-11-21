@@ -1141,3 +1141,34 @@ Se verificó **fuente exacta Tvheadend commit `8837853a6`**, `src/idnode.c` func
 `G3AJ_API_SERIALIZATION_VERIFIED=params`
 `G3AJ_CHANNEL_AUTONAME_VALUE=PENDING_OPERATOR_RECHECK`
 `G3AJ_WRITE_OPERATIONS=NONE`
+
+## G3-AJ: nombres automáticos confirmados, no-op write no equivale al evento HTSP (2026-11-21)
+
+Consulta CORREGIDA del operador a `/api/idnode/load?uuid=<UUID>`, leyendo `entries[0].params`:
+```text
+=== Alpha ===
+name: G3AB Alpha Renamed
+autoname: True
+enabled: True
+=== Beta ===
+name: G3AB Beta
+autoname: True
+enabled: True
+```
+
+**Confirmado**: los dos canales tienen `autoname=True`, por lo que no se debe escribir `name` para simular cambio: puede congelar la nomenclatura de canales actualmente derivada de red/servicio; `name` leído es nombre **efectivo** y no campo `ch_name` necesariamente persistente. Canal/UUID/servicios siguen estables y enabled.
+
+La revisión adicional de **Tvheadend 8837853a6**, `src/idnode.c` líneas 1219–1250, distingue:
+- `idnode_write0`: llama a `idnode_changedfn(self)` solo si `save` es true (o `IDCLASS_ALWAYS_SAVE`), con `dosave`; `idnode_notify_changed(self)` se invoca si `dosave` **aunque no cambien los valores**.
+- `idnode_changed(self)`: invoca tanto `idnode_notify_changed` como `idnode_changedfn` y encola persistencia.
+- Por tanto **enviar una escritura idempotente/no-op a la API no garantiza `channel_class_changed` ni mensaje HTSP `channelUpdate`**. No proponerla como solución sin prueba.
+- `autoname` getter True confirma modo automático; no se conoce aún un endpoint seguro/no-op que emita callback HTSP sin alterar estado.
+
+`G3AJ_AUTONAME_ALPHA=True`
+`G3AJ_AUTONAME_BETA=True`
+`G3AJ_NAME_WRITE_PROHIBITED=YES_FOR_MAINTENANCE`
+`G3AJ_NOOP_API_WRITE_TRIGGERS_HTSP=NOT_GUARANTEED`
+`G3AJ_SAFE_AUTO_REFRESH_TRIGGER=UNRESOLVED`
+`G3AJ_PRODUCTION_TOUCHED=NO`
+
+Próximo: decidir entre parche Tvheadend a fuente (`iptv_auto.c` notificar canales vinculados cuando cambia nombre de servicio), o estudiar endpoint explícito de re-notificación de canal, con pruebas G3-AB aisladas. Preferencia: causa origen y no reconexiones periódicas. No alterar master CoreELEC ni SQLite, ni escribir propiedades de canales reales.
