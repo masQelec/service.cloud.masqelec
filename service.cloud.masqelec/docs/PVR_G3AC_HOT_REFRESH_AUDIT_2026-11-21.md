@@ -332,3 +332,35 @@ python3 service.cloud.masqelec/tools/pvr_g3ac_observe.py --samples 3 --interval 
 ```
 
 Sin reinicio PVR, sin bouquet toggle, sin cambio M3U, sin escrituras SQLite.
+
+
+## G3-AD: gate de estabilidad dinámica superado en Ubuntu (operador 2026-11-21)
+
+El operador comunicó ejecución real de los nuevos tests y del observador actualizado:
+
+```text
+Ran 17 tests in 0.003s
+OK
+G3AC_SAMPLE=1: TVH_COUNT=2 KODI_COUNT=2 NAMES_MATCH=true
+ TVH_UUIDS_BY_NAME={"G3AB Alpha":"dba29285ca808eb6486d364f994b05db","G3AB Beta":"3bf90ae8eb828a6e4961902724a1f380"}
+ KODI_IDS_BY_NAME={"G3AB Alpha":3,"G3AB Beta":2}
+ TVH_UUIDS_STABLE_SINCE_SAMPLE1=null
+ KODI_IDS_STABLE_SINCE_SAMPLE1=null
+G3AC_SAMPLE=2: NAMES_MATCH=true TVH_UUIDS_STABLE_SINCE_SAMPLE1=true KODI_IDS_STABLE_SINCE_SAMPLE1=true
+G3AC_SAMPLE=3: NAMES_MATCH=true TVH_UUIDS_STABLE_SINCE_SAMPLE1=true KODI_IDS_STABLE_SINCE_SAMPLE1=true
+HTSP_EVENT_SEEN="NOT_MEASURED"
+KODI_TRIGGER_SEEN="NOT_MEASURED"
+CUID_MAPPING_PROVEN=false
+SQLITE_TOUCHED=false
+```
+
+`G3AD_DYNAMIC_OBSERVER_UNIT=PASS_17_OF_17`
+`G3AD_DYNAMIC_OBSERVER_LAB=PASS_3_SNAPSHOTS`
+`G3AD_TVH_ALPHA_UUID_BASELINE=dba29285ca808eb6486d364f994b05db`
+`G3AD_TVH_BETA_UUID_BASELINE=3bf90ae8eb828a6e4961902724a1f380`
+`G3AD_KODI_ALPHA_ID_BASELINE=3`
+`G3AD_KODI_BETA_ID_BASELINE=2`
+`G3AD_NAMES_MATCH=YES`
+`G3AD_HOT_REFRESH_RENAME=NOT_YET_RUN`
+
+Los valores null de la primera muestra son correctos: todavía no existe muestra precedente. Dos muestras posteriores confirman estabilidad bajo inventario sin cambios en un lapso de 20 segundos. Esto **no** demuestra que actualice etiquetas en caliente ni que se haya medido evento HTSP, CUID o callback. A continuación hacer seguimiento de **identidad por UUID TVH e ID Kodi**, no clave por nombre, en un renombrado de Alpha de una sola dimensión (URL original restaurada, bouquet intacto, PVR sin reiniciar).
