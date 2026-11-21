@@ -185,3 +185,33 @@ ID: 1 NOMBRE: G3AB Beta
 TOTAL: 2
 ```
 `G3AB_RENAME_PLAYLIST_WRITTEN=YES`; `G3AB_RENAME_PROPAGATED=NO_OBSERVED`; `G3AB_TVH_UUID_UNCHANGED=YES`; `G3AB_KODI_ID_UNCHANGED=YES`; `G3AB_REFETCH_CONFIRMED=NO`; `G3AB_CUID_CAUSALITY=UNPROVEN`. **No afirmar** que TVH rechaza rename hasta comprobar que leyó la M3U nueva y distinguir el nombre del servicio del nombre de canal, que puede estar gestionado manualmente/por configuración. Detener variaciones posteriores mientras se investiga. No reiniciar TVH ni modificar DB o master.
+
+
+## G3-AB rename: nombre nuevo ya visible en TVH (consulta posterior)
+
+El operador realizó un nuevo diagnóstico de solo lectura tras el snapshot anterior en el que el nombre seguía antiguo:
+
+```text
+=== PLAYLIST ===
+NOMBRE_NUEVO_EN_M3U: True
+NOMBRE_ANTIGUO_EN_M3U: False
+=== CANALES ===
+NOMBRE: G3AB Beta
+AUTONAME: True
+BOUQUET: True
+SERVICIOS: 1
+---
+NOMBRE: G3AB Alpha Renamed
+AUTONAME: True
+BOUQUET: True
+SERVICIOS: 1
+---
+=== MULTIPLEXORES ===
+MUX_NOMBRE: playlist.m3u - G3AB Beta
+MUX_HABILITADO: 1
+---
+MUX_NOMBRE: playlist.m3u - G3AB Alpha
+MUX_HABILITADO: 1
+```
+
+**Corrección de la interpretación previa:** `G3AB_RENAME_PROPAGATED=YES_TVH_OBSERVED`. En el snapshot inmediatamente posterior a `prepare.py rename` no había cambiado ningún nombre, pero en la consulta posterior el canal ya aparece renombrado. No está demostrado el instante exacto, el trigger de relectura ni el tiempo hasta convergencia. `autoname=True` y `bouquet=True` en ambos canales; **el nombre del mux Alpha permanece con la etiqueta anterior**, lo que no implica falta de propagación al canal. Este diagnóstico no imprimió UUID de canales ni estado Kodi; por tanto `G3AB_RENAME_TVH_UUID_STABLE=NOT_RECHECKED` y `G3AB_RENAME_KODI_ID_STABLE=NOT_RECHECKED` en el punto actual. Próximo gate: obtener snapshots TVH UUID+nombre y Kodi ID+nombre; no ejecutar etapa URL hasta confirmación de ambos.
