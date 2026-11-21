@@ -392,3 +392,37 @@ SQLITE_TOUCHED=false
 `G3AD_HOT_REFRESH_RENAME=NOT_YET_RUN`
 
 Los valores null de la primera muestra son correctos: todavía no existe muestra precedente. Dos muestras posteriores confirman estabilidad bajo inventario sin cambios en un lapso de 20 segundos. Esto **no** demuestra que actualice etiquetas en caliente ni que se haya medido evento HTSP, CUID o callback. A continuación hacer seguimiento de **identidad por UUID TVH e ID Kodi**, no clave por nombre, en un renombrado de Alpha de una sola dimensión (URL original restaurada, bouquet intacto, PVR sin reiniciar).
+
+
+## G3-AD: instrumentación controlada de renombrado preparada (sin ejecutar en Ubuntu)
+
+Nuevo `tools/pvr_g3ad_rename_watch.py` y `tests/test_pvr_g3ad_rename_watch.py` (**17 tests creados, todavía pendientes de ejecución**). Se basa en el observador G3-AC, pero para un renombrado sigue específicamente el canal Alpha por identificador TVH/Kodi mientras cambia el texto, y compara el canal Beta para protegerlo. Rechaza canal inesperado, duplicado, sin UUID/ID único, inventario distinto de dos canales, o renombrado ya aplicado antes del baseline. Detecta `G3AD=IDENTITY_CHANGED_ABORT` si cambia UUID/ID en la ventana. Si TVH renombra y Kodi no lo hace antes de finalizar, devuelve código 4 `G3AD=TVH_RENAMED_KODI_NOT_OBSERVED`; si ambos se actualizan devuelve código 0 `G3AD=BOTH_RENAMES_OBSERVED_NO_HTSP_TRACE`; sin renombrado TVH, código 3. **El watcher no captura eventos HTSP ni callback Kodi**, por lo que un resultado favorable solo demuestra convergencia de etiquetas dentro de la ventana, no mecanismos causales. Solo lectura, fuentes G3-AB de loopback, no escribe M3U, ni SQL, ni altera Kodi/PVR, ni reinicia servicios. No usar en el master.
+
+**Gate de operador antes de ensayo**:
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec
+git pull --ff-only origin develop
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_g3ad_rename_watch.py' -v
+```
+
+Después de confirmar tests, comprobar que M3U vuelve a URL original `ch1.ts` y que Alpha tiene nombre sin `Renamed`; verificar estado actual de TVH/Kodi y mantener conexión pvr.hts. Con **dos terminales**, arrancar primero:
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec
+python3 -u service.cloud.masqelec/tools/pvr_g3ad_rename_watch.py --samples 40 --interval 5
+```
+
+Tras ver `G3AD_SAMPLE=1` y baseline validado, en **segunda terminal exclusivamente en G3-AB**, ejecutar:
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec/service.cloud.masqelec/lab/pvr_g3ab
+python3 prepare.py rename
+```
+
+No reiniciar ni alternar el bouquet ni PVR durante la captura. La reimportación de TVH configurada a refetch_period=1 puede tardar más de un minuto, por eso se deja una ventana de 200 s (40 muestras x 5 s). El watcher registra estados sanitizados y aborta ante modificaciones de ID. Conservar logs solo si se filtran secretos. **No ejecutar todavía el paso de renombrado hasta pasar tests de operador y obtener baseline en primera muestra.** Después, documentar las medidas y decidir instrumentación HTSP.
+
+`G3AD_RENAME_WATCHER_CODE=COMMITTED`
+`G3AD_RENAME_WATCHER_UNIT=NOT_YET_RUN_BY_OPERATOR`
+`G3AD_HOT_RENAME_RESULT=PENDING`
+`G3AD_MASTER_UNTOUCHED=YES`
