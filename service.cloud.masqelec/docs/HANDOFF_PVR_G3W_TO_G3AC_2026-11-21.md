@@ -835,3 +835,18 @@ tcpdump: listening on lo, link-type EN10MB (Ethernet), snapshot length 262144 by
 `G3AF_CAPTURE_VALIDATES_HTSP_APPLICATION_DATA=NOT_YET`
 
 Próximo paso: `sudo tcpdump -nn -r runtime/htsp_capture/g3af_playback.pcap 'tcp and port 19992' 2>/dev/null | awk '{total++} /length [1-9][0-9]*$/ {datos++} END {print ...}'`. No enviar PCAP bruto ni payload. Si hay paquetes útiles, preparar una inspección local del protocolo limitada a mensajes de actualización relevantes con medidas de privacidad y correlación temporal.
+
+
+## G3-AF hallazgo: reproducción de Alpha coincide con actualización del nombre en Kodi (operador 2026-11-21)
+
+El operador comunica durante el experimento de control de `tcpdump` (reproducción de `G3AB Alpha` desde Kodi): **«al repdroducir, ahora ha cambiado el nombre en kodi»**. Contexto inmediatamente previo: TVH había aceptado `G3AB Alpha Renamed`, pero Kodi continuaba informando `G3AB Alpha` `channelid=3` y `pvr.hts` tenía sesión TCP HTSP establecida. El watcher anterior G3-AD terminó `TVH_RENAMED_KODI_NOT_OBSERVED` a lo largo de 40 muestras. Durante reproducción `tcpdump` capturó 1501 paquetes y 0 descartes reportados por kernel, pero **todavía no se ha obtenido conteo de paquetes con payload de ese PCAP**.
+
+**Hallazgo fuerte observacional:** el operador vio que la etiqueta de canal en Kodi cambió durante/con motivo temporal de iniciar reproducción. **No demostrar causalidad** ni afirmar que la reproducción invocó `TriggerChannelUpdate`, provocó evento HTSP específico, ni que se produjo cambio de ID: falta comprobar `PVR.GetChannels` después, compararlo con TVH y contar payload segmentado. Tampoco se confirmó todavía imagen/audio de la reproducción ni el momento exacto del evento. Debe explorarse si el paso de reproducción genera actividad HTSP y una resync de metadatos al margen de reiniciar PVR, con instrumentación real.
+
+`G3AF_PLAYBACK_COINCIDES_WITH_KODI_LABEL_CHANGE=OPERATOR_REPORTED`
+`G3AF_KODI_ALPHA_LABEL_AFTER_PLAYBACK_JSONRPC=PENDING`
+`G3AF_KODI_CHANNELID_AFTER_PLAYBACK=PENDING`
+`G3AF_PLAYBACK_PCAP_PAYLOAD_COUNT=PENDING`
+`G3AF_PLAYBACK_TRIGGERS_PVR_CHANNEL_REFRESH=HYPOTHESIS_UNPROVEN`
+
+Prioridad inmediata: antes de nuevas operaciones o playlist changes, ejecutar `PVR.GetChannels` de Kodi, leer TVH `channel/grid` y contar segmentos de payload de `g3af_playback.pcap` (no publicar pcap). Si la convergencia se confirma, diseñar un ensayo de causalidad seguro que contraste reproducción vs actividad de otros comandos/HTSP y event logs, **sin** declarar como solución reproducir un canal artificialmente. No reiniciar PVR, alternar bouquet ni modificar SQLite/master.
