@@ -62,13 +62,9 @@ def kodi_all_tv():
     groups = kodi("PVR.GetChannelGroups", {"channeltype": "tv"}).get("channelgroups")
     if not isinstance(groups, list):
         raise Blocked("KODI_GROUPS_UNAVAILABLE")
-    candidates = [g for g in groups if isinstance(g, dict) and
-                  isinstance(g.get("channelgroupid"), int) and
-                  g.get("channelgroupid") == "alltv"]
-    # JSON-RPC group ID may be a string ("alltv") on some versions.
-    if not candidates:
-        candidates = [g for g in groups if isinstance(g, dict)
-                      and g.get("channelgroupid") == "alltv"]
+    # Kodi uses the special group identifier "alltv" for all TV channels.
+    candidates = [g for g in groups if isinstance(g, dict)
+                  and g.get("channelgroupid") == "alltv"]
     if len(candidates) != 1:
         raise Blocked("KODI_ALLTV_NOT_UNAMBIGUOUS")
     result = kodi("PVR.GetChannels", {
