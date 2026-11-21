@@ -59,8 +59,10 @@ class RefetchInspectionTests(unittest.TestCase):
                 return {"total": 2, "entries": [self.network, self.network]}
             raise AssertionError("unexpected idnode lookup")
         with patch.object(M, "_request", side_effect=getter), \
-             patch.object(M.PLAYLIST, "is_file", return_value=True), \
-             patch.object(M.PLAYLIST, "is_symlink", return_value=False):
+             patch.object(M, "PLAYLIST", Mock(
+                 is_file=Mock(return_value=True),
+                 is_symlink=Mock(return_value=False),
+             )):
             with self.assertRaisesRegex(ValueError, "TARGET_NETWORK_AMBIGUOUS"):
                 M.inspect()
 
