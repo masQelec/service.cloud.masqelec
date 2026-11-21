@@ -1,0 +1,26 @@
+name: masqelec-pvr-g3ab
+services:
+  tvh:
+    image: lscr.io/linuxserver/tvheadend:latest
+    environment:
+      PUID: "${PUID:-1000}"
+      PGID: "${PGID:-1000}"
+      TZ: Europe/Madrid
+    ports:
+      - "127.0.0.1:19991:9981"
+      - "127.0.0.1:19992:9982"
+    volumes:
+      - ./runtime/tvh_config:/config
+      - ./runtime/recordings:/recordings
+      - ./runtime/playlist:/lab_playlist:ro
+    networks: [pvr_g3ab]
+    restart: "no"
+  streams:
+    image: nginx:alpine
+    volumes:
+      - ./runtime/streams:/usr/share/nginx/html:ro
+    networks: [pvr_g3ab]
+    restart: "no"
+networks:
+  pvr_g3ab:
+    driver: bridge
