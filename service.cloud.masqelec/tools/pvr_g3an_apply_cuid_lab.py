@@ -174,12 +174,11 @@ g3an_preflight(iptv_network_t *in, htsmsg_t *items)
         '      if (by_cuid && strcmp(im->mm_iptv_url_cmpid ?: "", url2) != 0) {\n'
         '        /* Do not change a currently playing stream in-place. */\n'
         '        if (im->mm_active) goto end;\n'
-        '        if (iptv_url_set(&im->mm_iptv_url, &im->mm_iptv_url_sane,\n'
-        '                         url, 1, 1)) {\n'
-        '          free(im->mm_iptv_url_cmpid);\n'
-        '          im->mm_iptv_url_cmpid = strdup(url2);\n'
-        '          idnode_changed(&im->mm_id);\n'
-        '        }\n'
+        '        iptv_url_set(&im->mm_iptv_url, &im->mm_iptv_url_sane,\n'
+        '                     url, 1, 1);\n'
+        '        free(im->mm_iptv_url_cmpid);\n'
+        '        im->mm_iptv_url_cmpid = strdup(url2);\n'
+        '        idnode_changed(&im->mm_id);\n'
         '      }\n',
         "AUTO_MATCH")
     data[auto] = replace_one(data[auto],
