@@ -77,3 +77,18 @@ API_WRITE_EXECUTED=NO
 El operador no confirmó explícitamente los 30 tests del conjunto G3-T/G3-S/G3-R. Tras esta corrección de criterio, debe ejecutarse como mínimo `test_pvr_g3t_identity_crosscheck.py`; ninguna prueba unitaria nueva se declara PASS todavía. Producción intacta.
 
 **Condición de cierre real:** ensayo aislado de refetch con delta de canales; contraste de identidad técnica CUID↔TVH y propagación de bajas a Kodi (preferiblemente mecanismos nativos), y sustitución del escritor heredado antes de conectar API. El resultado real G3-T demuestra coincidencia descriptiva, no resolución de esos tres requisitos.
+
+
+## Confirmación de tests G3-T v2 (operador)
+
+Salida comunicada por el operador tras aplicar el ajuste del criterio de multiconjunto:
+
+```text
+Ran 10 tests in 0.001s
+
+OK
+```
+
+`G3T_V2_UNIT_TESTS=PASS_10_OF_10`. El resultado valida la batería unitaria corregida, no prueba CUID, refetch con delta, ni eliminación de huérfanos en Kodi. El estado de ejecución de las baterías G3-R y G3-S sigue sin confirmación explícita en este tramo.
+
+Próximo cierre técnico: prueba aislada de cambios reales en playlist/red TVH y observación Kodi por interfaz nativa, sin tocar producción. No activar sincronizador API nuevo ni deshabilitar el fallback SQLite antes de tener un procedimiento sustitutivo probado.
