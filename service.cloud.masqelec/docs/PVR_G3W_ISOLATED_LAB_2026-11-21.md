@@ -88,3 +88,18 @@ curl -sS -o /dev/null -w 'HTTP=%{http_code}\n' --max-time 10 http://127.0.0.1:19
 ```
 
 `docker compose down` sin `-v` no borra los datos del laboratorio en `runtime/`. Sigue sin tocar TVH/CoreELEC reales. Si la publicación continúa fallando, revisar `docker inspect masqelec-pvr-g3w-tvh-1 --format '{{json .HostConfig.PortBindings}} {{json .NetworkSettings.Ports}}'` y configuración del daemon antes de cambiar otras opciones. **Este parche no ha sido aún validado por el operador**. No abrir puertos a `0.0.0.0` ni usar `network_mode: host` como solución rápida.
+
+
+## Evidencia real de arranque del laboratorio (captura 2026-11-21 10:41:52 CET)
+
+El operador confirmó **web funcional y M3U configurada** y aportó una captura HTML SingleFile de `http://127.0.0.1:19981/extjs.html`, vista Configuración → Canal / EPG → Canales. La inspección de las dos filas visibles muestra:
+- `G3W Synthetic 1`, número 1, habilitado, con servicio IPTV asociado, categoría `G3W TEST`.
+- `G3W Synthetic 2`, número 2, habilitado, con servicio IPTV asociado, categoría `G3W TEST`.
+- Paginador: **Canales 1–2 de 2**. El canal 3 no aparece.
+- Captura del LAB, no del master. La vista indica «Acceso no verificado»; mantener la publicación HTTP en `127.0.0.1`, no abrir la interfaz a toda la red sin control de acceso.
+
+**`G3W_TVH_INITIAL_TWO_CHANNELS=PASS_VISUAL`**. Esto demuestra ingestión y mapeo inicial de dos canales en TVH de laboratorio; aún NO demuestra relectura automática, 2→3→2, ni cambio real en Kodi.
+
+**Siguiente paso obligatorio:** conectar un Kodi con perfil separado al HTSP del TVH de laboratorio (host Ubuntu, puerto localhost 19982 o túnel SSH controlado), registrar sus dos canales iniciales y sus IDs. No cambiar a etapa `added` antes de completar esa línea base. La suite G3-W no se declara confirmada numéricamente solo porque la salida presentada por el operador incluyera «OK», sin cabecera de número de tests.
+
+**Estado:** `G3W_WEB_PORTS=WORKING`, `G3W_TVH_INITIAL_TWO_CHANNELS=PASS_VISUAL`, `G3W_KODI_LAB_BASELINE=PENDING`, `G3W_REAL_DELTA=PENDING`, `PRODUCTION_UNTOUCHED=YES`.
