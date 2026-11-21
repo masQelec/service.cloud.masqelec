@@ -385,3 +385,36 @@ MUX_ALPHA_EXISTE: False
 La M3U de laboratorio tenía previamente confirmada la URL alternativa de Alpha, y el snapshot de TVH obtenido en otro instante todavía mostraba UUID de canal/servicio/mux originales. **Cambio temporal entre snapshots:** el mux anterior ya no figura en el último `mux/grid`, lo que es compatible con sustitución del mux al cambiar URL, pero NO basta para afirmar creación de otro mux ni funcionamiento del flujo o estabilidad actual de canal y servicio. `G3AB_ORIGINAL_ALPHA_MUX_PRESENT=NO_CURRENT_SNAPSHOT`; `G3AB_URL_EFFECTIVE=NOT_PROVEN`; `G3AB_CHANNEL_UUID_STABLE_AFTER_MUX_CHANGE=NOT_RECHECKED`; `G3AB_KODI_CHANNELID_STABLE_AFTER_URL=NOT_RECHECKED`.
 
 Siguiente gate: consulta GET única de `channel/grid`, `mpegts/service/grid`, `mpegts/mux/grid`; imprimir solo UUID/relaciones **sintéticas G3-AB** y banderas de URL comparadas con `http://streams/ch1-alt.ts` sin mostrar valores de URI. No tocar master, no ejecutar limpiezas de servicios, ni reiniciar TVH para 'arreglar' la prueba. Confrontar cambios del objeto mux y del mapeo de canal antes de especular sobre regeneración o éxito de CUID.
+
+
+## G3-AB URL: UUID original de Alpha ausente tras cambiar URL (operador, 2026-11-21)
+
+El operador ejecutó lectura GET conjunta de canales, servicios y muxes en el TVH G3-AB cuando la M3U ya contenía `ch1-alt.ts`:
+
+```text
+CANALES: 2
+SERVICIOS: 3
+MUXES: 2
+=== G3AB Alpha ===
+UUID_CANAL_CONSERVADO: False
+=== G3AB Beta ===
+UUID_CANAL_CONSERVADO: True
+NOMBRE_ACTUAL: G3AB Beta
+SERVICIO_UUID: afe6f317e9b95eb03f6d91691e80f537
+MUX_UUID: 355a43f5f4c718478b87d3b6a1bc8408
+MUX_EN_INVENTARIO: True
+SERVICIO_HABILITADO: True
+CAMPOS_URL: ['iptv_url', 'iptv_url_cmpid']
+URL_ALTERNATIVA_EN_MUX: False
+```
+
+**Gate crítico:** Alpha ya no aparece bajo su UUID de canal original `185e5bdda6aafa6aa1aad2bb94ee703a` en este snapshot, mientras Beta conserva `f08f75aa26b58386630d4b225adbb34f`. Es compatible con sustitución/recreación de Alpha desencadenada por URL, pero aún no se ha identificado el UUID del segundo canal actual ni verificado en él que `iptv_url` sea exactamente `http://streams/ch1-alt.ts`. Tampoco se ha consultado Kodi tras el cambio; `channelid` puede permanecer, cambiar o quedar obsoleto. La estabilidad de CUID en la M3U **no garantiza UUID TVH estable en este ensayo**; no atribuir uso de CUID a TVH.
+
+`G3AB_URL_ALPHA_OLD_TVH_UUID_PRESENT=NO`
+`G3AB_URL_BETA_OLD_TVH_UUID_PRESENT=YES`
+`G3AB_URL_ALPHA_NEW_TVH_UUID=NOT_RECORDED`
+`G3AB_URL_ALPHA_EFFECTIVE_MUX_URL=NOT_YET_VERIFIED`
+`G3AB_URL_KODI_CHANNELID=NOT_YET_VERIFIED`
+`G3AB_CUTOVER_AUTHORIZED=NO`
+
+**No reiniciar PVR todavía**, ni modificar playlist, ni eliminar canales, servicios o muxes. Siguiente diagnóstico read-only: inventariar los 2 canales actuales (nombres, UUID, refs de servicio, mux), comprobar `iptv_url` en mux Alpha y obtener simultáneamente `PVR.GetChannels` de Kodi. Si cambia identidad en Kodi, priorizar la reconciliación no destructiva y plan para pérdida de identidad; reinicio PVR solo ensayo posterior con snapshot previo.
