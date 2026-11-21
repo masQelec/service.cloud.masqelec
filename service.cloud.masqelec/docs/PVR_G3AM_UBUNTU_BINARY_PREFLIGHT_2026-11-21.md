@@ -689,3 +689,34 @@ G3AN_JS_CACLIENT_DEFINITION=NOT_VERIFIED
 G3AN_JS_TARGET=REPORTED_UP_TO_DATE
 G3AN_GUI_GATE=FAIL
 ```
+
+## G3-AN — Regeneración dirigida del JavaScript resuelve interfaz (22/11/2026)
+
+Evidencia reportada por el operador después de `make -f Makefile.webui WEBUI=std -W src/webui/static/app/caclient.js src/webui/static/tvh.js.gz`:
+
+```text
+src/webui/static/tvh.js.gz.tmp=1409436
+src/webui/static/tvh.js.gz.tmp2=1098767
+src/webui/static/tvh.js.gz=295299
+G3AN_JS_GZIP=PASS
+G3AN_JS_UNCOMPRESSED_BYTES=1098767
+G3AN_CACLIENT_DEFINED=True
+G3AN_JS_SHA256=a4890cab8320abfcd5f5667b401219755a12b8d94311752025ebb19a724abc00
+G3AN_CACLIENT_DEFINITION=PASS
+G3AN_WEB_JS_HTTP=200
+G3AN_WEB_JS_REBUILD=COMPLETED
+OPERATOR_GUI_RESULT=ahora si
+```
+
+Conclusión: la regeneración dirigida incorporó efectivamente `tvheadend.caclient = function` al bundle. El operador confirma visualmente que la interfaz ahora funciona, pero todavía no ha entregado la prueba de consola final `configuration=true`, `status=true`; marcar confirmación visual y no afirmar ejecución automatizada del gate. Root cause: modificación de lista de fuentes en Makefile.webui no invalidaba el artefacto comprimido preexistente; una recompilación completa previa generó binario distinto sin refrescar el bundle. El montaje RO de archivos estáticos ya permite servir el bundle actualizado sin reiniciar TVH. El hash del ejecutable Linux experimental permanece según evidencia previa `f02a8858a0fe304b8a7fb5da78db7b4cd16dc354fad7327c4dbb49afc8bd61e5`; no se calculó nuevamente en este paso. Ningún cambio G3-AB ni despliegue CoreELEC.
+
+Próxima fase: configurar *solo G3-AM* red IPTV Automatic Network con URL `http://g3am-playlist/playlist.m3u`, verificar `g3am-001` y `g3am-002`, mapear servicios y obtener identidad baseline; mantener intacto G3-AB y no ejecutar `prepare.py rename` antes de preparar observación HTSP persistente.
+
+```text
+G3AN_JS_BUNDLE_DEFINITION=PASS
+G3AN_JS_HTTP=200
+G3AN_GUI_VISUAL_OPERATOR=PASS
+G3AN_GUI_CONSOLE_GATE=NOT_CAPTURED
+G3AM_IPTV_AUTO_NETWORK=NOT_CONFIGURED
+G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
+```
