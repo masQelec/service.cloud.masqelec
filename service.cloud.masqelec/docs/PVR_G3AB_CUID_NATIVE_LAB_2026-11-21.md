@@ -372,3 +372,16 @@ URL_ORIGINAL_ALPHA_EN_M3U: False
 Esto acredita que la M3U activa del laboratorio G3-AB contiene `http://streams/ch1-alt.ts` y **no** la URL base de Alpha `http://streams/ch1.ts`. El snapshot previo de TVH mantuvo UUID de canal/servicio/mux y recuentos 2/3/2, pero **no leyó el atributo URL efectivo del mux** y no determina si el refresco de TVH aplicó el cambio. Estado: `G3AB_URL_FILE_CHANGED=YES`; `G3AB_URL_TVH_APPLIED=NOT_YET_VERIFIED`; `G3AB_URL_TVH_UUID_STABLE=OBSERVED_SNAPSHOT_ONLY`; `G3AB_KODI_URL_PLAYBACK=NOT_TESTED`; `G3AB_CUID_CAUSALITY=UNPROVEN`.
 
 Siguiente gate: consultar `mpegts/mux/grid` con GET para el mux UUID Alpha y comprobar, sin imprimir URL, si los atributos de URL apuntan a `ch1-alt.ts` (y no `ch1.ts`). No inventar nombres de campos: enumerar únicamente nombres de campos relacionados con URL antes de extraer su valor. No reiniciar TVH/Kodi, no modificar SQLite, no tocar master. Si no está el campo en `grid`, consultar por GET el detalle read-only de `idnode/load` o marcar como no probado.
+
+
+## G3-AB URL: UUID original del mux Alpha ausente en consulta posterior
+
+El operador ejecutó `GET mpegts/mux/grid?start=0&limit=100` buscando el UUID de mux Alpha previo `4d3f4f0b654e570dc39029bebaf5c555` y reportó:
+
+```text
+MUX_ALPHA_EXISTE: False
+```
+
+La M3U de laboratorio tenía previamente confirmada la URL alternativa de Alpha, y el snapshot de TVH obtenido en otro instante todavía mostraba UUID de canal/servicio/mux originales. **Cambio temporal entre snapshots:** el mux anterior ya no figura en el último `mux/grid`, lo que es compatible con sustitución del mux al cambiar URL, pero NO basta para afirmar creación de otro mux ni funcionamiento del flujo o estabilidad actual de canal y servicio. `G3AB_ORIGINAL_ALPHA_MUX_PRESENT=NO_CURRENT_SNAPSHOT`; `G3AB_URL_EFFECTIVE=NOT_PROVEN`; `G3AB_CHANNEL_UUID_STABLE_AFTER_MUX_CHANGE=NOT_RECHECKED`; `G3AB_KODI_CHANNELID_STABLE_AFTER_URL=NOT_RECHECKED`.
+
+Siguiente gate: consulta GET única de `channel/grid`, `mpegts/service/grid`, `mpegts/mux/grid`; imprimir solo UUID/relaciones **sintéticas G3-AB** y banderas de URL comparadas con `http://streams/ch1-alt.ts` sin mostrar valores de URI. No tocar master, no ejecutar limpiezas de servicios, ni reiniciar TVH para 'arreglar' la prueba. Confrontar cambios del objeto mux y del mapeo de canal antes de especular sobre regeneración o éxito de CUID.
