@@ -887,3 +887,25 @@ G3AM_MAPPER_STATUS_IGNORE=0
 G3AM_CHANNELS=0
 G3AM_DIRECT_API_MAPPER=NOT_EXECUTED
 ```
+
+## G3-AM — dos canales auto-name creados (22/11/2026)
+
+El operador comunica que 'bucket' está desactivado (posiblemente se refiere a Bouquets; terminología no confirmada). Segunda ejecución de lectura API confirma:
+
+```text
+MAPPER={"total":0,"ok":0,"fail":0,"ignore":0}
+CHANNELS COUNT=2
+uuid=2591ccd729867bffc24e8f4bd8b765af name=G3AM Beta number=2 autoname=True
+uuid=beec46e5ab595d2474289e74c9ab9849 name=G3AM Alpha number=1 autoname=True
+```
+
+**Gate de baseline de canal superado:** exactamente 2 canales con numeración/nombres M3U esperados y autoname habilitado. Las estadísticas de mapper en 0 no explican quién los creó: no atribuir causalidad al mapeo por API o a bouquets sin evidencia. Necesario confirmar servicio→canal por lectura API y obtener detalle `api/idnode/load` de los canales, especialmente ch_name explícito y flags de auto-name. No ejecutar `prepare.py rename` hasta iniciar observación HTSP persistente: registrar uuid, nombre, número, asociaciones antes/después y eventos `channelUpdate`; `channelDelete` y `channelAdd` no deben ocurrir. Preservar G3-AB intacto. No reactivar Bouquets si están desactivados en lab.
+
+```text
+G3AM_CHANNEL_BASELINE=PASS
+G3AM_CHANNEL_COUNT=2
+G3AM_ALPHA_UUID=beec46e5ab595d2474289e74c9ab9849
+G3AM_BETA_UUID=2591ccd729867bffc24e8f4bd8b765af
+G3AM_BOTH_CHANNELS_AUTONAME=True
+G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
+```
