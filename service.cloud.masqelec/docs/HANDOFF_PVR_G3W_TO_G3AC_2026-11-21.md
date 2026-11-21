@@ -448,3 +448,59 @@ Esta evidencia acredita solamente que el generador sintético realizó la escrit
 `G3AD_KODI_HOT_RENAME_PROPAGATED=UNPROVEN`
 
 **No reiniciar PVR/bouquet ni restaurar M3U** mientras se intenta recopilar el resultado de la observación de la terminal 1; pedir salida desde `G3AD_SAMPLE=1` hasta último estado/código de salida. Si watcher no se inició antes de `prepare.py rename`, declararlo y repetir en otra ocasión desde baseline restaurado, sin fingir medición antes/durante.
+
+
+## G3-AD: reproducción controlada de divergencia de nombre con identidades estables (2026-11-21)
+
+Tras aplicar `python3 prepare.py rename`, el operador aportó salida **parcial** del watcher G3-AD:
+
+```text
+G3AD_SAMPLE=1
+TVH_ALPHA_NAME="G3AB Alpha"
+TVH_ALPHA_UUID="dba29285ca808eb6486d364f994b05db"
+TVH_BETA_UUID="3bf90ae8eb828a6e4961902724a1f380"
+KODI_ALPHA_NAME="G3AB Alpha"
+KODI_ALPHA_ID=3
+KODI_BETA_ID=2
+TVH_ALPHA_RENAMED=false
+KODI_ALPHA_RENAMED=false
+NAMES_MATCH=true
+TVH_UUID_STABLE=null
+KODI_ID_STABLE=null
+G3AD_SAMPLE=2
+TVH_ALPHA_NAME="G3AB Alpha"
+TVH_ALPHA_UUID="dba29285ca808eb6486d364f994b05db"
+TVH_BETA_UUID="3bf90ae8eb828a6e4961902724a1f380"
+KODI_ALPHA_NAME="G3AB Alpha"
+KODI_ALPHA_ID=3
+KODI_BETA_ID=2
+TVH_ALPHA_RENAMED=false
+KODI_ALPHA_RENAMED=false
+NAMES_MATCH=true
+TVH_UUID_STABLE=true
+KODI_ID_STABLE=true
+G3AD_SAMPLE=16
+TVH_ALPHA_NAME="G3AB Alpha Renamed"
+TVH_ALPHA_UUID="dba29285ca808eb6486d364f994b05db"
+TVH_BETA_UUID="3bf90ae8eb828a6e4961902724a1f380"
+KODI_ALPHA_NAME="G3AB Alpha"
+KODI_ALPHA_ID=3
+KODI_BETA_ID=2
+TVH_ALPHA_RENAMED=true
+KODI_ALPHA_RENAMED=false
+NAMES_MATCH=false
+TVH_UUID_STABLE=true
+KODI_ID_STABLE=true
+```
+
+**Confirmado:** TVH importó rename exclusivamente y conservó UUID de Alpha/Beta, mientras Kodi mantenía `channelid` 3/2 y el nombre anterior al menos hasta el sample 16 (intervalo configurado 5 segundos, ~75 segundos desde primera muestra). La divergencia no se debe a pérdida de identidad durante el renombrado. El watcher, que solo consulta GET/JSONRPC, no tiene telemetría de eventos HTSP ni callback nativo. **No consta todavía salida final del watcher (sample 40/resultado/código)**: NO declarar fallo persistente durante todos los 200 segundos, ni asignar causa a TVH/pvr.hts/Kodi.
+
+`G3AD_TVH_ALPHA_RENAME_APPLIED=YES`
+`G3AD_TVH_CHANNEL_UUIDS_DURING_RENAME=STABLE`
+`G3AD_KODI_JSONRPC_IDS_DURING_RENAME=STABLE`
+`G3AD_KODI_LABEL_STALE_AT_SAMPLE16=YES`
+`G3AD_HTSP_EVENT_EMITTED=NOT_MEASURED`
+`G3AD_PVR_HTS_TRIGGER_CALLED=NOT_MEASURED`
+`G3AD_WATCHER_FINAL_STATUS=PENDING`
+
+No reiniciar Kodi/PVR, no alternar bouquet ni restaurar playlist hasta capturar salida final. Después investigar logs nativos sin publicar secretos. No usar este resultado como prueba de que no llega el evento HTSP.
