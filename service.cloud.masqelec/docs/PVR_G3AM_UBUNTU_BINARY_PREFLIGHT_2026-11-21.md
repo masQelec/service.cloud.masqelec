@@ -185,3 +185,55 @@ G3AM_IPTV_NETWORK_CONFIG_VALUES=NOT_TESTED
 G3AM_HTTP_PLAYLIST_SOURCE=NOT_VERIFIED
 G3AM_PARALLEL_TVH=NOT_STARTED
 ```
+
+## G3-AM — origen M3U original y preparación instancia aislada (operador, 21/11/2026)
+
+Auditoría de red `runtime/tvh_config/input/iptv/networks/4a86445d515cfeb6dda45f45e2ee561d` devolvió:
+
+```text
+MUX_COUNT=2
+bouquet=True
+channel_number=0
+enabled=True
+max_streams=0
+refetch_period=1
+url_SCHEME=file
+G3AM_NETWORK_METADATA=COMPLETED
+```
+
+**Hallazgo esencial**: la playlist original utiliza esquema `file`, mientras el parche G3-AL restringe la nueva notificación a `http`/`https`; no confundir fallo futuro de HTTP con el comportamiento de la red original, ni considerar válida una prueba de parche activada mediante file://. La red original y sus dos muxes **no** se modifican.
+
+En `lab/pvr_g3ab/g3am/` se versionaron:
+- `compose.yaml`: proyecto separado `masqelec-pvr-g3am`, contenedor TVH que monta el binario G3-AL read-only y su propia config `../runtime/g3am/tvh_config`, servicios en red externa `masqelec-pvr-g3ab_pvr_g3ab`, puertos HTTP/HTSP localhost `29991/29992`; contenedor nginx `playlist` que sirve exclusivamente `../runtime/g3am/playlist`, alias `g3am-playlist`. La imagen de TVH es la runtime Noble verificada en smoke. No monta la configuración ni playlist original.
+- `prepare.py`: crea `runtime/g3am` tras comprobar marcador sintético; `init` falla si ya existe M3U para no pisarla; `baseline` y `rename` escriben únicamente la playlist privada con CUIDs `g3am-001/002`, URL de stream ya existente `http://streams/ch1.ts`/ch2.ts y nombre Alpha variable. No ejecutarlo hasta fijar baseline, y nunca usar `lab/pvr_g3ab/prepare.py` para ensayo G3-AM.
+
+**Advertencia de método**: La red IPTV de la nueva instancia debe configurarse explícitamente como **IPTV Automatic Network** con URL `http://g3am-playlist/playlist.m3u` y refetch 1 min; levantar servicios no configura por sí solo IPTV. No copiar datos ni identidades antiguas: los IDs se baselinarán dentro de la nueva instancia. No generar un `channelUpdate` de rename si los canales no tienen autoname y mapeo verificados. La segunda Kodi debe tener perfil propio, no compartir `runtime/kodi_home/.kodi`.
+
+### Gate de arranque controlado propuesto
+
+Comandos en el Ubuntu operador, con efectos solo en `runtime/g3am` y nuevo proyecto Docker. El operador debe revisar config de Compose antes de iniciar:
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec || exit 2
+git pull --ff-only origin develop || exit 2
+cd service.cloud.masqelec/lab/pvr_g3ab || exit 2
+python3 g3am/prepare.py init || exit 2
+docker compose -f g3am/compose.yaml config --quiet || exit 2
+docker compose -f g3am/compose.yaml up -d playlist tvh || exit 2
+docker compose -f g3am/compose.yaml ps
+```
+
+**Rollback exclusivo G3-AM:** `docker compose -f g3am/compose.yaml down` (sin `-v`, sin `--remove-orphans` contra el proyecto original), conservar `runtime/g3am` para diagnóstico. No ejecutar `docker compose down` sin `-f g3am/compose.yaml`.
+
+Si el arranque falla, registrar un extracto sanitizado de logs de G3-AM (sin tokens, URLs ni credenciales), diagnosticar antes de cambiar permisos o ejecutar root. Guardas: ruta exacta de binario, digest esperado, puertos libres, red externa aún existente, directorio creado por usuario 1000. El init es un cambio de almacenamiento **limitado al runtime privado** y no equivale a prueba HTSP ni Kodi.
+
+```text
+G3AM_ORIGINAL_PLAYLIST_SCHEME=FILE_VERIFIED
+G3AM_ORIGINAL_IPTV_MUX_COUNT=2
+G3AM_ORIGINAL_REFETCH_PERIOD=1
+G3AM_SEPARATE_COMPOSE=COMMITTED_NOT_OPERATOR_VALIDATED
+G3AM_SEPARATE_PLAYLIST_GENERATOR=COMMITTED_NOT_OPERATOR_VALIDATED
+G3AM_PARALLEL_TVH=NOT_STARTED
+G3AM_HTTP_PLAYLIST=NOT_RUNNING
+G3AM_CHANNELUPDATE=NOT_TESTED
+```
