@@ -1192,3 +1192,25 @@ Siguiente objetivo G3-AL: verificar contexto de lock del callback descarga y mec
 ### G3-AK continuación: callback HTTP TVH bloqueado por global_lock
 
 Revisión `tvheadend/tvheadend@8837853a6` `src/download.c` en `download_fetch_complete`: obtiene `tvh_mutex_lock(&global_lock)`, invoca `dn->process` para HTTP 200 con datos, luego libera lock. `iptv_auto_network_init` asigna `ap->in_download.process=iptv_auto_network_process`. Para **playlist importada por HTTP**, el procesamiento del nombre y una hipotética notificación de canal suceden bajo `global_lock` según esta ruta. **No generalizar** a rutas file/pipe sin auditar las callbacks del timer. Documento detallado G3-AK actualizado. Todavía **NO** existe parche compilado ni gate de emisión selectiva; producción intacta.
+
+## G3-AL: parche fuente Tvheadend para notificación de rename automático — candidato creado, NO compilado (2026-11-21)
+
+**Parche en develop**: `lab/pvr_g3ab/patches/tvheadend-8837853a6-g3al-channel-notify.patch`.
+**Plan y gates**: `docs/PVR_G3AL_TVH_PATCH_CANDIDATE_2026-11-21.md`.
+
+El parche apunta exclusivamente a `src/input/mpegts/iptv/iptv_auto.c` fuente exacta `tvheadend/tvheadend@8837853a6`, con `#include "htsp_server.h"`. Frente a cambio real de `im->mm_iptv_svcname` sobre multiplexor ya existente, y **solo si playlist HTTP(S)** (callback `download_fetch_complete` tiene `global_lock`), toma snapshot del nombre efectivo de los canales vinculados vía `mm_services` / `s_channels`, omite los que tienen `autoname` apagado o `ch_name` propio, deduplica por puntero, cambia nombre del mux con lógica original, compara nombre efectivo anterior/posterior y emite solo `htsp_channel_update(ch)` para aquellos con cambio real. Si falla memoria, omite las notificaciones pero conserva refetch. Libera snapshots; no cambia nombres persistentes, UUID, servicios ni bouquets. No introduce callbacks en file/pipe sin auditoría de locks.
+
+Revisión crítica previa: el **primer diff generado estaba mal formado** y no coincidía con contexto fuente; se corrigió y se comprobaron los cinco hunks por igualdad exacta de líneas/contadores contra el contenido del archivo upstream recuperado en GitHub. **Aún no se ha ejecutado `git apply --check` en un checkout real, ni compilación, ni ensayos runtime**. NO indicar "parche probado", "funcionando" o "gate PASS" antes de ver resultados Ubuntu.
+
+```text
+G3AL_PATCH_CREATED=YES
+G3AL_PATCH_HUNKS_MATCH_SOURCE=5/5
+G3AL_GIT_APPLY_CHECK_UBUNTU=PENDING
+G3AL_COMPILE=PENDING
+G3AL_HTSP_SAME_CONNECTION_TEST=PENDING
+G3AL_KODI_HOT_RENAME_TEST=PENDING
+G3AL_TVH_CONTAINER_MODIFIED=NO
+G3AL_PRODUCTION_MODIFIED=NO
+```
+
+Para probar solo aplicabilidad del patch, usar checkout upstream **fuera** del repo addon en `/home/ubuntu/tvheadend-g3al-upstream`; ver documento G3-AL para comandos que finalizan en `git apply --check`. No ejecutar `git apply` ni sustituir `lscr.io/linuxserver/tvheadend:latest` hasta gate de build y rollback. Importante: corregir nombre en Kodi es solo **una parte** del mantenimiento PVR (también importan eliminaciones, orden y grupos).
