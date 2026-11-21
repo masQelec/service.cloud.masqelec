@@ -463,3 +463,25 @@ LOG_LAST_MODIFIED: 1795284638.4809587
 El script cuenta coincidencias de expresiones regulares, **no** comprueba si las 4 líneas son incidentes durante la ventana G3-AD ni si el log tiene suficiente granularidad para instrumentar HTSP. El conteo de cero no demuestra que el servidor dejara de emitir `channelUpdate`, ni que el cliente dejara de procesarlo. No se ha revisado todavía el texto de esas 4 líneas, que puede contener URLs/credenciales. El fichero sí existe. `G3AE_KODI_LOG_LINES=629`; `G3AE_CHANNELUPDATE_LITERAL_COUNT=0`; `G3AE_PVR_ERRORS_REGEX_MATCHES=4_UNCLASSIFIED`; `G3AE_HTSP_EVENT_DELIVERY=NOT_MEASURED`; `G3AE_ROOT_CAUSE=UNKNOWN`.
 
 **Siguiente acción de mínimo riesgo**: diagnóstico de líneas de error con sanitización local de direcciones, credenciales y tokens, devolviendo tipo/nivel/posición temporal y mensaje redactado. Verificar si los incidentes son históricos y, si la telemetría es insuficiente, diseñar observación HTSP de laboratorio separada, sin tocar `pvr.hts` en master ni reiniciar bouquet/PVR. Evitar publicación de logs brutos.
+
+
+## G3-AE cierre de clasificación por hashes — resultado del operador (2026-11-21)
+
+Se calcularon huellas SHA-256 de las líneas de Kodi 224, 296, 363, 446, después de eliminar con regex únicamente la marca de tiempo inicial estándar:
+
+```text
+LINEA: 224 HUELLA: 88f327c0364588f1
+LINEA: 296 HUELLA: fbb57298b7e56950
+LINEA: 363 HUELLA: a77b4ad3f9dc034a
+LINEA: 446 HUELLA: e8613d1ccefd48ff
+```
+
+Las cuatro huellas **son distintas**. Por tanto, las líneas normalizadas no eran idénticas byte a byte; ello **no demuestra** que sean cuatro errores semánticamente diferentes (pueden variar IDs, subtimestamps, mensajes dinámicos o campos) ni una relación con el renombrado. No hay contenido suficiente para clasificarlas y la búsqueda textual `kodi.log` no mostró mensajes `channelUpdate` o `TriggerChannelUpdate`. **Cerrar investigación basada solo en hashes**, pasar a G3-AF: diseñar captura de eventos HTSP y comprobación del cliente en laboratorio, comenzar siempre la captura antes de un nuevo cambio controlado. El evento pasado NO puede observarse retroactivamente por una nueva captura.
+
+`G3AE_ERROR_HASHES_DISTINCT=YES_4_OF_4`
+`G3AE_ERRORS_RELATED_TO_RENAME=UNPROVEN`
+`G3AE_LOG_HUNT=INCONCLUSIVE_STOP`
+`G3AF_HTSP_PASSIVE_OBSERVER=NOT_YET_IMPLEMENTED`
+`G3AD_RENAME_DIVERGENCE_REPRODUCED=YES`
+
+Preservar el estado TVH `G3AB Alpha Renamed` / Kodi `G3AB Alpha` hasta preparar experimento instrumentado. No reiniciar PVR/bouquet ni tocar SQLite/master. Para generar nuevo evento HTSP, habrá que volver a baseline o realizar una transición de nombre controlada **después de iniciar la captura**; evitar deducir que una suscripción HTSP nueva tiene acceso a eventos históricos.
