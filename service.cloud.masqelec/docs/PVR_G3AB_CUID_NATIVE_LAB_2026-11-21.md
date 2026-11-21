@@ -162,3 +162,26 @@ Recv-Q Send-Q Local Address:Port  Peer Address:Port Process
 La **conexión TCP observada** termina en `127.0.0.1:19992`, HTSP del proyecto G3-AB; no hay conexión mostrada a 19982 en este filtro. La consulta JSON-RPC anterior muestra `G3AB Alpha`→`channelid=2`, `G3AB Beta`→`channelid=1`, ambos con nombres de G3-AB. La lectura TVH estable 3 veces registró Alpha UUID `185e5bdda6aafa6aa1aad2bb94ee703a`, Beta UUID `f08f75aa26b58386630d4b225adbb34f`.
 
 `G3AB_KODI_HTSP_PORT=VERIFIED_19992`, `G3AB_TVH_BASELINE_2=PASS`, `G3AB_KODI_BASELINE_2=PASS`, `G3AB_RENAME_STAGE=NOT_YET_EXECUTED`, `G3AB_CUID_CAUSALITY=NOT_PROVEN`. Esta evidencia verifica el socket y el contenido PVR observado, no demuestra que TVH reconozca el atributo CUID. Próximo gate: ejecutar `prepare.py rename` y esperar refetch confirmado; observar UUID y channelid, número de canales y nombre final, sin borrar datos ni tocar producción.
+
+
+## G3-AB rename: archivo cambiado, sin propagación observada (operador, 2026-11-21)
+
+El operador ejecutó `python3 prepare.py rename`; herramienta informó:
+```text
+G3AB_STAGE=RENAME
+G3AB_CUID_COUNT=2
+G3AB_MASTER_UNTOUCHED=YES
+G3AB_G3W_UNTOUCHED=YES
+```
+Consulta posterior de solo lectura:
+```text
+=== TVHEADEND ===
+UUID: 185e5bdda6aafa6aa1aad2bb94ee703a NOMBRE: G3AB Alpha
+UUID: f08f75aa26b58386630d4b225adbb34f NOMBRE: G3AB Beta
+TOTAL: 2
+=== KODI ===
+ID: 2 NOMBRE: G3AB Alpha
+ID: 1 NOMBRE: G3AB Beta
+TOTAL: 2
+```
+`G3AB_RENAME_PLAYLIST_WRITTEN=YES`; `G3AB_RENAME_PROPAGATED=NO_OBSERVED`; `G3AB_TVH_UUID_UNCHANGED=YES`; `G3AB_KODI_ID_UNCHANGED=YES`; `G3AB_REFETCH_CONFIRMED=NO`; `G3AB_CUID_CAUSALITY=UNPROVEN`. **No afirmar** que TVH rechaza rename hasta comprobar que leyó la M3U nueva y distinguir el nombre del servicio del nombre de canal, que puede estar gestionado manualmente/por configuración. Detener variaciones posteriores mientras se investiga. No reiniciar TVH ni modificar DB o master.
