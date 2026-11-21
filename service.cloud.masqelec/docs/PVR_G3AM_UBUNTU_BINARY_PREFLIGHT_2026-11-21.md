@@ -816,3 +816,27 @@ G3AM_IPTV_REFETCH_MINUTES=1
 G3AM_IPTV_SCAN_CREATE=True
 G3AM_IPTV_URL_FIXED=NOT_CONFIRMED
 ```
+
+## G3-AM — M3U importada; 2 muxes, 3 servicios, sin canales (22/11/2026)
+
+Resultado del operador después de corregir URL de `IPTV LOCAL`:
+
+```text
+G3AM_URL_OK=True
+G3AM_ENABLED=True
+G3AM_NETWORKS=1
+G3AM_MUXES=2
+G3AM_SERVICES=3
+G3AM_CHANNELS=0
+```
+
+La descarga y el parseo de la M3U HTTP ya crean exactamente 2 muxes, pero el escaneo detectó 3 servicios. Los 3 servicios no deben mapearse indiscriminadamente: un mux TS puede anunciar varios programas, o podrían existir entradas adicionales que requieren investigar. Ninguna identidad de canal está aún establecida. Próximo gate: obtener en solo lectura `api/mpegts/mux/grid` y `api/mpegts/service/grid` con `all=1`, imprimiendo únicamente campos no sensibles (`uuid`, `name`, `mux`, `network`, `sid`, `scan_result`, `scan_state`, `enabled`, `channel`, `channelname`, `servicename`, `svcname`, `provider`, `type`, `pmt`) y listar nombres de campos disponibles si hace falta. Correlacionar servicios por mux y mapear de manera selectiva solo los dos servicios pertinentes. Mantener intocados G3-AB, lista baseline y CUID; no ejecutar `prepare.py rename` hasta guardar UUID del canal y preparar observador HTSP persistente.
+
+```text
+G3AM_IPTV_HTTP_MUX_IMPORT=PASS
+G3AM_IPTV_MUX_COUNT=2
+G3AM_IPTV_SERVICE_COUNT=3
+G3AM_IPTV_CHANNEL_COUNT=0
+G3AM_SERVICE_TO_MUX_ASSOCIATION=NOT_YET_VERIFIED
+G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
+```
