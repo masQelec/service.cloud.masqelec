@@ -317,3 +317,17 @@ G3AM_ROOT_CAUSE_DATA_PATH=HYPOTHESIS_UNVERIFIED
 G3AM_TVH_HTTP_HTSP=NOT_RUNNING_AFTER_ABORT
 G3AM_ORIGINAL_G3AB=NOT_CHANGED_BY_DIAGNOSIS
 ```
+
+## G3-AM — auditoría fuente upstream exacta de perfiles (21/11/2026)
+
+Salida operador del checkout `8837853a6`: `.config.mk` define `prefix=/usr/local`, `datadir=${prefix}/share`; `src/profile.c:2910-2915` hace `profile_find_by_name2("pass", NULL, 1)` y `tvhabort` si no existe; `Makefile:651` declara `BUNDLES-yes += data/conf`. El operador verificó `data/conf` presente y `data/conf/profile` ausente. **La ausencia de data/conf/profile NO es prueba de falta de datos:** upstream `8837853a6` contiene `data/conf/profiles` (plural), con perfiles predefinidos `pass`, `matroska`, `htsp`. Verificado también en upstream exacto: `profile_init` intenta `hts_settings_load("profiles")`; `src/settings.c` consulta configuración local y, si no existe, ruta bundle `data/conf`. Referencias: https://raw.githubusercontent.com/tvheadend/tvheadend/8837853a6/src/profile.c , https://raw.githubusercontent.com/tvheadend/tvheadend/8837853a6/src/settings.c , https://raw.githubusercontent.com/tvheadend/tvheadend/8837853a6/data/conf/profiles .
+
+**Hipótesis comprobable, todavía no cerrada:** el build reducido no incluyó bundle `data/conf` o no lo encuentra el runtime en `/tmp`. Siguiente gate solo lectura: revisar en el checkout `CONFIG_BUNDLE`, `ENABLE_BUNDLE` y el archivo `build.linux/bundle.c`/símbolos, la presencia local `data/conf/profiles`, y hacer inspección de `fb_stat` en `src/filebundle.c`. No recompilar, no montar perfiles improvisados, no reiniciar TVH hasta precisar si se trata de bundle deshabilitado o ubicación de datos. La solución final debe seguir la lógica de bootstrap de esta revisión, no copiar configuración del original ni modificar código de canal.
+
+```text
+G3AM_PROFILE_PASS_DEFAULT_SOURCE=VERIFIED_UPSTREAM
+G3AM_DATA_CONF_PROFILES_PLURAL=VERIFIED_UPSTREAM
+G3AM_CONFIG_BUNDLE=NOT_YET_VERIFIED
+G3AM_PROFILE_ABORT_CAUSE=BUNDLE_OR_DATA_LOAD_HYPOTHESIS
+G3AM_TVH_BOOT=FAIL_EXIT_134
+```
