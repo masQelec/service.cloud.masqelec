@@ -1058,3 +1058,24 @@ G3AM_KODI_BETA_IDCHANNEL=1
 G3AM_KODI_BETA_IUNIQUEID=1473024293
 G3AM_KODI_LIVE_RENAME=NOT_TESTED
 ```
+
+## G3-AM — primer muestreo Kodi tras baseline sigue con nombre antiguo (22/11/2026)
+
+Operador publicó `python3 .../g3am/prepare.py baseline` y obtuvo `G3AM_STAGE=BASELINE`, fuente HTTP `http://g3am-playlist/playlist.m3u`, original G3-AB untouched. Lectura inmediata de `TV46.db` en modo read-only:
+
+```text
+KODI_CHANNEL=(1, 1473024293, 'G3AM Beta')
+KODI_CHANNEL=(2, 1699146942, 'G3AM Alpha Renamed')
+KODI_CHANNEL_COUNT=2
+G3AM_KODI_LIVE_BASELINE=FAIL
+ESTAB Kodi pid=25626 fd=32 127.0.0.1:34174 → 127.0.0.1:29992
+```
+
+**Interpretación estricta:** no está demostrado aún fallo de notificación o de Kodi: desconocemos si el refresh HTTP TVH (config ~60s) se produjo antes del muestreo. Tampoco hay pérdida de identidad en Kodi; los IDs y cardinalidad no cambiaron. Diagnóstico propuesto: poll read-only cada 5s hasta 90s, comparar `/api/channel/grid?all=1` UUID `beec46e5ab595d2474289e74c9ab9849` y `TV46.db` `idChannel=2`, `iUniqueId=1699146942`; diferenciar TVH sin cambio vs TVH actualizado/Kodi retrasado. No ejecutar rename nuevo, reiniciar Kodi ni editar DB hasta conocer respuesta. Verificar socket HTSP persistente y log si TVH cambia pero Kodi no. Este FAIL corresponde **solo a la primera muestra temporal**.
+
+```text
+G3AM_KODI_LIVE_BASELINE_FIRST_SAMPLE=FAIL
+G3AM_KODI_IDENTITY_STILL_STABLE=YES
+G3AM_TVH_BASELINE_REFRESH_STATUS=UNKNOWN
+G3AM_KODI_LIVE_BASELINE_DIAGNOSTIC=PENDING
+```
