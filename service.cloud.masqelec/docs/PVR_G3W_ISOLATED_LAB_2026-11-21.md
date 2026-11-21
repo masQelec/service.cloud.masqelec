@@ -163,3 +163,29 @@ TOTAL: 3
 ```
 
 `G3W_TVH_ADD=PASS_3_OF_3`; `G3W_KODI_ADD=PASS_3_OF_3`; `G3W_RETAINED_IDS_STABLE_DURING_ADD=YES`. Esto comprueba recepción del nuevo canal sin reinicio solicitado; el suceso exacto de refetch y el borrado automático de huérfanos **no** están aún acreditados. El siguiente paso es cambiar **solo** la M3U sintética de laboratorio con `prepare.py removed` y consultar TVH/Kodi por interfaces de solo lectura. No tocar master, PVR real ni SQLite.
+
+
+## Baja real 3→2 y ciclo completo 2→3→2 — confirmados por operador
+
+Tras ejecutar únicamente el generador de fixture `python3 prepare.py removed`:
+
+```text
+G3W_STAGE=REMOVED
+G3W_CHANNELS=2
+G3W_PLAYLIST_ONLY_IN_LAB=YES
+G3W_MASTER_UNTOUCHED=YES
+=== TVHEADEND ===
+UUID: 01acdb29035f6789d905cfd14f8ef5b0 NOMBRE: G3W Synthetic 1
+UUID: 918d272bf55884716e5fff5177ee8b08 NOMBRE: G3W Synthetic 2
+TOTAL: 2
+=== KODI ===
+ID: 1 NOMBRE: G3W Synthetic 1
+ID: 2 NOMBRE: G3W Synthetic 2
+TOTAL: 2
+```
+
+Se completa el ciclo de inventarios observado **TVH 2→3→2, Kodi 2→3→2**, manteniendo los UUID TVH `01acdb29035f6789d905cfd14f8ef5b0` y `918d272bf55884716e5fff5177ee8b08` y los IDs Kodi 1 y 2. Durante este ensayo no se solicitó reiniciar TVH/Kodi ni acceder a SQLite. Resultado: `G3W_TVH_REMOVE=PASS`, `G3W_KODI_REMOVE=PASS`, `G3W_NATIVE_ORPHAN_REMOVAL_OBSERVED=YES_ON_UBUNTU_LAB`.
+
+**Alcance y cautelas:** la coincidencia por API de dos snapshots no acredita por sí sola fecha exacta del evento de refetch ni que el mismo comportamiento exista en la versión CoreELEC/pvr.hts del master. El gate G3-V aún exige una declaración verificable del evento de refetch y conexión exclusiva Kodi laboratorio→TVH laboratorio antes de producir `LAB_DELTA=PASS` en su validador offline. La ausencia de escritura SQL se deduce del procedimiento realizado, no de auditoría de todos los procesos en el equipo. No se activó el nuevo sistema ni se retiró fallback legacy en producción.
+
+**Próximo paso:** comparar versiones Kodi/pvr.hts en Ubuntu y CoreELEC; comprobar baja nativa en CoreELEC solo mediante piloto seguro y autorizado, sin eliminar canales de la M3U maestra. Solo tras eso decidir la refactorización de `update_pvr.py`, manteniendo rutas de recuperación y verificaciones de inventario.
