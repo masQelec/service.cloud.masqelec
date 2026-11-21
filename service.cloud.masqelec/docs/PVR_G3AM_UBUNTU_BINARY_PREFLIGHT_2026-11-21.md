@@ -763,3 +763,31 @@ G3AM_PLAYLIST_BASELINE_CUIDS=PASS
 G3AM_IPTV_NETWORK=NOT_YET_CONFIRMED
 G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — IPTV no importada: única red deshabilitada (22/11/2026)
+
+Evidencia de API suministrada por el operador:
+
+```text
+NETWORKS HTTP=200 COUNT=1 TOTAL=1
+uuid=cc090ea0e9bf9e8670520252e4c23306
+networkname=IPTV LOCAL
+enabled=false
+url=?
+MUXES HTTP=200 COUNT=0 TOTAL=0
+SERVICES HTTP=200 COUNT=0 TOTAL=0
+CHANNELS HTTP=200 COUNT=0 TOTAL=0
+```
+
+La causa inmediata comprobada de ausencia de descarga/importación es que la única red IPTV está deshabilitada; `url=?` requiere confirmar el valor real (podría ser presentación de la API). La URL HTTP de nginx ya funciona y contiene CUID g3am-001/g3am-002. Los errores observados de `/static/icons/*.png` y `/static/extjs/resources/images/*` devuelven HTTP 500 y son otro defecto de recursos web, independiente de la red deshabilitada. No se han creado muxes ni servicios, así que no hay todavía identidades persistentes a comparar. Próximo paso: lectura acotada `GET /api/idnode/load?uuid=cc090ea0e9bf9e8670520252e4c23306` para recoger campos *no secretos* `enabled`, `url`, tipo/clase, `refetch_period`, `scan_create`, y contrastar con lista de red. No imprimir JSON completo porque puede contener contraseñas o parámetros de autenticación. Luego habilitar solo red G3-AM y corregir URL si hace falta; comprobar muxes antes de mapeo. No ejecutar `prepare.py rename`, no tocar G3-AB.
+
+```text
+G3AM_IPTV_NETWORK_COUNT=1
+G3AM_IPTV_NETWORK_ENABLED=FALSE
+G3AM_IPTV_NETWORK_URL=UNVERIFIED_QUESTION_MARK
+G3AM_MUXES=0
+G3AM_SERVICES=0
+G3AM_CHANNELS=0
+G3AM_STATIC_ICON_HTTP_500=OBSERVED
+G3AM_G3AL_HTSP_RENAME=NOT_TESTED
+```
