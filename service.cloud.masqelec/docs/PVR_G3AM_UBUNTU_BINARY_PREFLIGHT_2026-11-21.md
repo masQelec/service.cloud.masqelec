@@ -86,3 +86,48 @@ G3AM_LOCAL_UBUNTU_IMAGE=NOT_LISTED
 G3AM_COMPATIBLE_RUNTIME_IMAGE=NOT_SELECTED
 G3AM_PARALLEL_RUNTIME=NOT_STARTED
 ```
+
+## G3-AM — ABI host y propuesta runtime Noble (operador, 21/11/2026)
+
+```text
+HOST=Ubuntu 26.04 resolute
+HOST_GLIBC=2.43
+BIN_GLIBC_MAX_REQUIRED=2.38
+DOCKER_HOST_ARCH=x86_64
+DOCKER_HOST_OS=Ubuntu 26.04.1 LTS
+FREE_SPACE=/dev/sda2 321G available (64% used)
+G3AM_RUNTIME_ABI_PREFLIGHT=COMPLETED
+```
+
+La exigencia de símbolo GLIBC máximo observada (2.38) **es inferior a glibc 2.39 de Ubuntu 24.04 noble**. Es una precondición favorable, no prueba ejecutable. Ubuntu Noble distribuye `libssl3t64` (SONAME libssl.so.3), `libzstd1` y `zlib1g`. Referencias públicas: https://packages.ubuntu.com/libssl3t64 y https://packages.ubuntu.com/noble-updates/libs/.
+
+Añadido archivo `lab/pvr_g3ab/g3am/Dockerfile.runtime` en develop: runtime Ubuntu 24.04 con bibliotecas, sin copiar binario a imagen, usuario 1000 y ENTRYPOINT del binario montado read-only. **No modifica el Compose original**. No contiene la fuente ni reconstruye TVH, no publica puertos y por sí mismo no ejecuta servicios.
+
+### Siguiente gate operativo (G3-AM-RUNTIME-SMOKE)
+
+Desde la carpeta del repositorio, construir imagen experimental dedicada y comprobar el binario con `--version` y red `none`. La imagen puede descargarse, consumir disco y requerir red; **no toca los contenedores originales**, pero no es read-only respecto al almacén Docker. Comprobar con `docker image inspect` la imagen generada después. El ensayo sigue sin crear configuración o servidor.
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec || exit 2
+git pull --ff-only origin develop || exit 2
+docker build --pull -f service.cloud.masqelec/lab/pvr_g3ab/g3am/Dockerfile.runtime \
+  -t masqelec/tvh-g3am-runtime:noble \
+  service.cloud.masqelec/lab/pvr_g3ab/g3am || exit 2
+BIN=/home/ubuntu/tvheadend-g3al-upstream/build.linux/tvheadend
+test -f "$BIN" && test -x "$BIN" || exit 2
+test "$(sha256sum "$BIN" | awk '{print $1}')" = "b94c205632ab1dc8ad8e4d71d9c127ddae518fd28c3381919b5974de65aa753a" || exit 2
+docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --mount "type=bind,source=$BIN,target=/opt/g3al/tvheadend,readonly" \
+  masqelec/tvh-g3am-runtime:noble --version || exit 2
+echo G3AM_RUNTIME_BINARY_SMOKE=PASS
+```
+
+El código anterior solo declara PASS si el proceso dentro de Docker termina con código cero. Si falla, no declarar compatibilidad del runtime. Antes de arrancar TVH habrá un gate separado de configuración privada, playlist HTTP, red y rollback. No usar este Dockerfile para CoreELEC.
+
+```text
+G3AM_NOBLE_ABI_STATIC_ASSESSMENT=COMPATIBLE_ON_GLIBC_VERSION
+G3AM_RUNTIME_DOCKERFILE_COMMITTED=YES
+G3AM_RUNTIME_IMAGE_BUILT=NO_OPERATOR_RESULT
+G3AM_RUNTIME_BINARY_SMOKE=NOT_TESTED
+G3AM_PARALLEL_TVH=NOT_STARTED
+```
