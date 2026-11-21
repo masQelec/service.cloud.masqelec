@@ -148,3 +148,17 @@ TOTAL: 2
 ```
 
 Los IDs y etiquetas son **idénticos** a la lectura anterior. Esto comprueba estabilidad entre esas dos respuestas, pero **no** la conexión efectiva al HTSP `127.0.0.1:19992`: el usuario no ha confirmado explícitamente qué puerto dejó configurado, ni JSON-RPC expone la procedencia. Siguiente gate leer conexiones TCP reales del proceso Kodi y comprobar `127.0.0.1:19992` ESTAB y ausencia de `127.0.0.1:19982` ESTAB. No repetir innecesariamente PVR.GetChannels ni ejecutar `rename` antes de confirmar el endpoint.
+
+
+## G3-AB: conexión HTSP de Kodi al laboratorio confirmada por socket (2026-11-21)
+
+Operador ejecutó en Ubuntu `sudo ss -tnp state established '( dport = :19992 or dport = :19982 )'` con Kodi abierto. Resultado:
+
+```text
+Recv-Q Send-Q Local Address:Port  Peer Address:Port Process
+0      0 127.0.0.1:57906    127.0.0.1:19992 users:(("kodi.bin",pid=182136,fd=34))
+```
+
+La **conexión TCP observada** termina en `127.0.0.1:19992`, HTSP del proyecto G3-AB; no hay conexión mostrada a 19982 en este filtro. La consulta JSON-RPC anterior muestra `G3AB Alpha`→`channelid=2`, `G3AB Beta`→`channelid=1`, ambos con nombres de G3-AB. La lectura TVH estable 3 veces registró Alpha UUID `185e5bdda6aafa6aa1aad2bb94ee703a`, Beta UUID `f08f75aa26b58386630d4b225adbb34f`.
+
+`G3AB_KODI_HTSP_PORT=VERIFIED_19992`, `G3AB_TVH_BASELINE_2=PASS`, `G3AB_KODI_BASELINE_2=PASS`, `G3AB_RENAME_STAGE=NOT_YET_EXECUTED`, `G3AB_CUID_CAUSALITY=NOT_PROVEN`. Esta evidencia verifica el socket y el contenido PVR observado, no demuestra que TVH reconozca el atributo CUID. Próximo gate: ejecutar `prepare.py rename` y esperar refetch confirmado; observar UUID y channelid, número de canales y nombre final, sin borrar datos ni tocar producción.
