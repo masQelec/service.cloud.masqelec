@@ -103,3 +103,24 @@ SERVICIOS_COMPARTIDOS_POR_VARIOS_CANALES=0
 El UUID `e2bf26af3bd98f7ac3f11acb11ce12cc` (segundo Beta en el primer GET) **ya no aparece en channel/grid**. No se acreditó cuándo ni por qué desapareció. Es compatible con convergencia asíncrona, pero no demuestra causalidad ni confirma que una sola ejecución de la playlist produzca un canal por CUID. Hay 3 servicios MPEG-TS, sin información todavía de cuál está huérfano. `G3AB_TVH_CURRENT_INVENTORY=2`, `G3AB_TVH_BASELINE_STABILITY=NOT_YET_PROVEN`, `G3AB_KODI_BASELINE=NOT_TESTED`.
 
 Antes de avanzar: comparar varias instantáneas READ-ONLY de 2 canales, los mismos UUID, mismas referencias de servicio, misma M3U baseline; investigar si tercer servicio está sin canal; y comprobar que las 16 pruebas unitarias pasan. No borrar canales/servicios/muxes ni activar variante `rename` hasta fijar la línea base.
+
+
+## G3-AB baseline estabilizado por tres GET de solo lectura (operador, 2026-11-21)
+
+El operador ejecutó tres consultas `GET /api/channel/grid` separadas por intervalos de 20 s y comparó tuplas `(uuid, name, services)`:
+
+```text
+LECTURA_1_CANALES: 2
+LECTURA_1_UUID: ['185e5bdda6aafa6aa1aad2bb94ee703a', 'f08f75aa26b58386630d4b225adbb34f']
+LECTURA_2_CANALES: 2
+LECTURA_2_UUID: ['185e5bdda6aafa6aa1aad2bb94ee703a', 'f08f75aa26b58386630d4b225adbb34f']
+LECTURA_3_CANALES: 2
+LECTURA_3_UUID: ['185e5bdda6aafa6aa1aad2bb94ee703a', 'f08f75aa26b58386630d4b225adbb34f']
+INVENTARIO_ESTABLE: True
+SERVICIOS_TOTALES: 3
+SERVICIOS_SIN_CANAL: 1
+```
+
+Correspondencia TVH del snapshot anterior: `G3AB Alpha`→`185e5bdda6aafa6aa1aad2bb94ee703a`; `G3AB Beta`→`f08f75aa26b58386630d4b225adbb34f`. El script comparó también nombre y servicios, aunque solo imprimió UUID. El tercer UUID Beta previo `e2bf26af3bd98f7ac3f11acb11ce12cc` ya no aparece. Conclusión acotada: `G3AB_TVH_BASELINE_STABLE_3_READS=PASS`; no se ha acreditado por qué surgió/desapareció el duplicado, ni estabilidad tras modificación de playlist. Se conserva un servicio MPEG-TS sin canal y no se autoriza eliminarlo.
+
+Próximo gate: **Kodi G3-AB aislado**, comprobar userdata efectiva y host HTSP 127.0.0.1:19992 (nunca 19982 de G3-W ni master), registrar dos `channelid` con `PVR.GetChannels`, y solo después ensayar `rename`. Las 16 pruebas unitarias del fixture G3-AB no constan aún reportadas por el operador.
