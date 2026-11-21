@@ -1130,3 +1130,14 @@ Siguiente gate G3-AJ **solo lectura**: inspeccionar con `/api/idnode/load?uuid=<
 `G3AI_SERVICES_STABLE=YES`
 `G3AI_CHANNEL_NAME_ORIGIN=UNKNOWN_UNTIL_AUTONAME_CHECK`
 `G3AI_NAME_WRITE_SAFE=NO_UNPROVEN`
+
+## G3-AJ: corregido lector idnode/load, usa params (2026-11-21)
+
+El operador ejecutó un script read-only que leía `entries[0].props` de `GET /api/idnode/load?uuid=<UUID>` y obtuvo `name: NO_DISPONIBLE`, `autoname: NO_DISPONIBLE`, `enabled: NO_DISPONIBLE` para Alpha y Beta. **No refleja la inexistencia de propiedades**, sino que el script miró una clave errónea.
+
+Se verificó **fuente exacta Tvheadend commit `8837853a6`**, `src/idnode.c` función `idnode_serialize0()`: construye `htsmsg_add_msg(m, "params", idnode_params(idc, self, list, optmask, lang))`. La clave `props` corresponde a `idclass_serialize0()` para definición de clase, no a instancias. El nuevo lector debe buscar `entries[0]["params"]`, procesar la lista por `id`/`value` y limitar salida a `name`, `autoname`, `enabled`. Conservar null/ausente como pendiente si no retorna. No divulgar respuesta completa ni escribir configuraciones.
+
+`G3AJ_FIRST_READ_RESULT=INVALID_WRONG_KEY_PROPS`
+`G3AJ_API_SERIALIZATION_VERIFIED=params`
+`G3AJ_CHANNEL_AUTONAME_VALUE=PENDING_OPERATOR_RECHECK`
+`G3AJ_WRITE_OPERATIONS=NONE`
