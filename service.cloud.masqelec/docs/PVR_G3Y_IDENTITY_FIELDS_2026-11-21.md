@@ -40,3 +40,27 @@ A. Inspeccionar la estructura de los campos `services` y la identidad subyacente
 ## Cambios excluidos
 
 Sin modificaciones en `update_pvr.py` durante G3-Y, sin cambios en master, sin deploy, sin gestión de tags históricos, sin eliminación de canales, sin llamada a APIs mutadoras.
+
+## Primer ensayo del operador y corrección del diagnóstico
+
+El operador informó:
+```
+Ran 12 tests in 0.000s
+OK
+G3Y=BLOCKED
+REASON=API_UNAVAILABLE
+```
+
+`G3Y_UNIT=PASS_12` para la primera versión; `G3Y_LIVE=BLOCKED`. El motivo `API_UNAVAILABLE` agrupaba cualquier excepción que no fuera `Blocked`, por lo que **no permite identificar por sí solo si falló TVH o Kodi**.
+
+Se ha corregido el script para clasificar por endpoint errores de conexión (`TVH_UNREACHABLE` / `KODI_UNREACHABLE`), autenticación, HTTP 404, JSON inválido, tamaños y errores HTTP genéricos, sin mostrar URLs ni excepciones potencialmente sensibles. Se añadieron **5 pruebas unitarias**, quedando **17 previstas**. Validación del operador posterior a este cambio todavía pendiente.
+
+Diagnóstico para Ubuntu:
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec
+git pull --ff-only origin develop
+python3 -m py_compile service.cloud.masqelec/tools/pvr_g3y_identity_fields_lab.py
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_g3y_identity_fields_lab.py' -v
+python3 service.cloud.masqelec/tools/pvr_g3y_identity_fields_lab.py
+```
+Si el error es `KODI_UNREACHABLE`, comprobar que sigue abierto Kodi y que su JSON-RPC local escucha en 8080. Si `KODI_AUTH_REQUIRED`, detener aquí: no enviar contraseñas en línea de comandos ni desactivar autenticación de servicios expuestos. Si es `TVH_UNREACHABLE`, inspeccionar contenedores con `docker compose ps` en el directorio G3-W y la publicación loopback 19981. No alterar producción.
