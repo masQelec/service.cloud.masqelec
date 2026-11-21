@@ -813,3 +813,25 @@ La ventana de paquetes va de 7 s **antes** del `mtime` de la M3U hasta 192 s **d
 `G3AF_TVH_CHANNELUPDATE_EMISSION_ROOT_CAUSE=UNPROVEN`
 
 Siguiente discriminación sin cambios: inspeccionar timestamps de importación de TVH en log Docker (solo metadatos filtrados), y si hace falta instrumentar lado TVH HTSP de laboratorio con un evento nativo seguro (sin reiniciar bouquet/PVR) o verificar configuración de suscripción HTSP, antes de cualquier workaround. Nunca publicar PCAP sin sanitizar.
+
+
+## G3-AF: captura de control durante reproducción completada, payload pendiente (21/11/2026)
+
+El operador inició `sudo timeout 45 tcpdump -i lo -nn -s 0 -U -w runtime/htsp_capture/g3af_playback.pcap 'tcp and port 19992'` para el ensayo de reproducción del canal Alpha en Kodi y comunicó la salida de tcpdump:
+
+```text
+tcpdump: listening on lo, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+1501 packets captured
+3006 packets received by filter
+0 packets dropped by kernel
+```
+
+**Importante:** `1501 packets captured` no demuestra por sí solo que exista tráfico de aplicación HTSP. El contador `packets received by filter` (3006) tampoco debe interpretarse como paquetes útiles o pérdidas: es una estadística dependiente de plataforma/captura. `0 dropped by kernel` sí indica que no reportó descartes de kernel. No se ha comunicado todavía el análisis `length > 0` de este PCAP ni la confirmación de si el usuario pulsó y consiguió reproducción en Kodi durante los 45 s. No afirmar que la captura validó payload hasta contar segmentos con datos.
+
+`G3AF_PLAYBACK_PCAP_REPORTED_CAPTURED=1501`
+`G3AF_PLAYBACK_PCAP_KERNEL_DROPS=0`
+`G3AF_PLAYBACK_PCAP_PAYLOAD_PACKETS=PENDING`
+`G3AF_PLAYBACK_KODI_AV_OBSERVED=UNREPORTED`
+`G3AF_CAPTURE_VALIDATES_HTSP_APPLICATION_DATA=NOT_YET`
+
+Próximo paso: `sudo tcpdump -nn -r runtime/htsp_capture/g3af_playback.pcap 'tcp and port 19992' 2>/dev/null | awk '{total++} /length [1-9][0-9]*$/ {datos++} END {print ...}'`. No enviar PCAP bruto ni payload. Si hay paquetes útiles, preparar una inspección local del protocolo limitada a mensajes de actualización relevantes con medidas de privacidad y correlación temporal.
