@@ -258,3 +258,34 @@ El operador aclaró: **«lo he reinicido yo el bouquet si es eso el problema»**
 `G3AD_HOT_RENAME_GATE=HOLD_UNTIL_STABLE_BASELINE`
 
 En un futuro ensayo de refresco caliente, **prohibir operaciones manuales de bouquet, borrado/importación de canales y reinicio PVR entre snapshots**. Primero registrar UUID TVH, ID Kodi y estado de bouquet; luego cambiar exactamente el nombre de un canal, medir actualizaciones del lado TVH y Kodi y después restaurar, con pruebas aisladas. Si el operador aclara la operación exacta (p. ej., pulsar «Refresh» frente a eliminar/recrear), documentar diferencia explícita sin inventar.
+
+
+## G3-AD: precisión del operador sobre bouquet y red IPTV (2026-11-21)
+
+El operador aclaró que en TVH **deshabilitó y volvió a habilitar el bouquet** existente (NO dijo haberlo eliminado ni recreado). La operación se realizó manualmente durante el desarrollo de G3-AD; su instante exacto respecto a los snapshots y su efecto sobre UUID no fueron medidos directamente. Esto es factor de confusión específico para la regeneración simultánea de Alpha/Beta. No atribuir los UUID nuevos ni al reemplazo de M3U por `prepare.py`, ni exclusivamente a la alternancia del bouquet sin un ensayo de comparación.
+
+Lectura del inventario de red `GET /api/mpegts/network/grid?start=0&limit=100` comunicada por operador:
+
+```text
+=== RED ===
+UUID: 4a86445d515cfeb6dda45f45e2ee561d
+NETWORKNAME: IPTV LOCAL
+ENABLED: True
+SKIPINITSCAN: True
+AUTODISCOVERY: 0
+REFETCH_PERIOD: 1
+CHANNEL_NUMBER: 0
+CAMPOS_CONFIG: ['channel_number', 'id
+```
+
+El último valor `CAMPOS_CONFIG` aparece **truncado** en el mensaje; no inferir claves restantes. `refetch_period=1` es valor observado de la configuración, no demuestra por sí solo cuándo se aplicó la última reimportación ni cuántos objetos reemplazó. `SKIPINITSCAN=True` y `AUTODISCOVERY=0` no prueban por sí solos política de estabilidad de identidad de canales.
+
+`G3AD_BOUQUET_OPERATOR_ACTION=DISABLED_THEN_ENABLED`
+`G3AD_BOUQUET_DELETED_RECREATED=NOT_REPORTED`
+`G3AD_NETWORK_UUID=4a86445d515cfeb6dda45f45e2ee561d`
+`G3AD_NETWORK_REFETCH_PERIOD=1`
+`G3AD_UUID_CHURN_CAUSE=UNPROVEN_CONFOUNDED_BY_BOUQUET_TOGGLE`
+`G3AD_FURTHER_BOUQUET_TOGGLE=HOLD`
+`G3AD_NEXT_GATE=CONTROLLED_RENAME_HOT_REFRESH_ON_STABLE_INVENTORY`
+
+Para ensayo controlado: no volver a alternar bouquet ni reiniciar PVR entre snapshots; verificar primero 2 canales TVH y Kodi, documentar ID/UUID actuales **sin exigir identidades antiguas 2/1**, después cambiar únicamente nombre sobre URL original y observar durante más de un período de `refetch` estable. No usar `PVR.GetChannels` como evidencia de `channelUpdate` emitido: hace falta instrumentación del cliente o captura HTSP aparte.
