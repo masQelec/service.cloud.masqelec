@@ -1116,3 +1116,17 @@ La auditoría recuperó **fuente de Tvheadend de GitHub en `ref=8837853a6`**, ve
 `G3AI_IPTV_MUX_NOTIFY_VS_CHANNEL_HTSP_DIFFERENCE=VERIFIED_DIRECT_PATHS`
 `G3AI_PRODUCTION_CHANGE=NO`
 `G3AI_SAFE_REFRESH_MECHANISM=NOT_YET_VERIFIED`
+
+## G3-AI: identidad de los canales y naturaleza del nombre (2026-11-21)
+
+Snapshot read-only de `/api/channel/grid?limit=100`: Alpha UUID `dba29285ca808eb6486d364f994b05db`, nombre efectivo `G3AB Alpha Renamed`, enabled=true, servicios `e98c6fdf8c5a5e16e3ea122319f9977b`; Beta UUID `3bf90ae8eb828a6e4961902724a1f380`, nombre efectivo `G3AB Beta`, enabled=true, servicios `afe6f317e9b95eb03f6d91691e80f537`. UUID/servicios coinciden con los snapshots anteriores.
+
+Fuente exacta Tvheadend `8837853a6` en `src/channels.c`: `channel_get_name()` devuelve `ch->ch_name` si existe y no está vacío; si no, devuelve nombre heredado desde `service_get_channel_name()`. La propiedad `autoname` usa `channel_class_autoname_set()`, y setter `name` escribe `ch_name`. Por tanto, `name` en `channel/grid` es nombre efectivo, **no certifica nombre propio**. Escribir dicho nombre para forzar callback **puede fijarlo e impedir el seguimiento de cambios del servicio**, violando el objetivo. No hacerlo.
+
+Siguiente gate G3-AJ **solo lectura**: inspeccionar con `/api/idnode/load?uuid=<UUID>` ambos y reportar exclusivamente `name`, `autoname`, `enabled` sin volcar objetos completos; verificar respuesta y permisos. Hasta comprobar, no activar cambios de nombre, autoname, bouquet, SQL ni reinicios PVR.
+
+`G3AI_ALPHA_UUID_STABLE=YES`
+`G3AI_BETA_UUID_STABLE=YES`
+`G3AI_SERVICES_STABLE=YES`
+`G3AI_CHANNEL_NAME_ORIGIN=UNKNOWN_UNTIL_AUTONAME_CHECK`
+`G3AI_NAME_WRITE_SAFE=NO_UNPROVEN`
