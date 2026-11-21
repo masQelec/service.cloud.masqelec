@@ -840,3 +840,24 @@ G3AM_IPTV_CHANNEL_COUNT=0
 G3AM_SERVICE_TO_MUX_ASSOCIATION=NOT_YET_VERIFIED
 G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — identificación de 3 servicios en 2 muxes, mapeo selectivo pendiente (22/11/2026)
+
+El operador proporcionó inventario API y exportación SingleFile de la pestaña Services a las 00:20:15 CET. El DOM de la UI incluye las pestañas Configuration/Status (reparación ExtJS confirmada), el selector "Hide: Inactive services", los servicios y botón "Map Selected"; la fila deshabilitada está visible/seleccionada en la captura.
+
+Servicios:
+- Mux `playlist.m3u - G3AM Alpha`: `66f63f4e1a9d19a643a806990433bb8c`, SID 1, enabled=true, `svcname=G3AB Signal 1` (provider FFmpeg), sin canales.
+- Mux `playlist.m3u - G3AM Beta`: `68a79db48e632d6a766b7eee25d97458`, SID 2, enabled=true, `svcname=G3AB Signal 2` (provider FFmpeg), sin canales.
+- Mux Beta: `949dba9313a31b88edc8b1263fba9869`, SID 1, `svcname=G3AM Beta`, enabled=false, indicador UI `Missing In PAT/SDT`, sin canales.
+
+La tercera entrada parece ser el servicio nominal provisional del M3U sustituido tras escanear el programa MPEG-TS real; confirmada la condición inactiva/missing, no eliminarla ni mapearla por defecto. Para tener exactamente 2 canales: seleccionar exclusivamente los dos servicios habilitados (identificar por UUID/SID/nombre/mux), usar Map Selected y validar `channel/grid` y asociaciones `mpegts/service/grid`. Evitar la fila Beta SID1. El mapper puede crear canales con nombres `G3AB Signal 1/2`, distintos de `G3AM Alpha/Beta`. Esto tiene **impacto directo** en el gate G3-AL: el parche solo emite htsp_channel_update si el nombre *efectivo de un canal autoname* cambia después de la variación `im->mm_iptv_svcname`; una variación de M3U sin cambio del nombre efectivo derivado de un servicio real puede resultar en 0 notificaciones legítimamente. Registrar ch_name/ch_autoname y nombre efectivo de ambos canales antes de rename; no forzar nombres manuales ni dar por probada la solución.
+
+```text
+G3AM_SERVICE_ALPHA_UUID=66f63f4e1a9d19a643a806990433bb8c
+G3AM_SERVICE_BETA_UUID=68a79db48e632d6a766b7eee25d97458
+G3AM_SERVICE_BETA_PROVISIONAL_UUID=949dba9313a31b88edc8b1263fba9869
+G3AM_BETA_PROVISIONAL_STATE=DISABLED_MISSING_IN_PAT_SDT
+G3AM_ACTIVE_SERVICES=2
+G3AM_CHANNEL_MAPPING=NOT_YET_EXECUTED
+G3AL_RENAME_EFFECTIVE_NAME_BEHAVIOR=UNVERIFIED
+```
