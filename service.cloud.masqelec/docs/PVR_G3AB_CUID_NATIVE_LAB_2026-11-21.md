@@ -326,3 +326,14 @@ ID: 1 NOMBRE: G3AB Beta
 Previamente TVH había recuperado los nombres originales y seguía mostrando 2 canales con sus UUID iniciales. Se valida `G3AB_RESTORED_TVH=PASS`, `G3AB_RESTORED_KODI=PASS`, `G3AB_RESTORED_KODI_IDS_STABLE=PASS`, `G3AB_RENAME_AND_RESTORE_NATIVE_IDENTITIES=PASS_OBSERVED`, `G3AB_CUID_CAUSALITY=UNPROVEN`, `G3AB_LIVE_LABEL_REFRESH=FAIL_OBSERVED`. **No** inferir que esta técnica es segura durante reproducción real ni emplearla automáticamente en master.
 
 Siguiente gate `url`: partiendo de la M3U restaurada, escribir solo el cambio de URL sintética de Alpha a `http://streams/ch1-alt.ts`; capturar inventarios TVH/Kodi y multiplexor/servicio previos y posteriores (sin exponer URLs reales). La etapa puede desencadenar reasignación de mux o servicio aun manteniendo CUID; comprobar la convergencia antes de asumir fallo o éxito. No borrar entradas TVH ni SQLite; no modificar CoreELEC.
+
+
+## Prioridad de arquitectura: actualización del cliente PVR en caliente (2026-11-21)
+
+El operador fija como objetivo principal: **que el cliente PVR refresque** sin tocar SQLite ni reconstruir la biblioteca. Evidencia del laboratorio: TVH actualiza renombrado/restauración, Kodi mantiene `channelid` pero su `label` no converge mientras permanece conectado; un reinicio manual de PVR consigue actualizar la etiqueta con ID estable. Evitar confundir problema de notificación de metadatos con identidad o con baja de huérfanos.
+
+Hipótesis a contrastar secuencialmente (sin cambios destructivos): (a) ¿TVH emite `channelUpdate` HTSP con `channelName`? (b) ¿`pvr.hts` recibe el mensaje? (c) ¿invoca la señal de actualización de canales de la API del addon Kodi? (d) ¿Kodi actualiza el `label` asociado al mismo `channelid`? Consultar código de `kodi-pvr/pvr.hts` en rama/versión compatible con CoreELEC 21.2.6.1, no asumir que Piers 22 tiene el mismo comportamiento.
+
+Fuentes consultadas: Kodi builtin list https://kodi.wiki/view/List_of_built-in_functions y JSON-RPC API https://kodi.wiki/view/JSON-RPC_API/v12. **No se ha identificado un JSON-RPC público documentado `PVR.UpdateChannels`**; `PVR.Scan` no es un refresco genérico de metadatos, sino búsqueda/scan. No prometer comandos no comprobados.
+
+Criterio de éxito futuro: actualización sin reiniciar Kodi, sin toggles deshabilitar/habilitar el addon, sin escrituras SQLite, sin afectar reproducción activa, conservando UUID TVH, Kodi IDs, grupos y preferencias; fallback de reinicio del cliente solo tras validación y fuera de reproducción. `G3AB_HOT_REFRESH_IMPLEMENTED=NO`, `G3AB_HTSP_NOTIFICATION_DIAGNOSIS=PENDING`, `MASTER_TOUCHED=NO`.
