@@ -132,3 +132,26 @@ PRODUCTION_CUTOVER_AUTHORIZED=NO
 ```
 
 **No sustituir estas declaraciones por afirmaciones más fuertes sin nuevas mediciones.**
+
+
+## G3-AD: inventario de log Kodi y estado M3U (operador, 2026-11-21)
+
+Consulta read-only desde el perfil G3-AB:
+
+```text
+=== LABORATORIO ===
+M3U_EXISTE: True
+URL_ALTERNATIVA: True
+NOMBRE_RENOMBRADO: False
+=== KODI LOG ===
+LOG_EXISTE: True
+PVR_HTS_COUNT: 84
+HTSP_COUNT: 22
+CHANNEL_UPDATE_COUNT: 0
+CHANNEL_ADD_DELETE_COUNT: 0
+DEBUG_LINES_COUNT: 1
+```
+
+La M3U sigue en URL alternativa y **no** en la etapa `rename`. El log contiene referencias a cliente/HTSP pero ningún literal `channelUpdate` o `channelAdd`/`channelDelete`; el conteo `DEBUG_LINES_COUNT: 1` **no demuestra** cuál es el nivel de log efectivo ni si están habilitadas categorías PVR/cliente: se contó texto, no se verificó configuración. **No concluir ausencia de eventos HTSP** a partir de cero coincidencias textuales. Tampoco repetir un ensayo de renombrado sobre la etapa `url` sin restaurar primero la URL original para no mezclar cambios de atributos.
+
+`G3AD_KODI_LOG_PRESENT=YES`, `G3AD_KODI_LOG_CHANNELUPDATE_LITERAL=0`, `G3AD_HTSP_EVENTS_OBSERVED=NO`, `G3AD_DEBUG_CAPABILITY=NOT_VERIFIED`, `G3AD_URL_VARIANT_ACTIVE=YES`. Próximo paso: inspeccionar configuración real de logging disponible en Kodi de laboratorio y preparar una captura de alcance limitado antes del cambio de nombre. No subir logs sin revisar posibles URLs, IPs, credenciales o tokens. No modificar master/SQLite.
