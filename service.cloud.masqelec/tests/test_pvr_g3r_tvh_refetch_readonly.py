@@ -66,6 +66,29 @@ class RefetchInspectionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "TARGET_NETWORK_AMBIGUOUS"):
                 M.inspect()
 
+    def test_idnode_params_schema(self):
+        self.node["params"] = self.node.pop("props")
+        status, output = self.run_case()
+        self.assertEqual(status, 0)
+        self.assertIn("PROPERTY_SCHEMA=PARAMS", output)
+        self.assertIn("REFETCH_PERIOD_MINUTES=60", output)
+
+    def test_direct_grid_fields_without_props(self):
+        self.node.pop("props")
+        self.network.update({
+            "url": "file:///storage/.user/playlist.m3u",
+            "refetch_period": 60,
+        })
+        status, output = self.run_case()
+        self.assertEqual(status, 0)
+        self.assertIn("PROPERTY_SCHEMA=UNAVAILABLE", output)
+        self.assertIn("REFETCH_PERIOD_MINUTES=60", output)
+
+    def test_missing_all_properties_reports_only_schema_flags(self):
+        self.node.pop("props")
+        with self.assertRaisesRegex(ValueError, "NETWORK_PROPERTIES_UNAVAILABLE"):
+            self.run_case()
+
     def test_write_endpoint_rejected(self):
         with self.assertRaisesRegex(ValueError, "UNAPPROVED_ENDPOINT"):
             M._request("idnode/save", {})
