@@ -1,0 +1,134 @@
+# HANDOFF PVR G3-W → G3-AC — Mantenimiento PVR nativo (2026-11-21)
+
+**Proyecto**: `masQelec/service.cloud.masqelec`, rama `develop`. **Ruta repo**: `service.cloud.masqelec/`. **Ruta Ubuntu**: `/home/ubuntu/GitHub/service.cloud.masqelec`. Este documento es el punto de entrada para continuar en otro chat; leer los informes detallados enumerados abajo y el código fuente antes de alterar el proyecto.
+
+## Objetivo funcional y límites
+
+El addon gestiona la playlist M3U y el mantenimiento PVR (Tvheadend + Kodi, cliente `pvr.hts`). El sistema heredado en `lib/update_pvr.py` realiza acciones potencialmente destructivas: reconciliación por nombre contra base de datos Kodi TVxx.db, baja Tvheadend por API, reinicios/alternancia PVR y mantenimiento de tags. Objetivo: **mantener el inventario de canales y grupos correctamente y refrescar Kodi a través de interfaces nativas, sin escrituras SQLite, sin bajas ambiguas y preservando la identidad cuando sea posible**.
+
+Restricciones:
+- Master CoreELEC `root@192.168.1.102`: **sin escritura, despliegue ni ensayo destructivo autorizado**. No probar cambios de URL/playlist, ni deshabilitar PVR ni borrar canales/grupos en master.
+- Los seis grupos históricos extra de Tvheadend están protegidos; playlist histórica: 720 canales, 26 grupos, TVH 32 tags, 24 nombres duplicados. Las observaciones son históricas: la M3U publicada en `masQelec/cloud.masqelec/pvr/playlist.m3u` tenía **865** `#EXTINF` y **865 CUID únicos** al consultarla el 21/11/2026. No equiparar épocas ni afirmar divergencia de producción sin medir ambos inventarios al mismo tiempo.
+- No activar `CUTOVER`, no sustituir `update_pvr.py`, no eliminar mecanismos de recuperación antes de gates completos. No manipular directamente `TVxx.db` durante laboratorios.
+- Nunca interpretar `CUID` como identificador TVH/HTSP demostrado. Los CUID observados en M3U son valores textuales opacos y la API TVH no mostró mapeo CUID→UUID.
+
+## Entornos
+
+- Master: CoreELEC Kodi **21.2.5** (`Amlogic-ng.arm`), `pvr.hts 21.2.6.1`. Ubuntu laboratorio Kodi **21.3**, `kodi-pvr-hts 21.2.6+ds-1.1`. La equivalencia de comportamiento/binarios **NO** está demostrada.
+- G3-W: `lab/pvr_g3w/`; Compose `masqelec-pvr-g3w`, TVH HTTP `127.0.0.1:19981`, HTSP `127.0.0.1:19982`; playlist sintética sin CUID, generador `prepare.py before|added|removed`. **No alterar este runtime para G3-AB**.
+- G3-AB: `lab/pvr_g3ab/`; Compose `masqelec-pvr-g3ab`, TVH HTTP **`127.0.0.1:19991`**, HTSP **`127.0.0.1:19992`**; `runtime/playlist/playlist.m3u`, `runtime/tvh_config`, `runtime/streams`, `runtime/kodi_home`. Generador `prepare.py baseline|rename|url|group|reorder|homonym|restored`. Todos los estados tienen CUID `g3ab-001`, `g3ab-002`. Al pasar de una etapa a otra, **cada etapa se construye desde baseline**: no pasar `rename → url` sin restauración, o se cambian dos atributos. Los contenedores se iniciaron con puertos limitados a loopback. Kodi G3-AB se ejecuta desde Ubuntu con `HOME="$PWD/runtime/kodi_home" kodi`; no abrir simultáneamente G3-W y G3-AB Kodi. El socket del proceso Kodi se verificó ESTAB a `127.0.0.1:19992`; JSON-RPC se consultó en `127.0.0.1:8080` (ojo: antes se vio escucha `0.0.0.0:8080`; evitar exposición LAN).
+- Los flujos TS de laboratorio son **12 segundos** generados por ffmpeg, servidos por Nginx en red Docker; no son evidencia de reproducción continua.
+
+## Fases y evidencias confirmadas por operador
+
+| Fase | Resultado real | Conclusión precisa |
+| --- | --- | --- |
+| G3-W | TVH y Kodi **2→3→2** con IDs originales estables | Kodi Ubuntu retiró el canal desaparecido sin escritura SQLite solicitada, no acredita CoreELEC |
+| G3-X | 16 tests PASS | Shadow read-only `lib/pvr_native_convergence.py`, no reemplazo del legado; rechaza ambigüedad por homónimos |
+| G3-Y | 17 tests PASS | TVH `uuid` y Kodi `channelid` visibles, **sin puente probado** CUID/HTSP |
+| G3-Z | 10 tests PASS | Referencias a servicios son `str`; sin resolución todavía |
+| G3-Z2 | 13 tests PASS; 2 referencias de canal resueltas entre 3 servicios | Integridad TVH canal→servicio sin CUID |
+| G3-Z3–Z5 | 1 servicio sin canal/deshabilitado, comparte mux con servicio de canal | No borrar servicios/muxes por no estar asociados |
+| G3-AA | 15 tests PASS | Comparador offline por CUID seguro ante nombres duplicados/cambios, sin demostrar soporte CUID por TVH |
+| G3-AB | Compose y playlist sintética en Ubuntu; 2 canales estables tras duplicado Beta temporal; fuente de duplicado **no demostrada** | Baseline TVH/Kodi establecido |
+| G3-AB rename | Tvheadend cambia nombre conservando UUID de canal; Kodi mantiene ID pero **no** refresca etiqueta en caliente durante observación; al reiniciar Kodi una vez la actualiza | Mecanismo de refresco en vivo NO validado |
+| G3-AB restored | TVH vuelve a nombre inicial; Kodi no refresca en caliente, **reiniciar PVR dentro de Kodi** sí actualiza nombre manteniendo ID | Tipo exacto de acción de reinicio PVR operador no precisado; no automatizar en producción |
+| G3-AB URL | Nueva URL `ch1-alt.ts` aplicada; Tvheadend **sustituye UUID de canal/servicio/mux de Alpha**, Beta estable | CUID estable en playlist **no conserva identidad TVH** ante URL |
+| G3-AB Kodi URL | Tras refresco manual PVR, Kodi mantiene Alpha `channelid=2` y Beta `1` | NO demuestra por sí solo continuidad backend, pero TVH registra suscripción de Alpha |
+| G3-AB suscripción | TVH `status/subscriptions`: Alpha `Running`, errors=0, entrada/salida >0 | El flujo se entrega por TVH; imagen/audio perceptibles en GUI Kodi **no confirmados** |
+| G3-AC | **9/9 tests PASS**, tres snapshots `NAMES_MATCH=true`, `ID_PRESERVED=true` | Sistema actualmente convergido; **no se provocaron cambios entre snapshots**, por tanto **NO prueba refresco en caliente** |
+
+### Identidades concretas del laboratorio G3-AB
+
+Baseline antes de URL:
+- TVH Alpha canal `185e5bdda6aafa6aa1aad2bb94ee703a`; servicio `18cd0031a734c2342ac3956d754fb63e`; mux `4d3f4f0b654e570dc39029bebaf5c555`; Kodi Alpha `channelid=2`.
+- TVH Beta canal `f08f75aa26b58386630d4b225adbb34f`; servicio `afe6f317e9b95eb03f6d91691e80f537`; mux `355a43f5f4c718478b87d3b6a1bc8408`; Kodi Beta `channelid=1`.
+
+Tras cambio `url` de Alpha:
+- TVH Alpha canal **`780608ad2385d70c9d46279e0f62250e`**; servicio **`5a6962a3ab51cfec0c933f6cc7eda030`**; mux **`f9e55f38b435969d396393edc3b7acc4`**; campo `iptv_url` coincide con `http://streams/ch1-alt.ts`.
+- Beta mantuvo sus tres UUID.
+- Kodi tras reinicio/refresco PVR: Alpha `channelid=2`, Beta `1`, sin duplicados.
+- TVH demostró suscripción de Alpha `Running` con `errors=0`, `total_in=965192`, `total_out=881587`. `status/subscriptions.service` contiene nombre descriptivo, **no** UUID.
+
+G3-AC observaciones finales (operador): 9 tests unitarios en 0.000s OK, tres lecturas cada una `TVH_COUNT=2`, `KODI_COUNT=2`, `NAMES_MATCH=true`, `ID_PRESERVED=true`, `TVH_NAMES=[G3AB Alpha,G3AB Beta]`, `KODI_NAMES` iguales, `HTSP_EVENT_SEEN=NOT_MEASURED`, `KODI_TRIGGER_SEEN=NOT_MEASURED`, `CUID_MAPPING_PROVEN=false`, `SQLITE_TOUCHED=false`. **Puede ser solo la convergencia actual de etiquetas: no inventar que una actualización HTSP fue vista.** La etapa efectiva del fichero M3U después de ensayos previos debe comprobarse antes de futuros cambios.
+
+## Auditoría fuente pvr.hts Omega: mecanismo nativo ya existe
+
+Se inspeccionó **directamente** `kodi-pvr/pvr.hts` rama `Omega`, archivo https://github.com/kodi-pvr/pvr.hts/blob/Omega/src/Tvheadend.cpp :
+- `AsyncProcess()` en torno a líneas 1738–1744 acepta `channelAdd`, `channelUpdate`, `channelDelete`; `channelUpdate` llama `ParseChannelAddOrUpdate(msg,false)`.
+- `ParseChannelAddOrUpdate()` en torno a líneas 2129–2220 lee `channelId`, actualiza `channelName` si está en el mensaje, compara objeto anterior y posterior y llama `TriggerChannelUpdate()` si cambió y ya superó `ASYNC_CHN`.
+- La cola de eventos `HTSP_EVENT_CHN_UPDATE` se procesa fuera del mutex y llama a `kodi::addon::CInstancePVRClient::TriggerChannelUpdate()` (~1834).
+- `GetChannels` (~336–372) entrega `SetUniqueId(channel.GetId())` y `SetChannelName(channel.GetName())`. **`CUID` de playlist no forma parte de este mapeo.**
+- Esta es evidencia del **código Omega de referencia**, no del binario exacto compilado `21.2.6.1` en CoreELEC.
+- Faltan evidencias de emisión del evento desde el servidor, recepción en el cliente, activación del callback, y reacción de Kodi. No atribuir el fallo a capa específica sin instrumentación.
+- La API JSON-RPC pública no ofrece una llamada `PVR.UpdateChannels` documentada; `PVR.Scan` no significa refrescar metadatos.
+
+## Archivos y documentos a leer al retomar
+
+Código:
+- `lib/update_pvr.py` (legado, sin migrar).
+- `lib/pvr_native_convergence.py` (shadow sin mutación).
+- `lib/pvr_cuid_offline.py`, `tests/test_pvr_cuid_offline.py` (comparador CUID; 15 PASS).
+- `lab/pvr_g3w/prepare.py`, `lab/pvr_g3ab/prepare.py`, `lab/pvr_g3ab/compose.yaml` (laboratorios separados).
+- `tools/pvr_g3ac_observe.py`, `tests/test_pvr_g3ac_observe.py` (9 PASS).
+
+Documentos:
+- `docs/PVR_G3W_ISOLATED_LAB_2026-11-21.md`.
+- `docs/PVR_G3X_NATIVE_SHADOW_2026-11-21.md`.
+- `docs/PVR_G3Y_IDENTITY_FIELDS_2026-11-21.md`.
+- `docs/PVR_G3Z_TVH_SERVICE_SHAPES_2026-11-21.md`.
+- `docs/PVR_G3Z2_SERVICE_RESOLUTION_2026-11-21.md`.
+- `docs/PVR_G3AA_CUID_IDENTITY_2026-11-21.md`.
+- `docs/PVR_G3AB_CUID_NATIVE_LAB_2026-11-21.md`.
+- `docs/PVR_G3AC_HOT_REFRESH_AUDIT_2026-11-21.md`.
+
+## Próximo trabajo — G3-AD (seguir en este chat o en otro)
+
+**Prioridad del operador:** conseguir que **el cliente PVR se refresque en caliente**, sin reiniciar Kodi, sin ciclos automáticos de desactivar/re-activar `pvr.hts`, sin alterar SQLite, con mínimo impacto en reproducción.
+
+1. Actualizar árbol local `git pull --ff-only origin develop`; comprobar `git status --short` y tests G3-AC.
+2. Verificar **estado real actual** de M3U G3-AB (baseline/rename/url/restored) y TVH/Kodi sin asumir etapa por etiquetas actuales.
+3. Identificar herramientas viables para observar en un ensayo controlado `channelUpdate` **en HTSP** y `TriggerChannelUpdate` **en cliente**. Priorizar logs Kodi/pvr.hts debug en perfil **aislado**, fuente exacta del addon/versión disponible; evitar modificar daemon de producción. La conexión HTSP transporta datos binarios y puede estar autenticada: no publicar capturas con tokens/sesiones; no confundir raw packet count con prueba de contenido `channelUpdate`.
+4. Diseñar un ensayo **solo rename**, a partir de URL y metadatos restaurados, observar antes/durante/después el evento y `label` mientras cliente permanece conectado. El observador actual solo lee inventarios y **no** tiene instrumentación HTSP.
+5. Clasificar dónde se interrumpe la cadena: emisión TVH, recepción pvr.hts, detección de cambio y callback Kodi, o aplicación final. Proponer solución mínima **solo cuando se demuestre la causa**. No asumir que addon Python puede llamar callbacks C++ de `pvr.hts`.
+6. Si un cambio de URL sigue regenerando UUID de TVH, no diseñar limpieza por nombre ni asumir que CUID los preserva; establecer estrategia de equivalencia de identidad no destructiva o aceptar cambio controlado de identidad según garantías observadas.
+7. Mantener comprobación de grupos protegidos (6 históricos), duplicados, cambios de nombre y URLs, y futuras pruebas CoreELEC **solo tras autorización**.
+
+## Comandos seguros para retomar
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec
+git pull --ff-only origin develop
+git status --short
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_g3ac_observe.py' -v
+python3 service.cloud.masqelec/tools/pvr_g3ac_observe.py --samples 3 --interval 10
+cd service.cloud.masqelec/lab/pvr_g3ab
+docker compose ps
+grep -E 'CUID=|ch1-alt' runtime/playlist/playlist.m3u | sed -E 's#https?://[^ ]+#<REDACTED_URL>#g'
+```
+
+No publicar M3U real, credenciales IPTV, tokens HTSP ni datos del master.
+
+## Gates al cierre de este handoff
+
+```text
+G3W_NATIVE_2_3_2_UBUNTU=PASS_OBSERVED
+G3AA_OFFLINE_CUID_UNIT=PASS_15
+G3AB_TVH_RENAME_AND_RESTORE=PASS
+G3AB_KODI_RENAME_REQUIRES_PVR_REFRESH=OBSERVED
+G3AB_URL_NEW_TVH_CHANNEL_SERVICE_MUX=CONFIRMED
+G3AB_URL_KODI_CHANNELIDS_AFTER_PVR_REFRESH=UNCHANGED_2_AND_1
+G3AB_URL_TVH_SUBSCRIPTION_RUNNING_ZERO_ERRORS=PASS
+G3AC_UNIT_TESTS=PASS_9
+G3AC_LAB_SAMPLES=PASS_3_STATIC_MATCH
+G3AC_HTSP_CHANNELUPDATE_CAPTURE=NOT_DONE
+G3AC_KODI_NATIVE_TRIGGER_CAPTURE=NOT_DONE
+G3AC_AUTO_HOT_REFRESH=NOT_PROVEN
+CUID_TO_TVH_UUID_PROVEN=NO
+CUID_TO_KODI_CHANNELID_PROVEN=NO
+MASTER_MODIFIED=NO_REPORTED
+SQLITE_MAINTENANCE_REMOVED=NO
+PRODUCTION_CUTOVER_AUTHORIZED=NO
+```
+
+**No sustituir estas declaraciones por afirmaciones más fuertes sin nuevas mediciones.**
