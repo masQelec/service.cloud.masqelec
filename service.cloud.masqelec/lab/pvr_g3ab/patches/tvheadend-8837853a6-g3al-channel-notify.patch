@@ -1,28 +1,25 @@
 diff --git a/src/input/mpegts/iptv/iptv_auto.c b/src/input/mpegts/iptv/iptv_auto.c
 --- a/src/input/mpegts/iptv/iptv_auto.c
 +++ b/src/input/mpegts/iptv/iptv_auto.c
-@@ -20,8 +20,9 @@
+@@ -20,7 +20,8 @@
  #include "tvheadend.h"
  #include "http.h"
  #include "iptv_private.h"
 -#include "channels.h"
--#include "download.h"
 +#include "channels.h"
 +#include "htsp_server.h"
-+#include "download.h"
+ #include "download.h"
  #include "epggrab.h"
  #include "misc/m3u.h"
- 
-@@ -67,8 +68,67 @@
+@@ -67,8 +68,65 @@
  /*
   *
   */
 -static void
--iptv_auto_network_process_m3u_item(
+-iptv_auto_network_process_m3u_item(iptv_network_t *in,
 +/*
-+ * G3-AL laboratory candidate: capture names before updating the IPTV mux,
-+ * then emit HTSP updates only for auto-named channels whose effective name
-+ * really changed. Keep channel mappings and stored names untouched.
++ * G3-AL laboratory candidate: snapshot effective names before changing the
++ * IPTV mux name; notify only auto-named channels whose effective name changed.
 + */
 +typedef struct iptv_auto_channel_snapshot {
 +  channel_t *channel;
@@ -30,8 +27,7 @@ diff --git a/src/input/mpegts/iptv/iptv_auto.c b/src/input/mpegts/iptv/iptv_auto
 +} iptv_auto_channel_snapshot_t;
 +
 +static void
-+iptv_auto_channel_snapshots_free(iptv_auto_channel_snapshot_t *items,
-+                                 size_t count)
++iptv_auto_channel_snapshots_free(iptv_auto_channel_snapshot_t *items, size_t count)
 +{
 +  size_t i;
 +  for (i = 0; i < count; i++)
@@ -41,8 +37,8 @@ diff --git a/src/input/mpegts/iptv/iptv_auto.c b/src/input/mpegts/iptv/iptv_auto
 +
 +static int
 +iptv_auto_channel_snapshots_take(mpegts_mux_t *mm,
-+                                  iptv_auto_channel_snapshot_t **items,
-+                                  size_t *count)
++                                 iptv_auto_channel_snapshot_t **items,
++                                 size_t *count)
 +{
 +  mpegts_service_t *ms;
 +  idnode_list_mapping_t *ilm;
@@ -79,25 +75,23 @@ diff --git a/src/input/mpegts/iptv/iptv_auto.c b/src/input/mpegts/iptv/iptv_auto
 +}
 +
 +static void
-+iptv_auto_network_process_m3u_item(
++iptv_auto_network_process_m3u_item(iptv_network_t *in,
                                     const char *last_url,
                                     const http_arg_list_t *remove_args,
                                     const http_arg_list_t *ignore_args,
-@@ -81,8 +141,11 @@
+@@ -81,7 +139,10 @@
    mpegts_mux_t *mm;
    iptv_mux_t *im;
    url_t u, u2;
 -  int change, epgcfg, muxprio, smuxprio;
--
 +  int change, epgcfg, muxprio, smuxprio, name_changed, can_notify;
 +  iptv_auto_channel_snapshot_t *name_snapshots = NULL;
 +  size_t name_snapshots_count = 0;
 +  size_t k;
-+
+   http_arg_list_t args;
    http_arg_t *ra1, *ra2, *ra2_next;
    size_t l;
-   int64_t chnum2, vlcprog;
-@@ -224,12 +287,25 @@
+@@ -224,12 +285,21 @@
      im = (iptv_mux_t *)mm;
      if (strcmp(im->mm_iptv_url_cmpid ?: (im->mm_iptv_url ?: ""), url2) == 0) {
        im->im_delete_flag = 0;
@@ -109,10 +103,7 @@ diff --git a/src/input/mpegts/iptv/iptv_auto.c b/src/input/mpegts/iptv/iptv_auto
 -      }
 +      change = 0;
 +      name_changed = strcmp(im->mm_iptv_svcname ?: "", name) != 0;
-+      /*
-+       * HTTP download_fetch_complete() holds global_lock. Other playlist
-+       * sources keep the original behavior until their lock is audited.
-+       */
++      /* The HTTP download callback holds global_lock; file/pipe not audited. */
 +      can_notify = name_changed &&
 +                   (!strncmp(in->in_url ?: "", "http://", 7) ||
 +                    !strncmp(in->in_url ?: "", "https://", 8));
@@ -120,7 +111,6 @@ diff --git a/src/input/mpegts/iptv/iptv_auto.c b/src/input/mpegts/iptv/iptv_auto
 +          iptv_auto_channel_snapshots_take(mm, &name_snapshots,
 +                                           &name_snapshots_count))
 +        can_notify = 0;
-+
 +      if (name_changed) {
 +        free(im->mm_iptv_svcname);
 +        im->mm_iptv_svcname = strdup(name);
@@ -129,7 +119,7 @@ diff --git a/src/input/mpegts/iptv/iptv_auto.c b/src/input/mpegts/iptv/iptv_auto
        if (im->mm_iptv_chnum != chnum) {
          mpegts_network_bouquet_trigger((mpegts_network_t *)in, 0); /* propagate LCN change */
          im->mm_iptv_chnum = chnum;
-@@ -277,9 +353,19 @@
+@@ -277,9 +347,19 @@
          im->mm_iptv_streaming_priority = smuxprio;
          change = 1;
        }
