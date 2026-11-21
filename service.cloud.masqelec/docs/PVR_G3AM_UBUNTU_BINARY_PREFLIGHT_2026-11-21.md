@@ -1096,3 +1096,33 @@ G3AM_KODI_LIVE_BASELINE=PASS
 G3AM_KODI_LIVE_RENAME_RETURN=PENDING
 G3AM_KODI_NO_RECONNECT_PROOF=PENDING
 ```
+
+## G3-AM — gate extremo a extremo PVR Kodi rename reversible PASS (22/11/2026)
+
+El operador informa de que Kodi actualiza el canal al refrescar Tvheadend, sin reiniciarlo. Evidencia de la última transición `baseline` → `rename`:
+
+```text
+KODI_CHANNEL= (1, 1473024293, 'G3AM Beta')
+KODI_CHANNEL= (2, 1699146942, 'G3AM Alpha Renamed')
+G3AM_KODI_FINAL_COUNT= 2
+G3AM_KODI_RENAME_CYCLE=PASS
+===== HTSP CONNECTION =====
+ESTAB 127.0.0.1:29992 127.0.0.1:34174
+ESTAB 127.0.0.1:34174 127.0.0.1:29992 users:(("kodi.bin",pid=25626,fd=32))
+```
+
+Cadena completa registrada: TVH Alpha UUID `beec46e5ab595d2474289e74c9ab9849` conservado en cambio previo, HTSP `channelUpdate` Alpha ID `1699146942` durante conexión abierta, Kodi `TV46.db` idChannel Alpha `2`, iUniqueId `1699146942`, nombre reversible `G3AM Alpha Renamed` → `G3AM Alpha` → `G3AM Alpha Renamed` con total de 2 canales y Beta `idChannel=1`, `iUniqueId=1473024293` sin cambios. Socket pvr.hts aún ESTAB puerto cliente 34174, sin reiniciar Kodi durante ensayo según operador. **Gate end-to-end de renombrado G3-AM/Kodi PASS en Linux Ubuntu con binario experimental.** El mismo puerto en dos muestras no demuestra matemáticamente ausencia de toda reconexión; tampoco se recibió aún el resumen final de contadores del observador HTSP.
+
+**No ampliar el resultado:** no están probados altas, bajas, reordenaciones, grupos/etiquetas, URL cambiante, listas masivas, continuidad ante apagón/refetch, ni compatibilidad compilada CoreELEC. Próximo plan: matriz sintética controlada con una variante por caso y pre/post TVH UUID/ID HTSP/Kodi idChannel, evitar alterar G3-AB y producción; comprobar HTSP channelAdd/channelDelete/update y número de canales. No declarar solucionado el mantenimiento integral hasta superar casos de eliminación y reordenado. Tras PVR abordar lectura de géneros XMLTV 'Otros/Desconocidos'.
+
+```text
+G3AM_KODI_PVR_RENAME_E2E=PASS
+G3AM_KODI_RENAME_REVERSIBLE=PASS
+G3AM_KODI_ALPHA_IDCHANNEL_STABLE=2
+G3AM_KODI_ALPHA_IUNIQUEID_STABLE=1699146942
+G3AM_KODI_CHANNEL_COUNT=2
+G3AM_KODI_SOCKET_ESTABLISHED=YES
+G3AM_KODI_NO_RECONNECT_EXHAUSTIVE_PROOF=NO
+G3AM_PVR_CHURN_MATRIX=PENDING
+G3AM_CORELEC_BINARY_BUILD=PENDING
+```
