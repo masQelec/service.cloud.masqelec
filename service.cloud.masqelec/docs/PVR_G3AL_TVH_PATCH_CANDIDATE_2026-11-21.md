@@ -45,14 +45,13 @@ Desde `/home/ubuntu/GitHub/service.cloud.masqelec`:
 git pull --ff-only origin develop
 
 # No utilizar el árbol del addon para el checkout upstream.
-mkdir -p /home/ubuntu/GitHub/service.cloud.masqelec/_lab_upstream
-cd /home/ubuntu/GitHub/service.cloud.masqelec/_lab_upstream
+cd /home/ubuntu
 
-if [ ! -d tvheadend-8837853a6/.git ]; then
-  git clone --filter=blob:none https://github.com/tvheadend/tvheadend.git tvheadend-8837853a6
+if [ ! -d tvheadend-g3al-upstream/.git ]; then
+  git clone --filter=blob:none https://github.com/tvheadend/tvheadend.git tvheadend-g3al-upstream
 fi
-cd tvheadend-8837853a6
-git fetch origin 8837853a6
+cd tvheadend-g3al-upstream
+git fetch --filter=blob:none origin
 git checkout --detach 8837853a6
 
 git status --short
