@@ -621,3 +621,25 @@ Las cuatro huellas **son distintas**. Por tanto, las líneas normalizadas no era
 `G3AD_RENAME_DIVERGENCE_REPRODUCED=YES`
 
 Preservar el estado TVH `G3AB Alpha Renamed` / Kodi `G3AB Alpha` hasta preparar experimento instrumentado. No reiniciar PVR/bouquet ni tocar SQLite/master. Para generar nuevo evento HTSP, habrá que volver a baseline o realizar una transición de nombre controlada **después de iniciar la captura**; evitar deducir que una suscripción HTSP nueva tiene acceso a eventos históricos.
+
+
+## G3-AF: enlace HTSP Kodi–TVH confirmado con ss (operador, 2026-11-21)
+
+El operador ejecutó `sudo ss -tnp '( dport = :19992 or sport = :19992 )'` y aportó:
+
+```text
+ESTAB 0 0 127.0.0.1:19992 127.0.0.1:46266 users:(("docker-proxy",pid=177108,fd=12))
+ESTAB 0 0 127.0.0.1:46266 127.0.0.1:19992 users:(("kodi.bin",pid=187296,fd=30))
+```
+
+Conexión HTSP TCP establecida entre proceso `kodi.bin` Ubuntu (PID 187296) y el puerto 19992 publicado por Docker TVH. Las colas Recv-Q/Send-Q eran cero en ese instante. **No demuestra recepción ni procesamiento de `channelUpdate`**: solo conexión transportando HTSP potencial. La solicitud anterior incluía `command -v tcpdump`, `tshark` y `ss`, pero el operador solo compartió salida de `ss`; por tanto **`tcpdump`/`tshark` no están aún confirmados instalados**. No inventar.
+
+`G3AF_HTSP_KODI_TCP_ESTABLISHED=YES`
+`G3AF_HTSP_CLIENT_PID_AT_OBSERVATION=187296`
+`G3AF_HTSP_DOCKER_PROXY_PID_AT_OBSERVATION=177108`
+`G3AF_TCPDUMP_AVAILABLE=UNKNOWN`
+`G3AF_TSHARK_AVAILABLE=UNKNOWN`
+`G3AF_HTSP_CHANNELUPDATE_CAPTURED=NO`
+`G3AF_PVR_NATIVE_TRIGGER_OBSERVED=NO`
+
+Próxima prueba condicionada: confirmar capturador disponible, **iniciar captura limitada a loopback y puerto 19992 antes de cambiar M3U**, después producir transición controlada `rename → restored` (sin cambiar URL), leer PCAP **localmente** para buscar `channelUpdate` y `channelName` en payload HTSP decodificado, no inferir evento por bytes TCP. Tener en cuenta que HTSP puede transportar autenticación y datos sensibles; no subir PCAP/log bruto a GitHub/chat, no compartir secretos. Si no hay programa instalado, buscar alternativa de solo lectura en laboratorio; no tocar master. Antes de nueva transición revalidar TVH `G3AB Alpha Renamed` y Kodi `G3AB Alpha`; no reiniciar ni alternar bouquet.
