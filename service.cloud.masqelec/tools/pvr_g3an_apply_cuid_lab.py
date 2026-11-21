@@ -101,6 +101,12 @@ g3an_preflight(iptv_network_t *in, htsmsg_t *items)
           tvherror(LS_IPTV, "G3-AN duplicate CUID, refusing playlist");
           return -1;
         }
+        if (other_cuid &&
+            (url = htsmsg_get_str(item, "m3u-url")) &&
+            strcmp(url, htsmsg_get_str(other, "m3u-url") ?: "") == 0) {
+          tvherror(LS_IPTV, "G3-AN duplicated URL with distinct CUID");
+          return -1;
+        }
       }
       matches = 0;
       legacy = 0;
