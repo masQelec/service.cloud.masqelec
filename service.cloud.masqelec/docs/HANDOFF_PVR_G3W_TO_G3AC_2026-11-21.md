@@ -1024,3 +1024,63 @@ sudo python3 ../../tools/pvr_g3ah_htsp_pcap.py runtime/htsp_capture/g3af_playbac
 ```
 
 **Gates**: `G3AH_TESTS_UBUNTU=PENDING`, `G3AH_RENAME_PARSED=PENDING`, `G3AH_PLAYBACK_PARSED=PENDING`, `G3AH_HTSP_NEW_SESSION_CHANNELADD_VALIDATED=UNPROVEN`. Si el decoder reporta huecos/frames inválidos, detener inferencias y depurar parsing, no declarar ausencia de evento. No subir PCAP ni imprimir payload. No modificar SQLite, IPTV producción, PVR nativo ni master CoreELEC.
+
+
+## G3-AH: gate Ubuntu PASS, validación de mensajes HTSP y diagnóstico fuente TVH (2026-11-21)
+
+**Ejecución del operador:**
+
+```text
+Ran 12 tests in 0.003s
+OK
+
+RENAME:
+G3AH=OFFLINE_OBSERVATION
+TCP_PACKETS=32
+TCP_PAYLOAD_PACKETS=0
+SYN_PACKETS=0
+MIDSTREAM_PACKETS=32
+G3AH_AUTH_CONTENT_PRINTED=NO
+G3AH_HTSP_RECEIVED_BY_PVR_PROVEN=NO
+
+PLAYBACK:
+G3AH=OFFLINE_OBSERVATION
+TCP_PACKETS=1501
+TCP_PAYLOAD_PACKETS=1024
+SYN_PACKETS=4
+MIDSTREAM_PACKETS=455
+SESSION client_to_server:40098 frames=7 invalid=0 gap=False events={}
+SESSION client_to_server:49262 frames=7 invalid=0 gap=False events={}
+SESSION server_to_client:40098 frames=434 invalid=0 gap=False events={
+ channelAdd:2,channelAdd_with_id:2,channelAdd_with_name:2,
+ initialSyncCompleted:1,subscriptionStart:1,tagAdd:2,tagUpdate:2}
+SESSION server_to_client:49262 frames=668 invalid=0 gap=False events={
+ channelAdd:2,channelAdd_with_id:2,channelAdd_with_name:2,
+ initialSyncCompleted:1,subscriptionStart:1,tagAdd:2,tagUpdate:2}
+G3AH_AUTH_CONTENT_PRINTED=NO
+G3AH_HTSP_RECEIVED_BY_PVR_PROVEN=NO
+```
+
+**GATE G3-AH PASS en laboratorio:** 12/12 tests, reconstrucción HTSP válida (0 frames inválidos, 0 gaps en sesiones nuevas), y **dos sincronizaciones iniciales completas** en conexiones servidor→Kodi 49262/40098. Cada una entregó dos `channelAdd` con `channelName` y `channelId` más `initialSyncCompleted`. Kodi previamente confirmó nombre nuevo e IDs locales estables. `G3AH_HTSP_RECEIVED_BY_PVR_PROVEN=NO` es conservador: el PCAP prueba **envío de TVH sobre socket**, no procesamiento interno exacto de Kodi. La captura rename muestra 32 paquetes sin payload (lectura anterior tcpdump indicó 28; diferencia de conteo no explicada), cero SYN, todo midstream; no inferir frames en ella.
+
+**Auditoría upstream TVH master realizada tras ese PASS**:
+- `src/channels.c` `channel_class_changed` llama `htsp_channel_update(ch)`.
+- `src/channels.c` `channel_set_name` modifica directamente `ch->ch_name` y devuelve indicador; `channel_rename_and_save` llama `idnode_changed(&ch->ch_id)` si cambia, activando ruta de canal.
+- `src/htsp_server.c` `htsp_channel_update` emite `channelUpdate` a conexiones async con acceso, construido en `_htsp_channel_update`.
+- `src/input/mpegts/iptv/iptv_auto.c` `iptv_auto_network_process_m3u_item`, **en la rama de mux IPTV ya existente**, compara `im->mm_iptv_svcname` con el nuevo nombre M3U, lo sustituye, pone `change=1` y al final llama **`idnode_notify_changed(&im->mm_id)`**; no llama directamente `idnode_changed(&ch->ch_id)` ni `htsp_channel_update(ch)` en esta función.
+- **Hipótesis de causa concreta, ahora sustentada por fuente**: el renombrado automático se propaga a metadatos de mux/servicio y queda visible por API de canales TVH (nombre efectivo puede derivar de servicio), pero esa vía no provoca una notificación HTSP de canal sobre sesión existente. Todavía falta comprobar la versión exacta del contenedor TVH del lab y callbacks indirectos en `idnode_notify_changed`/servicio, así como campo `ch_name` explícito vs fallback `service_get_channel_name`. No declarar causa definitiva hasta contrastar fuente exacta/ensayo controlado.
+
+**Referencias**:
+https://github.com/tvheadend/tvheadend/blob/master/src/channels.c
+https://github.com/tvheadend/tvheadend/blob/master/src/htsp_server.c
+https://github.com/tvheadend/tvheadend/blob/master/src/input/mpegts/iptv/iptv_auto.c
+
+**Próximo gate G3-AI**: verificar versión/source TVH de Docker lab, correlacionar los callbacks del canal y cambios por M3U de playlist con ruta `idnode_notify_changed`, y diseñar activación mínima y segura del evento de canal para laboratorio (solo si API soporta escritura exacta e idempotente sin borrar/recrear servicios; mejor corregir origen TVH que reiniciar pvr.hts). No tocar master CoreELEC, SQLite, bouquet protegido ni producción.
+
+`G3AH_UBUNTU_TESTS=12_12_PASS`
+`G3AH_NEW_HTSP_SYNC_49262=VALID_CHANNELADD_2_INITIALSYNCCOMPLETED_1`
+`G3AH_NEW_HTSP_SYNC_40098=VALID_CHANNELADD_2_INITIALSYNCCOMPLETED_1`
+`G3AH_CAPTURE_INVALID_FRAMES=0`
+`G3AH_CAPTURE_GAPS_NEW_SESSIONS=0`
+`G3AH_ROOT_CAUSE_UPSTREAM=STRONG_HYPOTHESIS_NOT_FINAL`
+`G3AH_PRODUCTION_CHANGES=NO`
