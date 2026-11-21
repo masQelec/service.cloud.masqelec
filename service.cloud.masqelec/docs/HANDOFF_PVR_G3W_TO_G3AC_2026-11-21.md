@@ -643,3 +643,23 @@ Conexión HTSP TCP establecida entre proceso `kodi.bin` Ubuntu (PID 187296) y el
 `G3AF_PVR_NATIVE_TRIGGER_OBSERVED=NO`
 
 Próxima prueba condicionada: confirmar capturador disponible, **iniciar captura limitada a loopback y puerto 19992 antes de cambiar M3U**, después producir transición controlada `rename → restored` (sin cambiar URL), leer PCAP **localmente** para buscar `channelUpdate` y `channelName` en payload HTSP decodificado, no inferir evento por bytes TCP. Tener en cuenta que HTSP puede transportar autenticación y datos sensibles; no subir PCAP/log bruto a GitHub/chat, no compartir secretos. Si no hay programa instalado, buscar alternativa de solo lectura en laboratorio; no tocar master. Antes de nueva transición revalidar TVH `G3AB Alpha Renamed` y Kodi `G3AB Alpha`; no reiniciar ni alternar bouquet.
+
+
+## G3-AF: tcpdump disponible, tshark no disponible; ensayo de captura HTSP limitado
+
+El operador confirmó:
+
+```text
+tcpdump=DISPONIBLE
+tshark=NO_DISPONIBLE
+```
+
+Se preparó procedimiento de captura pasiva exclusivamente en laboratorio G3-AB; **no se ha ejecutado aún**. Crear directorio de captura privada (umask 077) en `lab/pvr_g3ab/runtime` (ignorado por Git), ejecutar `sudo timeout 180 tcpdump -i lo -s 0 -U -w <pcap> 'tcp and port 19992'` antes de aplicar un cambio de nombre. La captura sin filtro adicional puede incluir cualquier cliente conectado al puerto HTSP G3-AB; comprobar `ss` antes, no subir archivo. La posible presencia de mensajes de autenticación obliga a no imprimir ni distribuir payload o pcap, analizar solo índices/indicadores.
+
+Para generar un nuevo evento con el estado actual TVH `G3AB Alpha Renamed` y Kodi `G3AB Alpha`, restaurar **únicamente nombre** con `python3 prepare.py restored` (etapa original, URL original ya restaurada); comprobar que M3U URL original antes del ensayo. Esta transición debe comenzar **después de la captura**. Observar TVH y Kodi sin reiniciar PVR ni alternar bouquet y con IDs registrados. El simple conteo de cadenas `channelUpdate` o `channelName` en `tcpdump -A` es un **indicio**, no una decodificación completa HTSP ni garantía de recepción/procesamiento por `pvr.hts` (la carga puede estar fragmentada o codificada). La ausencia de cadena tampoco prueba ausencia del evento. Para atribuir evento se necesitará decodificación HTSP con TCP reensamblado, dirección servidor→cliente y estructura de mapa confirmada.
+
+`G3AF_TCPDUMP_AVAILABLE=YES`
+`G3AF_TSHARK_AVAILABLE=NO`
+`G3AF_CAPTURE_EXECUTED=NO`
+`G3AF_CHANNELUPDATE_OBSERVED=NO`
+`G3AF_CAPTURE_REQUIRES_OPERATOR_ACTION=YES`
