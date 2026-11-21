@@ -80,3 +80,33 @@ echo "G3AL_PATCH_APPLY_CHECK=PASS"
 - Es una modificación de Tvheadend, no del addon. Necesitaría distribución, mantenimiento y actualización de un binario diferente para usuarios de masQelec.
 - No inferir que CUID M3U equivale a identificador Tvheadend/Kodi.
 - La actualización de nombre no valida aún la gestión integral del mantenimiento PVR (eliminación, cambio de URL, orden y grupos). La transición completa no está autorizada.
+
+## G3-AL: `git apply --check` confirmado por operador; siguiente compilación aislada (21/11/2026)
+
+El operador ejecutó checkout fuente exacto separado `/home/ubuntu/tvheadend-g3al-upstream`, obtuvo:
+```text
+HEAD está ahora en 8837853a debian: enable IPv6 under systemd as well
+8837853a6
+G3AL_PATCH_APPLY_CHECK=PASS
+```
+No informó modificaciones al checkout upstream ni al contenedor de laboratorio. El echo PASS siguió a `git apply --check`; la orden anterior no imprimió error. Gates: `G3AL_UPSTREAM_CHECKOUT=8837853a6`, `G3AL_GIT_APPLY_CHECK_UBUNTU=PASS`, `G3AL_PATCH_APPLIED_TO_CHECKOUT=NO_BEFORE_NEXT_GATE`, `G3AL_COMPILE=PENDING`.
+
+En la fuente original `Dockerfile` del commit `8837853a6` existen builder y runner Alpine. El builder ejecuta `./configure` con `--disable-ffmpeg_static --disable-libav --disable-doc` y `make install` con dependencias de compilación; el runner utiliza biblioteca/ABI de Alpine, **no debe sustituirse directamente un binario sobre el contenedor LinuxServer del lab sin confirmar compatibilidad de ABI y configuración**. Si se prueba build, preferir imagen Docker separada con tag propio, sin pasar `--build` sobre servicio TVH activo y sin reusar sus volúmenes.
+
+Siguiente gate limitado a compilación de **copia de código**:
+```bash
+cd /home/ubuntu/tvheadend-g3al-upstream
+test "$(git rev-parse HEAD)" = "$(git rev-parse 8837853a6)" || exit 2
+test -z "$(git status --porcelain)" || { echo "BLOCKED_DIRTY_UPSTREAM"; exit 2; }
+git apply /home/ubuntu/GitHub/service.cloud.masqelec/service.cloud.masqelec/lab/pvr_g3ab/patches/tvheadend-8837853a6-g3al-channel-notify.patch
+git diff --check
+./configure --disable-ffmpeg_static --disable-libav --disable-doc
+make -j2
+```
+No ejecutar `make install` en host, no lanzar servidor ni reiniciar contenedores. Si `./configure` falla por dependencias del host, **no instalar paquetes automáticamente**: capturar el mensaje concreto, preparar builder Docker aislado si procede. Los comandos `git apply` modifican solo `/home/ubuntu/tvheadend-g3al-upstream`, un checkout aparte. `make -j2` limita concurrencia y puede ocupar recursos del host; no confundir éxito de configure con binario funcional.
+
+**Observación de riesgo**: validar la compilación incluye comprobar declaraciones de tipos de `mpegts_service_t`, `htsp_channel_update`, `idnode_list_mapping_t` y el acceso a `in->in_url`. Si compila, realizar diff de símbolos y posteriormente montar ensayo de contenedor alternativo respaldado; todavía no autorizado despliegue producción.
+
+`G3AL_COMPILE=NOT_YET_EXECUTED`
+`G3AL_CONTAINER_SWAPPED=NO`
+`G3AL_RELEASE_AUTHORIZED=NO`
