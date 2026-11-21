@@ -631,3 +631,31 @@ G3AN_PATCH_HOST=NOT_APPLIED
 G3AN_NEW_BINARY=NOT_BUILT
 G3AM_GUI_REPAIRED=NOT_VERIFIED
 ```
+
+## G3-AN — compilación completada, fallo de GUI persistente (22/11/2026)
+
+Salida del operador:
+```text
+SHA256(build.linux/tvheadend)=f02a8858a0fe304b8a7fb5da78db7b4cd16dc354fad7327c4dbb49afc8bd61e5
+VERSION=4.3-2897~g8837853a-dirty
+G3AM_TVH=Up 5 seconds
+G3AN_HTTP=200
+G3AN_BUILD_AND_BOOT=COMPLETED
+BROWSER typeof tvheadend.caclient=undefined
+BROWSER configuration=false
+BROWSER status=false
+BROWSER admin=1
+```
+
+El parche G3-AN no pasó el gate de GUI. ExtensionMessagingService.js puede ser una extensión ajena, sin prueba de relación con TVH.
+
+En Makefile.webui upstream, el artefacto src/webui/static/tvh.js.gz depende de JAVASCRIPT_SRC, pero no directamente del propio Makefile.webui. Al cambiar solo lista de fuentes por flags, Make puede reutilizar un artefacto comprimido previo si no detecta el cambio; también cabe caché navegador. Siguiente diagnóstico, sin mutaciones: revisar cinco CONFIG_* CA en .config.mk; comprobar que el Makefile.webui parcheado incluye nuevos flags; comprobar generado src/webui/static/tvh.js.gz mediante gzip -cd con Python leyendo bytes y buscando tvheadend.caclient; revisar make -n -f Makefile.webui WEBUI=std sobre target exacto. Solo después forzar regeneración dirigida del bundle JS y, si procede, volver a abrir en sesión de navegador limpia.
+
+```text
+G3AN_NEW_BINARY_SHA256=f02a8858a0fe304b8a7fb5da78db7b4cd16dc354fad7327c4dbb49afc8bd61e5
+G3AN_WEBUI_CACLIENT=UNDEFINED
+G3AN_GUI_CONFIG_STATUS=FALSE
+G3AN_BUILD_GATE=PASS
+G3AN_GUI_GATE=FAIL
+G3AN_COMPRESSED_JS_REGENERATED=UNKNOWN
+```
