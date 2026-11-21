@@ -1079,3 +1079,20 @@ G3AM_KODI_IDENTITY_STILL_STABLE=YES
 G3AM_TVH_BASELINE_REFRESH_STATUS=UNKNOWN
 G3AM_KODI_LIVE_BASELINE_DIAGNOSTIC=PENDING
 ```
+
+## G3-AM — Kodi live reverse baseline PASS (22/11/2026)
+
+El operador confirma salida del polling de solo lectura tras `prepare.py baseline`, con Kodi ya arrancado y cliente PVR activo:
+
+```text
+T=0s TVH='G3AM Alpha' TVH_COUNT=2 KODI='G3AM Alpha' KODI_COUNT=2 KODI_ID=2
+G3AM_KODI_LIVE_BASELINE=PASS
+```
+
+La primera muestra previa había observado todavía `G3AM Alpha Renamed` en Kodi; posteriormente TVH y Kodi convergieron al nombre `G3AM Alpha` sin reiniciar Kodi según secuencia del operador. Se conserva `idChannel=2`, cantidad de canales=2; el `iUniqueId=1699146942` ya estaba demostrado en snapshot anterior y el script de polling seleccionó el registro por esa identidad. No declarar ausencia de reconexión como hecho hasta captura o socket corroborado. Próxima etapa: `prepare.py rename`, esperar sincronización, comparar BD Kodi read-only con registros esperados Beta (idChannel 1,iUniqueId 1473024293) y Alpha Renamed (idChannel 2,iUniqueId 1699146942), UUID TVH y no duplicados; registrar estabilidad del socket y logs.
+
+```text
+G3AM_KODI_LIVE_BASELINE=PASS
+G3AM_KODI_LIVE_RENAME_RETURN=PENDING
+G3AM_KODI_NO_RECONNECT_PROOF=PENDING
+```
