@@ -483,3 +483,24 @@ SERVICIO_UUID_NUEVO_PRESENTE: False
 **Interpretación estricta:** TVH informó una suscripción activa nominalmente para Alpha. La búsqueda de cadena UUID nuevo `5a6962a3ab51cfec0c933f6cc7eda030` dentro de `str(entry)` fue falsa, pero eso **no demuestra uso del servicio antiguo**: la propiedad `service` puede ser etiqueta textual en lugar de UUID. Tampoco se observaron valores de transferencia `in/out/total_in/total_out`, `state` o `errors`, por lo que reproducción de datos aún no acreditada. El TS sintético tiene 12 s, por lo que la ventana de medición es corta.
 
 `G3AB_URL_KODI_TVH_SUBSCRIPTION=OBSERVED_1`; `G3AB_URL_STATUS_CHANNEL=ALPHA`; `G3AB_URL_SERVICE_UUID_MATCH=NOT_AVAILABLE_FROM_CURRENT_FIELDS`; `G3AB_URL_STREAM_BYTES=NOT_YET_CHECKED`; `G3AB_URL_KODI_PLAYBACK=NOT_YET_VERIFIED`. Próximo diagnóstico de solo lectura: observar campo `service` como tipo/igualdad con nombre de servicio sintético y contadores de bytes/estado/errores, sin credenciales ni IPs. No sacar conclusión causal por ausencia de UUID en estado.
+
+
+## G3-AB URL: TVH registra reproducción de Alpha con tráfico y cero errores (2026-11-21)
+
+El operador consultó `GET /api/status/subscriptions` durante la reproducción de G3AB Alpha:
+
+```text
+CANAL: G3AB Alpha
+TIPO_SERVICIO: str
+SERVICIO: IPTV #1/IPTV LOCAL/playlist.m3u - G3AB Alpha/G3AB Signal 1
+ESTADO: Running
+ERRORES: 0
+ENTRADA: 128404
+SALIDA: 115971
+TOTAL_ENTRADA: 965192
+TOTAL_SALIDA: 881587
+```
+
+El estado de suscripción `Running`, el contador de errores `0` y contadores no nulos de tráfico acreditan flujo servido desde TVH al cliente mientras la suscripción está activa. La propiedad `service` es una descripción `str`, no contiene UUID; por tanto este endpoint **no prueba directamente** igualdad con UUID del nuevo servicio. La relación de inventario del canal Alpha con nuevo servicio/mux y URL alternativa **sí** se verificó previamente por API GET. La salida no acredita aún que el usuario haya observado vídeo y audio en pantalla Kodi.
+
+`G3AB_URL_ALPHA_TVH_SUBSCRIPTION_RUNNING=PASS`; `G3AB_URL_ALPHA_TVH_SUBSCRIPTION_ERRORS=0`; `G3AB_URL_ALPHA_TVH_STREAM_BYTES=OBSERVED_NONZERO`; `G3AB_URL_KODI_CHANNELID_AFTER_REFRESH=2`; `G3AB_URL_AV_PLAYBACK_ON_SCREEN=UNCONFIRMED`. Conclusión: evidencia sólida de entrega del TS de laboratorio tras actualización de URL, sin atribución causal al atributo CUID, y con regeneración de UUIDs TVH. Próxima prioridad: investigar mecanismo de refresco en caliente de `pvr.hts` y eventos HTSP, conservar PVR/Kodi IDs, no modificar SQLite ni master; documentar reproducción audiovisual si operador la confirma.
