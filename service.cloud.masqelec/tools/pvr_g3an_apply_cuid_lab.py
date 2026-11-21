@@ -134,6 +134,17 @@ g3an_preflight(iptv_network_t *in, htsmsg_t *items)
           return -1;
         }
       }
+    } else {
+      /* Losing a previously assigned CUID must not silently recreate a mux. */
+      url = htsmsg_get_str(item, "m3u-url");
+      if (url) LIST_FOREACH(mm, &in->mn_muxes, mm_network_link) {
+        im = (iptv_mux_t *)mm;
+        if (im->mm_iptv_cuid &&
+            strcmp(im->mm_iptv_url_sane ?: (im->mm_iptv_url ?: ""), url) == 0) {
+          tvherror(LS_IPTV, "G3-AN missing CUID for established mux");
+          return -1;
+        }
+      }
     }
   }
   return 0;
