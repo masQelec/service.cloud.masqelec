@@ -547,3 +547,31 @@ LOG_LAST_MODIFIED: 1795284638.4809587
 El script cuenta coincidencias de expresiones regulares, **no** comprueba si las 4 líneas son incidentes durante la ventana G3-AD ni si el log tiene suficiente granularidad para instrumentar HTSP. El conteo de cero no demuestra que el servidor dejara de emitir `channelUpdate`, ni que el cliente dejara de procesarlo. No se ha revisado todavía el texto de esas 4 líneas, que puede contener URLs/credenciales. El fichero sí existe. `G3AE_KODI_LOG_LINES=629`; `G3AE_CHANNELUPDATE_LITERAL_COUNT=0`; `G3AE_PVR_ERRORS_REGEX_MATCHES=4_UNCLASSIFIED`; `G3AE_HTSP_EVENT_DELIVERY=NOT_MEASURED`; `G3AE_ROOT_CAUSE=UNKNOWN`.
 
 **Siguiente acción de mínimo riesgo**: diagnóstico de líneas de error con sanitización local de direcciones, credenciales y tokens, devolviendo tipo/nivel/posición temporal y mensaje redactado. Verificar si los incidentes son históricos y, si la telemetría es insuficiente, diseñar observación HTSP de laboratorio separada, sin tocar `pvr.hts` en master ni reiniciar bouquet/PVR. Evitar publicación de logs brutos.
+
+
+## G3-AE: cuatro líneas FAILED clasificadas por hora (operador, 2026-11-21)
+
+El operador realizó el diagnóstico local del `kodi.log` (sin mostrar los mensajes):
+
+```text
+LOG_MODIFICADO: 2026-11-21T19:10:38.480959
+LINEA: 224
+FECHA_LOG: 2026-11-21 12:07:56
+CATEGORIAS: FAILED
+---
+LINEA: 296
+FECHA_LOG: 2026-11-21 12:09:57
+CATEGORIAS: FAILED
+---
+LINEA: 363
+FECHA_LOG: 2026-11-21 18:27:59
+CATEGORIAS: FAILED
+---
+LINEA: 446
+FECHA_LOG: 2026-11-21 18:29:20
+CATEGORIAS: FAILED
+```
+
+Estas cuatro líneas satisfacen la regex `(pvr|htsp).*(error|failed|disconnect|reconnect)` y contienen `failed`; **no** tenemos el mensaje ni la causa, ni sabemos si se refieren a `channelUpdate`, reconexión, HTTP o reproducción. Es posible que algunas correspondan a ensayos anteriores. La marca de modificación del log a las 19:10:38 no data por sí sola el instante del fallo de refresco. En particular no concluir causalidad por cercanía temporal hasta confrontar la cronología del renombrado. `G3AE_PVR_FAILED_LINES=4`, `G3AE_FAILED_ACTIONS=UNKNOWN`, `G3AE_HTSP_EMISSION_CAPTURE=NOT_DONE`, `G3AE_ROOT_CAUSE=UNKNOWN`.
+
+Próximo diagnóstico: obtener solamente los tipos y palabras clave de error con sanitización o inspección local de líneas 224,296,363,446 sin publicar URLs, tokens, contraseñas, IPs o datos de producción. Mantener el estado TVH Alpha Renamed / Kodi Alpha, sin reinicios ni alternancia bouquet; si los mensajes no corresponden a eventos, pasar a instrumentación HTSP aislada.
