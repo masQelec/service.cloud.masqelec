@@ -729,3 +729,31 @@ TVH aplicó el estado `restored` (nombre Alpha original), conservó los dos UUID
 `G3AF_KODI_UPDATED_BECAUSE_OF_RESTORE=NOT_PROVEN`
 `G3AF_PCAP_HTSP_PAYLOAD_PACKETS=0`
 `G3AF_HTSP_CHANNELUPDATE_EMITTED=NOT_MEASURED`
+
+
+## G3-AF: segundo ensayo rename, TVH cambió pero PCAP no capturó payload (21/11/2026)
+
+El operador ejecutó `python3 prepare.py rename` y verificó la transición del backend mediante API GET:
+
+```text
+G3AB_STAGE=RENAME
+G3AB_CUID_COUNT=2
+G3AB_MASTER_UNTOUCHED=YES
+G3AB_G3W_UNTOUCHED=YES
+TVH antes: G3AB Alpha dba29285ca808eb6486d364f994b05db
+TVH después: G3AB Alpha Renamed dba29285ca808eb6486d364f994b05db
+TVH Beta: G3AB Beta 3bf90ae8eb828a6e4961902724a1f380
+PAQUETES_TOTAL: 12
+PAQUETES_CON_DATOS: 0
+```
+
+El archivo de captura fue `runtime/htsp_capture/g3af_rename.pcap`; el comando `tcpdump -nn -r` + awk encontró 12 paquetes y ninguno con `length > 0`. Esto **no demuestra que el servidor haya emitido o dejado de emitir `channelUpdate`** porque no se han aportado marcas temporales de inicio/fin de tcpdump, ni la hora precisa de aplicación TVH, ni prueba de conexión HTSP activa durante el cambio. **Tampoco se sabe aún si Kodi conserva el nombre antiguo en esta segunda transición** (la observación G3-AD anterior sí demostró esa divergencia). El snapshot de TVH demuestra rename con UUID conservados para Alpha y Beta.
+
+Hay dos capturas con solo ACKs y ningún payload observadas en dos transiciones, lo que hace prioritaria la discriminación entre: (a) TVH no genera evento HTSP ante refetch de playlist sin cambio de UUID, (b) el capturador no coincidió con la emisión/evento o no vio tráfico de aplicación, (c) cliente no suscrito o conexión no activa. **No implementar workaround aún**. Nuevo gate: timestamps/tamaño del PCAP (tcpdump -tt -nn -r sin dump de payload), `ss -tnp` actual, y Kodi `PVR.GetChannels` actual; comparar horario de M3U y PCAP, sin revelar datos sensibles. Para la siguiente transición, lanzar captura controlada con inicio verificado, comprobar actividad de la conexión y momento de renombrado, y preferentemente instrumentar lado servidor para identificar si `htsp_channel_update` se llamó.
+`G3AF_RENAME_TVH_APPLIED=YES`
+`G3AF_RENAME_ALPHA_TVH_UUID_STABLE=YES`
+`G3AF_RENAME_BETA_TVH_UUID_STABLE=YES`
+`G3AF_SECOND_PCAP_TOTAL_PACKETS=12`
+`G3AF_SECOND_PCAP_DATA_PACKETS=0`
+`G3AF_KODI_AFTER_SECOND_RENAME=NOT_RECHECKED`
+`G3AF_HTSP_CHANNELUPDATE_EMITTED=UNPROVEN`
