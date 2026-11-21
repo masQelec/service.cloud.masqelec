@@ -556,3 +556,25 @@ G3AM_GUI_CONFIG_STATUS_TABS=MISSING
 G3AM_ACCESSUPDATE_ADMIN=UNKNOWN
 G3AM_CLIENT_JS_EXCEPTION=UNKNOWN
 ```
+
+## G3-AM — consola confirma admin=1 y construcción interrumpida (operador, 21/11/2026)
+
+Inspección navegador en `/extjs.html`:
+```text
+admin: 1
+capabilitiesLoaded: true
+configurationCreated: false
+statusCreated: false
+cometConnected: true
+```
+
+En el JavaScript exacto `src/webui/static/app/tvheadend.js:1042-1050,1102-1256`, `o.admin == true` acepta `1` por igualdad no estricta. La pestaña Configuration se asigna a `tvheadend.confpanel` **al terminar** numerosas llamadas a funciones de construcción (baseconf, imgcacheconf, satipsrvconf, acleditor, networks, etc.); si una función falta o lanza excepción, pueden aparecer EPG/DVR, pero `confpanel` y `statuspanel` quedan falsos. Se descarta como explicación suficiente `admin=false` y se prioriza excepción JS en una de esas llamadas, sin conocer aún cuál. Revisión de solo lectura en consola: enumerar **typeof sin ejecutar** de los constructores invocados en dicho bloque, revisar el primer error rojo original de consola; también comprobar HTTP de asset faltante si señala URL concreta. No cambiar --noacl ni Compose hasta identificar causa. El HTML SingleFile es snapshot ya renderizado, no demuestra error JS concreto ni la secuencia de cargas de recursos.
+
+```text
+G3AM_BROWSER_ACCESSUPDATE_ADMIN=1
+G3AM_BROWSER_CAPABILITIES_LOADED=TRUE
+G3AM_BROWSER_CONFIG_PANEL=FALSE
+G3AM_BROWSER_STATUS_PANEL=FALSE
+G3AM_BROWSER_COMET_OBJECT=TRUE
+G3AM_GUI_CAUSE=UNKNOWN_EXCEPTION_OR_MISSING_CONSTRUCTOR
+```
