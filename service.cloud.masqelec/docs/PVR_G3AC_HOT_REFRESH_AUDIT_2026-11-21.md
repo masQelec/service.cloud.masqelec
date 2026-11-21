@@ -245,3 +245,16 @@ Revisión directa de código en GitHub `develop`:
 **Conclusión sustentada**: regeneraciones UUID de Alpha/Beta ocurrieron dentro de una sesión de contenedor sin reinicio observado, y la restauración de playlist fue una sustitución atómica completa del fichero. **Hipótesis NO probada**: TVH reimportó de forma destructiva la M3U y recreó IDs debido al reemplazo atómico, a reescaneo periódico o a la configuración IPTV. Tampoco se descarta reinicio interno del proceso TVH (RestartCount Docker no equivale al contador de procesos) ni automatismos de TVH. Importante no afirmar que solo el `os.replace` causó el churn de Beta sin capturar tiempos, logs internos y configuración de la red IPTV.
 
 `G3AD_DOCKER_TVH_RESTART_COUNT=0`; `G3AD_DOCKER_STREAMS_RESTART_COUNT=0`; `G3AD_PREPARE_REWRITES_WHOLE_PLAYLIST=YES`; `G3AD_UUID_CHURN_CAUSE=NOT_PROVEN`; `G3AD_NEXT_GATE=TVH_IPTV_IMPORT_FORENSICS_READ_ONLY`. Siguiente evidencia read-only: inspeccionar en API la configuración de la red IPTV (scan/create channels/muxes/refetch/reimport), comparar inventario UUID desde dos instantes sin más escrituras y revisar únicamente contadores/tipos de eventos del contenedor. No volcar configuración con credenciales ni logs completos en chat/GitHub. Mantener `G3AD_RENAME_GATE=HOLD`, no cambiar prepare ni producción hasta clasificar causa.
+
+
+## Corrección causal G3-AD: operador intervino manualmente sobre bouquet (2026-11-21)
+
+El operador aclaró: **«lo he reinicido yo el bouquet si es eso el problema»**. Es decir, durante la secuencia de ensayos existió una operación **manual de reinicio/refresco/reconstrucción de bouquet TVH** (acción exacta de interfaz y momento concreto aún por precisar). Este dato invalida utilizar el cambio simultáneo de UUID de Alpha y Beta como prueba de que `prepare.py restored`, `os.replace`, o el refresco periódico M3U **por sí solos** regeneraron ambos canales: hay un factor de confusión conocido. Sigue demostrado que el contenedor TVH no se reinició a nivel Docker, pero eso no excluye las operaciones de bouquet. No declarar causalidad de bouquet sin medir antes/después ni confundir actualizar bouquet con borrarlo/recrearlo.
+
+`G3AD_OPERATOR_MANUAL_BOUQUET_ACTION=REPORTED`
+`G3AD_BOTH_UUID_CHURN_ATTRIBUTABLE_TO_M3U=NO_EVIDENCE`
+`G3AD_BOTH_UUID_CHURN_ATTRIBUTABLE_TO_BOUQUET=PLAUSIBLE_NOT_PROVEN`
+`G3AD_DOCKER_RESTARTS=0`
+`G3AD_HOT_RENAME_GATE=HOLD_UNTIL_STABLE_BASELINE`
+
+En un futuro ensayo de refresco caliente, **prohibir operaciones manuales de bouquet, borrado/importación de canales y reinicio PVR entre snapshots**. Primero registrar UUID TVH, ID Kodi y estado de bouquet; luego cambiar exactamente el nombre de un canal, medir actualizaciones del lado TVH y Kodi y después restaurar, con pruebas aisladas. Si el operador aclara la operación exacta (p. ej., pulsar «Refresh» frente a eliminar/recrear), documentar diferencia explícita sin inventar.
