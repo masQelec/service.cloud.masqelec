@@ -67,7 +67,7 @@ def _summary(tvh_rows, kodi_rows):
     }
 
 
-def probe(tvh_url, kodi_url, kodi_user=None, kodi_password=None):
+def probe(tvh_url, kodi_url):
     # Only the controlled lab loopback endpoints are accepted.
     if tvh_url != "http://127.0.0.1:19981" or kodi_url != "http://127.0.0.1:8080":
         raise Blocked("UNAPPROVED_ENDPOINT")
@@ -79,10 +79,6 @@ def probe(tvh_url, kodi_url, kodi_user=None, kodi_password=None):
                       "properties": ["channelnumber", "subchannelnumber"],
                       "limits": {"start": 0, "end": 20000}}}
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
-    if kodi_user is not None and kodi_password is not None:
-        import base64
-        token = base64.b64encode((kodi_user + ":" + kodi_password).encode()).decode()
-        headers["Authorization"] = "Basic " + token
     kodi = _fetch(urllib.request.Request(
         kodi_url + "/jsonrpc", data=json.dumps(rpc).encode(),
         headers=headers, method="POST"))
@@ -95,11 +91,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--tvh", default="http://127.0.0.1:19981")
     parser.add_argument("--kodi", default="http://127.0.0.1:8080")
-    parser.add_argument("--kodi-user")
-    parser.add_argument("--kodi-password")
     opts = parser.parse_args(argv)
     try:
-        result = probe(opts.tvh, opts.kodi, opts.kodi_user, opts.kodi_password)
+        result = probe(opts.tvh, opts.kodi)
     except Exception as exc:
         reason = str(exc) if type(exc) is Blocked else "API_UNAVAILABLE"
         print("G3Y=BLOCKED")
