@@ -80,3 +80,32 @@ En `src/input/mpegts/iptv/iptv_auto.c`, función `iptv_auto_network_process_m3u_
     G3AM_URL_POST_KODI_IDCHANNEL=UNKNOWN
     G3AM_PATCH_G3AL_RENAME=PASS
     G3AM_URL_IDENTITY_FIX=NOT_IMPLEMENTED
+
+## Confirmación forense final de URL (22/11/2026)
+
+Captura operador:
+
+    KODI idChannel=1 iUniqueId=1473024293 iClientId=1 sChannelName='G3AM Beta'
+    KODI idChannel=2 iUniqueId=354983035 iClientId=1 sChannelName='G3AM Alpha Renamed'
+    KODI CHANNEL_COUNT=2
+    MUX Alpha uuid=ec0791b576f077922360e490e2abc68b name='playlist.m3u - G3AM Alpha Renamed' iptv_url='http://streams/ch1.ts?g3am%5Furl%5Ftest=1' iptv_url_cmpid=same
+    MUX Beta uuid=4dc2e4d79e413d1df42cef0239e4e5ab iptv_url='http://streams/ch2.ts' cmpid=same
+    G3AM_POST_URL_FORENSICS=COMPLETED
+
+La API confirmó cambio de mux UUID (anterior de Alpha no consta en inventario previo de este documento) y ya se había comprobado cambio de servicio y canal UUID. En Kodi **idChannel=2 siguió estable**, pero **iUniqueId cambió 1699146942→354983035**. La ausencia de duplicados no compensa pérdida de identidad PVR. El guion bajo escapado como `%5F` es parte de la normalización del parser, no evidencia de identidad por sí sola.
+
+### Nueva inspección upstream exacta 8837853a6
+
+`src/misc/m3u.c:142-169` conserva atributos arbitrarios de `#EXTINF` en el `htsmsg` bajo su nombre literal. **CUID sí llega al mapa de entrada**, pero `src/input/mpegts/iptv/iptv_auto.c:93-143,223-325` nunca lo lee: localiza mux por URL de comparación, crea uno cuando cambia y borra el antiguo en `iptv_auto_network_process` (~412-435). `src/input/mpegts/iptv/iptv_mux.c:39-82` tiene setter `iptv_url_set(&im->mm_iptv_url,&im->mm_iptv_url_sane,...)` que normaliza/actualiza ambos campos; `iptv_url_cmpid` es propiedad string oculta independiente (`iptv_mux.c:154-159`). **No basta con asignar directamente `mm_iptv_url`**: actualizar coherentemente ambos valores y persistencia del mux, respetar posibles entradas activas y todo el ciclo de streaming.
+
+Diseño de cambio todavía NO implementado: identificador IPTV explícito del mux, persistente y único por red; búsqueda prioritariamente por CUID válido y no duplicado, fallback URL sin CUID; adopción/migración de mux existente sin CUID solo con mapeo inequívoco; en coincidencia CUID actualizar URL vía setter nativo y comparación, conservando mux/servicio/canal UUID; no borrar/recrear canales. Rechazar CUID duplicados/ambiguos y no alterar estado ante listas inválidas. Considerar que `CUID` es una convención de esta lista, no identificador universal o estándar de todos los proveedores. Test con URL que cambia de host, path y query; etapas de rollback, posible streaming activo y persistencia tras reinicio. Lo anterior es **diseño hipotético pendiente de revisión de ciclo de vida**; no atribuir PASS ni implementarlo precipitadamente.
+
+**Estado conservado:** playlist Alpha apunta a URL con query `g3am_url_test`, Kodi y TVH tienen nuevas identidades; no restaurar ni limpiar TVH por ahora. No comenzar altas/bajas hasta definir tratamiento de identidad estable.
+
+    G3AM_URL_CHANGE_IDENTITY=FAIL_CONFIRMED
+    G3AM_KODI_IDCHANNEL_STABLE=YES_2
+    G3AM_KODI_IUNIQUEID_CHANGED=YES
+    G3AM_URL_ROOT_CAUSE=URL_BASED_MUX_MATCH_SOURCE_VERIFIED
+    G3AM_CUID_PARSER_PROPAGATES_ATTRIBUTE=YES
+    G3AM_CUID_USED_AS_MUX_ID=NO
+    G3AM_CUID_PATCH_DESIGN=OPEN
