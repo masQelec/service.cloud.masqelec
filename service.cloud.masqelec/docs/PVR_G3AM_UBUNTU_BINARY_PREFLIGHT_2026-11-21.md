@@ -931,3 +931,25 @@ G3AM_HTSP_OBSERVER_COMMITTED=YES
 G3AM_HTSP_RENAME=NOT_TESTED
 G3AM_KODI_INTEGRATION=NOT_TESTED
 ```
+
+## G3-AM — evidencia runtime positiva de channelUpdate en HTSP persistente (22/11/2026)
+
+El operador abrió `tools/pvr_g3am_htsp_watch.py` y confirmó `G3AM_HTSP_CONNECTED=YES`, `G3AM_HTSP_INITIAL_SYNC=PASS`, `G3AM_HTSP_READY_FOR_RENAME=YES`. Inicialmente llegaron `channelAdd` con IDs HTSP Beta `1473024293`, Alpha `1699146942`. Con la conexión abierta ejecutó `g3am/prepare.py rename`, que imprimió `G3AM_STAGE=RENAME`, playlist PRIVATE_ONLY y G3AB original untouched. El observador recibió:
+
+```text
+HTSP_EVENT=channelUpdate ID=1699146942 NAME=G3AM Alpha Renamed PHASE=AFTER_SYNC
+```
+
+**Interpretación:** el parche G3-AL en runtime emite al menos un `channelUpdate` de Alpha con el **mismo channelId HTSP** que la sincronización inicial, sin reconexión del observador. Esta evidencia supera el gate de notificación en conexión persistente. Todavía no se ha recibido salida final del observador (`G3AM_HTSP_SUMMARY`), ni snapshot API post-rename demostrando UUID TVH constante y Beta intacta, ni comparación de eventos sin add/delete posteriores al initialSync. No afirmar gate completo de identidad ni éxito en Kodi.
+
+Próximo gate: API `/api/channel/grid?all=1` con conjunto exacto de UUID Alpha `beec46e5ab595d2474289e74c9ab9849`, Beta `2591ccd729867bffc24e8f4bd8b765af`, nombres Alpha Renamed/Beta y contadores finales HTSP. Luego preparar Kodi G3-AM con **nuevo perfil y directorio de datos** distintos de `runtime/kodi_home/.kodi` de G3-AB; evaluar capacidad de lanzamiento sin colisión de Kodi/puertos antes de cambios. Cuidar que el rename ya sucedió: para ensayo Kodi repetir ciclos baseline->rename con observación activa y capturar PVR.GetChannels antes/después.
+
+```text
+G3AM_PERSISTENT_HTSP_CHANNELUPDATE=PASS
+G3AM_ALPHA_HTSP_ID_INITIAL=1699146942
+G3AM_ALPHA_HTSP_ID_UPDATE=1699146942
+G3AM_ALPHA_HTSP_NAME_AFTER=G3AM Alpha Renamed
+G3AM_TVH_PERSISTENT_UUID_POST_RENAME=NOT_YET_VERIFIED
+G3AM_HTSP_POST_SYNC_NO_CHURN=NOT_YET_VERIFIED
+G3AM_KODI_PVR_SYNC=NOT_TESTED
+```
