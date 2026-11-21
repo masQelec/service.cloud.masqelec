@@ -467,3 +467,19 @@ TOTAL: 2
 **Observación:** tras el refresco manual no hay duplicados visibles y Kodi mantiene ambos `channelid` originales, a pesar de que TVH ya había sustituido canal, servicio y mux de Alpha al cambiar la URL. `G3AB_URL_KODI_AFTER_PVR_REFRESH_COUNT=2`, `G3AB_URL_KODI_AFTER_PVR_REFRESH_ALPHA_ID=2`, `G3AB_URL_KODI_AFTER_PVR_REFRESH_BETA_ID=1`. Esto **no demuestra aún** que el Kodi Alpha resuelva al nuevo backend TVH ni reproduzca desde `http://streams/ch1-alt.ts`; tampoco demuestra que CUID mantenga la identidad (TVH sustituyó el UUID).
 
 **Nuevo gate:** abrir Alpha G3-AB desde GUI Kodi de laboratorio, comprobar la reproducción audiovisual y observar por GET `/api/status/subscriptions` del TVH G3-AB durante la sesión para relacionar servicio/mux nuevo con el canal reproducido. Si el status no incluye identificador explícito de servicio, limitar la conclusión a observación audiovisual y no inferir un vínculo UUID. Evitar invocar un comando de reproducción JSON-RPC sin prueba de disponibilidad y no alterar TVxx.db ni servicios. Cuidar duración del TS sintético (12 s) y errores EPG/imagecache ajenos. No emplear en master.
+
+
+## G3-AB URL: suscripción Kodi→TVH Alpha observada, service UUID no aparece (2026-11-21)
+
+El operador reprodujo `G3AB Alpha` desde el Kodi G3-AB y consultó `GET /api/status/subscriptions`:
+
+```text
+SUSCRIPCIONES_ACTIVAS: 1
+CAMPOS_DISPONIBLES: ['channel', 'client', 'errors', 'hostname', 'id', 'in', 'out', 'pids', 'profile', 'service', 'start', 'state', 'title', 'total_in', 'total_out', 'username']
+CANAL: G3AB Alpha
+SERVICIO_UUID_NUEVO_PRESENTE: False
+```
+
+**Interpretación estricta:** TVH informó una suscripción activa nominalmente para Alpha. La búsqueda de cadena UUID nuevo `5a6962a3ab51cfec0c933f6cc7eda030` dentro de `str(entry)` fue falsa, pero eso **no demuestra uso del servicio antiguo**: la propiedad `service` puede ser etiqueta textual en lugar de UUID. Tampoco se observaron valores de transferencia `in/out/total_in/total_out`, `state` o `errors`, por lo que reproducción de datos aún no acreditada. El TS sintético tiene 12 s, por lo que la ventana de medición es corta.
+
+`G3AB_URL_KODI_TVH_SUBSCRIPTION=OBSERVED_1`; `G3AB_URL_STATUS_CHANNEL=ALPHA`; `G3AB_URL_SERVICE_UUID_MATCH=NOT_AVAILABLE_FROM_CURRENT_FIELDS`; `G3AB_URL_STREAM_BYTES=NOT_YET_CHECKED`; `G3AB_URL_KODI_PLAYBACK=NOT_YET_VERIFIED`. Próximo diagnóstico de solo lectura: observar campo `service` como tipo/igualdad con nombre de servicio sintético y contadores de bytes/estado/errores, sin credenciales ni IPs. No sacar conclusión causal por ausencia de UUID en estado.
