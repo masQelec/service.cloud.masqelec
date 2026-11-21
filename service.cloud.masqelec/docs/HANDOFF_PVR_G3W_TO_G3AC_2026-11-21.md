@@ -317,3 +317,46 @@ El último valor `CAMPOS_CONFIG` aparece **truncado** en el mensaje; no inferir 
 `G3AD_NEXT_GATE=CONTROLLED_RENAME_HOT_REFRESH_ON_STABLE_INVENTORY`
 
 Para ensayo controlado: no volver a alternar bouquet ni reiniciar PVR entre snapshots; verificar primero 2 canales TVH y Kodi, documentar ID/UUID actuales **sin exigir identidades antiguas 2/1**, después cambiar únicamente nombre sobre URL original y observar durante más de un período de `refetch` estable. No usar `PVR.GetChannels` como evidencia de `channelUpdate` emitido: hace falta instrumentación del cliente o captura HTSP aparte.
+
+
+## G3-AD: tres observaciones convergidas y reparación del gate de identidad fijo
+
+El operador ejecutó `tools/pvr_g3ac_observe.py --samples 3 --interval 10` tras la alternancia manual del bouquet. En **cada una de las tres muestras**:
+
+```text
+STATUS="OBSERVED_ONLY"
+TVH_COUNT=2
+KODI_COUNT=2
+NAMES_MATCH=true
+ID_PRESERVED=false
+TVH_NAMES=["G3AB Alpha", "G3AB Beta"]
+KODI_NAMES=["G3AB Alpha", "G3AB Beta"]
+HTSP_EVENT_SEEN="NOT_MEASURED"
+KODI_TRIGGER_SEEN="NOT_MEASURED"
+CUID_MAPPING_PROVEN=false
+SQLITE_TOUCHED=false
+```
+
+`ID_PRESERVED=false` aquí **no medía estabilidad entre muestras**: era una comparación incorrectamente anclada a Kodi Alpha=2/Beta=1 en código anterior. El último inventario JSON-RPC medido fue Alpha=3/Beta=2; los nombres TVH/Kodi sí coinciden en los tres snapshots, pero el observador antiguo **no imprimía los IDs ni UUID en cada lectura**, por lo que su constancia durante esos 30 s **no quedó demostrada**.
+
+**Corrección en rama develop**: `tools/pvr_g3ac_observe.py` ahora captura mapeos por nombre `tvh_uuids_by_name` y `kodi_ids_by_name`, sin IDs fijos; el primer muestreo establece baseline por ejecución, los siguientes generan `TVH_UUIDS_STABLE_SINCE_SAMPLE1` y `KODI_IDS_STABLE_SINCE_SAMPLE1`; devuelve código 2 si cambian. Verifica dos nombres únicos de prefijo sintético G3AB, dos UUID TVH únicos y dos channelid Kodi enteros únicos; rechaza errores JSON-RPC, inventario erróneo y fuente inesperada. El observador **no** captura HTSP ni decide si `CUID` mapea TVH. El estado `STATUS=OBSERVED_ONLY` es lectura, nunca éxito del refresco en caliente. `tests/test_pvr_g3ac_observe.py` se amplió de 9 a **17 pruebas sintéticas**, **pendientes de ejecución Ubuntu**.
+
+**Limitación a considerar**: comparar mapeos por nombre hace que un renombrado real cambie la clave del mapa y dé `STABLE=false` aunque el UUID canal se conserve; este observador es un **gate de estabilidad en ventana sin cambios**, no la herramienta definitiva para seguir identidad durante un renombrado. Para ese ensayo se requerirá un tracker por identificador y transición explícita de nombre de Alpha (G3AB Alpha → G3AB Alpha Renamed) con baseline previo, no reinterpretar `STABLE=false` de un renombrado como recreación de UUID.
+
+`G3AD_G3AC_OBSERVER_STATIC_NAMES_MATCH=PASS_3`
+`G3AD_G3AC_OLD_ID_PRESERVED_FLAG=INVALID_HARDCODED_BASELINE`
+`G3AD_G3AC_DYNAMIC_OBSERVER_IMPLEMENTED=YES`
+`G3AD_G3AC_DYNAMIC_UNIT_TESTS=PENDING_17`
+`G3AD_G3AC_DYNAMIC_OBSERVER_LAB=PENDING`
+`G3AD_HOT_RENAME_EVENT_PROVEN=NO`
+
+Comandos:
+
+```bash
+cd /home/ubuntu/GitHub/service.cloud.masqelec
+git pull --ff-only origin develop
+python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_g3ac_observe.py' -v
+python3 service.cloud.masqelec/tools/pvr_g3ac_observe.py --samples 3 --interval 10
+```
+
+Sin reinicio PVR, sin bouquet toggle, sin cambio M3U, sin escrituras SQLite.
