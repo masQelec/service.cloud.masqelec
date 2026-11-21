@@ -578,3 +578,26 @@ G3AM_BROWSER_STATUS_PANEL=FALSE
 G3AM_BROWSER_COMET_OBJECT=TRUE
 G3AM_GUI_CAUSE=UNKNOWN_EXCEPTION_OR_MISSING_CONSTRUCTOR
 ```
+
+## G3-AN — diagnóstico de Configuration ExtJS incompleto (21/11/2026)
+
+Valores reales de consola navegador del operador:
+```text
+admin=1
+capabilitiesLoaded=true
+configurationCreated=false
+statusCreated=false
+cometConnected=true
+G3AM_MISSING_METHODS=["codec_tab","caclient"]
+G3AM_CAPABILITIES=["caclient","tvadapters","satip_client","satip_server","timeshift","trace"]
+```
+
+Revisión código upstream exacto `8837853a6`:
+- `src/webui/static/app/tvheadend.js:1192-1193` solo invoca `codec_tab` si el servidor anuncia `libav`; el operador no tiene `libav`, por lo que la ausencia de `codec_tab` es **esperada** y no bloqueante.
+- `src/webui/static/app/tvheadend.js:1214-1215` invoca `tvheadend.caclient(cp,6)` si `capabilities` incluye `caclient`. Operador: incluye `caclient` pero la función falta; esto explica de modo concreto una excepción `TypeError: tvheadend.caclient is not a function` antes de `tvheadend.confpanel=cp` (línea 1250) y antes de insertar Status (línea 1254).
+- `src/main.c:157-159` anuncia `caclient` cuando `ENABLE_CWC || ENABLE_CAPMT || ENABLE_CONSTCW || ENABLE_CCCAM || ENABLE_LINUXDVB_CA`.
+- `Makefile.webui:131-137` incluye `caclient.js` **solo** si `CONFIG_CWC || CONFIG_CCCAM || CONFIG_CAPMT`. Las opciones CONSTCW/LINUXDVB_CA permiten anunciar capacidad con JS omitido. Esto es defecto de compatibilidad build/webui en este upstream. Ausencia de consola de excepción exacta: la causa es una deducción fuerte de condiciones observadas, pendiente de probar reparada.
+
+Se versiona parche incremental `lab/pvr_g3ab/patches/tvheadend-8837853a6-g3an-caclient-ui-capability.patch` que modifica **solo** la guarda del array `tvheadend_capabilities` en `src/main.c` para anunciar caclient únicamente cuando `ENABLE_CWC || ENABLE_CAPMT || ENABLE_CCCAM` (igual que la inclusión JS). No cambia backend, ACL, fuentes M3U, ni canal. Se debe comprobar `git apply --check` en checkout upstream del operador **que ya tiene parche G3-AL** y recompilar `make -j2` en el host para aplicar a binario. No reejecutar `./configure`; conservar flags configurados. Antes de compilar parar únicamente contenedor experimental G3-AM TVH y guardar copia binaria rollback fuera del proyecto versionado; levantar de nuevo con `--force-recreate` (bind mount del ejecutable, evita old inode). Nunca parar G3-AB.
+
+Gates pendientes: `G3AN_PATCH_CHECK`, `G3AN_BUILD`, `G3AN_HTTP_API`, `G3AN_CAPABILITIES_NO_CACLIENT`, `G3AN_GUI_CONFIGURATION_STATUS`. No declarar éxito hasta output de operador.
