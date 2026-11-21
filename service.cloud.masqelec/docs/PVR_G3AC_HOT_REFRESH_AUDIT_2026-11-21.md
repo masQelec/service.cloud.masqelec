@@ -97,3 +97,26 @@ SQLITE_TOUCHED=false
 `G3AC_UNIT_TESTS=PASS_9`; `G3AC_OBSERVER_LAB=PASS_3_OBSERVATIONS`; `G3AC_CURRENT_TVH_KODI_NAMES_MATCH=YES`; `G3AC_KODI_IDS_BASELINE_MATCH=YES`; `G3AC_HOT_REFRESH=NOT_TESTED_BY_STATIC_OBSERVATIONS`; `G3AC_HTSP_EVENT=NOT_MEASURED`; `G3AC_TRIGGER_CHANNEL_UPDATE=NOT_MEASURED`. **Importante:** el valor `SQLITE_TOUCHED=false` es una propiedad del script observador, no prueba que ningún otro proceso haya escrito en la base de datos. En estos tres snapshots no se introdujo ningún cambio entre muestras; por tanto **no prueban** actualización en caliente. La ejecución no comunicó fallos.
 
 El siguiente ensayo debe preparar un cambio de nombre de una sola dimensión sobre el **estado real actual** de la M3U, observar simultáneamente TVH/Kodi y, en paralelo, el registro de eventos de `pvr.hts` si es técnicamente observable sin recompilar el cliente. No reiniciar PVR durante el segmento de observación en caliente. Mantener el master fuera de alcance.
+
+
+## G3-AD: inventario de log Kodi y estado M3U (operador, 2026-11-21)
+
+Consulta read-only desde el perfil G3-AB:
+
+```text
+=== LABORATORIO ===
+M3U_EXISTE: True
+URL_ALTERNATIVA: True
+NOMBRE_RENOMBRADO: False
+=== KODI LOG ===
+LOG_EXISTE: True
+PVR_HTS_COUNT: 84
+HTSP_COUNT: 22
+CHANNEL_UPDATE_COUNT: 0
+CHANNEL_ADD_DELETE_COUNT: 0
+DEBUG_LINES_COUNT: 1
+```
+
+La M3U sigue en URL alternativa y **no** en la etapa `rename`. El log contiene referencias a cliente/HTSP pero ningún literal `channelUpdate` o `channelAdd`/`channelDelete`; el conteo `DEBUG_LINES_COUNT: 1` **no demuestra** cuál es el nivel de log efectivo ni si están habilitadas categorías PVR/cliente: se contó texto, no se verificó configuración. **No concluir ausencia de eventos HTSP** a partir de cero coincidencias textuales. Tampoco repetir un ensayo de renombrado sobre la etapa `url` sin restaurar primero la URL original para no mezclar cambios de atributos.
+
+`G3AD_KODI_LOG_PRESENT=YES`, `G3AD_KODI_LOG_CHANNELUPDATE_LITERAL=0`, `G3AD_HTSP_EVENTS_OBSERVED=NO`, `G3AD_DEBUG_CAPABILITY=NOT_VERIFIED`, `G3AD_URL_VARIANT_ACTIVE=YES`. Próximo paso: inspeccionar configuración real de logging disponible en Kodi de laboratorio y preparar una captura de alcance limitado antes del cambio de nombre. No subir logs sin revisar posibles URLs, IPs, credenciales o tokens. No modificar master/SQLite.
