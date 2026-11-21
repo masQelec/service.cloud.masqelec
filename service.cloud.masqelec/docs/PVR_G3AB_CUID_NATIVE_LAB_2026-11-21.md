@@ -312,3 +312,17 @@ El operador aclara que **en Kodi, al reiniciar PVR sí se produjo el cambio de n
 Evidencia declarada: `G3AB_RESTORED_KODI_LABEL_AFTER_PVR_RESTART=UPDATED_OPERATOR_REPORTED`. **No se han vuelto a imprimir** los `channelid` después de esta acción, por lo que `G3AB_RESTORED_KODI_ID_STABLE_AFTER_PVR_RESTART=NOT_YET_VERIFIED`. El nombre de TVH había vuelto al original con los UUID esperados.
 
 Implicación: reiniciar la capa PVR refrescó el nombre sin reiniciar Kodi entero, opción potencialmente preferible a reinicio total, pero **no autoriza** recomendar ciclos de desactivación/activación masivos, ni constituye solución validada para uso periódico o durante reproducción. Investigar mecanismo mínimo de actualización y si emite los eventos HTSP necesarios. Antes de pasar a `url`, verificar Kodi Alpha=`G3AB Alpha` ID=2 y Beta=`G3AB Beta` ID=1. `G3AB_URL_STAGE=PENDING_RESTORED_ID_CONFIRMATION`. No borrar SQLite.
+
+
+## G3-AB restored: Kodi recupera nombres y conserva IDs tras reinicio PVR (2026-11-21)
+
+Después de que el operador reiniciara PVR dentro de Kodi (acción concreta todavía sin especificar), ejecutó `PVR.GetChannels` y obtuvo:
+
+```text
+ID: 2 NOMBRE: G3AB Alpha
+ID: 1 NOMBRE: G3AB Beta
+```
+
+Previamente TVH había recuperado los nombres originales y seguía mostrando 2 canales con sus UUID iniciales. Se valida `G3AB_RESTORED_TVH=PASS`, `G3AB_RESTORED_KODI=PASS`, `G3AB_RESTORED_KODI_IDS_STABLE=PASS`, `G3AB_RENAME_AND_RESTORE_NATIVE_IDENTITIES=PASS_OBSERVED`, `G3AB_CUID_CAUSALITY=UNPROVEN`, `G3AB_LIVE_LABEL_REFRESH=FAIL_OBSERVED`. **No** inferir que esta técnica es segura durante reproducción real ni emplearla automáticamente en master.
+
+Siguiente gate `url`: partiendo de la M3U restaurada, escribir solo el cambio de URL sintética de Alpha a `http://streams/ch1-alt.ts`; capturar inventarios TVH/Kodi y multiplexor/servicio previos y posteriores (sin exponer URLs reales). La etapa puede desencadenar reasignación de mux o servicio aun manteniendo CUID; comprobar la convergencia antes de asumir fallo o éxito. No borrar entradas TVH ni SQLite; no modificar CoreELEC.
