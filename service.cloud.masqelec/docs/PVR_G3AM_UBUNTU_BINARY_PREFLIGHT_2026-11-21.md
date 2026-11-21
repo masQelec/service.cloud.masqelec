@@ -909,3 +909,25 @@ G3AM_BETA_UUID=2591ccd729867bffc24e8f4bd8b765af
 G3AM_BOTH_CHANNELS_AUTONAME=True
 G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — gate HTSP persistente preparado (22/11/2026)
+
+Operador confirmó asociación real por API:
+
+```text
+G3AM Alpha: ch UUID beec46e5ab595d2474289e74c9ab9849; number=1; autoname=True
+  service G3AB Signal 1 SID1 -> channel [beec46e5ab595d2474289e74c9ab9849]
+G3AM Beta: ch UUID 2591ccd729867bffc24e8f4bd8b765af; number=2; autoname=True
+  service G3AB Signal 2 SID2 -> channel [2591ccd729867bffc24e8f4bd8b765af]
+G3AM Beta provisional SID1: enabled=False, channel=[]
+```
+
+Herramienta `tools/pvr_g3am_htsp_watch.py` versionada: conexión exclusiva `127.0.0.1:29992`, hello HTSP y enableAsyncMetadata, eventos channelAdd/channelUpdate/channelDelete/initialSyncCompleted, sin autenticación por --noacl de laboratorio y sin reproducción. Ejecutar desde Ubuntu en **terminal 1**: `python3 service.cloud.masqelec/tools/pvr_g3am_htsp_watch.py --seconds 180`; esperar `G3AM_HTSP_READY_FOR_RENAME=YES`, sin cerrar conexión. En **terminal 2**, tras verificar ruta, marca sintética y estado baseline, ejecutar `python3 service.cloud.masqelec/lab/pvr_g3ab/g3am/prepare.py rename`. La lista HTTP se volverá a publicar y refetch=1 minuto; NO reiniciar TVH durante prueba. Observar `channelUpdate` con Alpha Renamed, 0 channelAdd/Deletes después de initialSync, UUID TVH idénticos y Beta intacta. Diferenciar ID HTSP de UUID TVH y de ID Kodi. El observador es candidato aún no ejecutado en Ubuntu; su éxito no demuestra comportamiento Kodi. Futuro gate: Kodi G3-AM con perfil completamente separado de `runtime/kodi_home/.kodi`, no reutilizar proceso G3-AB ni PVR DB. No afirmar gate hasta disponer de evidencias.
+
+```text
+G3AM_SERVICE_ASSOCIATIONS=PASS
+G3AM_TWO_CHANNEL_BASELINE=PASS
+G3AM_HTSP_OBSERVER_COMMITTED=YES
+G3AM_HTSP_RENAME=NOT_TESTED
+G3AM_KODI_INTEGRATION=NOT_TESTED
+```
