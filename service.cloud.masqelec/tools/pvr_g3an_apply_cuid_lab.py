@@ -114,9 +114,14 @@ g3an_preflight(iptv_network_t *in, htsmsg_t *items)
         im = (iptv_mux_t *)mm;
         if (im->mm_iptv_cuid && strcmp(im->mm_iptv_cuid, cuid) == 0)
           matches++;
-        else if (!im->mm_iptv_cuid &&
+        else if (im->mm_iptv_cuid &&
                  (url = htsmsg_get_str(item, "m3u-url")) &&
-                 strcmp(im->mm_iptv_url_sane ?: (im->mm_iptv_url ?: ""), url) == 0)
+                 strcmp(im->mm_iptv_url_sane ?: (im->mm_iptv_url ?: ""), url) == 0) {
+          tvherror(LS_IPTV, "G3-AN existing URL belongs to another CUID");
+          return -1;
+        } else if (!im->mm_iptv_cuid &&
+                   (url = htsmsg_get_str(item, "m3u-url")) &&
+                   strcmp(im->mm_iptv_url_sane ?: (im->mm_iptv_url ?: ""), url) == 0)
           legacy++;
       }
       if (matches > 1 || (!matches && legacy > 1)) {
