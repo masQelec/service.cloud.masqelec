@@ -418,3 +418,37 @@ URL_ALTERNATIVA_EN_MUX: False
 `G3AB_CUTOVER_AUTHORIZED=NO`
 
 **No reiniciar PVR todavía**, ni modificar playlist, ni eliminar canales, servicios o muxes. Siguiente diagnóstico read-only: inventariar los 2 canales actuales (nombres, UUID, refs de servicio, mux), comprobar `iptv_url` en mux Alpha y obtener simultáneamente `PVR.GetChannels` de Kodi. Si cambia identidad en Kodi, priorizar la reconciliación no destructiva y plan para pérdida de identidad; reinicio PVR solo ensayo posterior con snapshot previo.
+
+
+## G3-AB URL: sustitución confirmada de canal, servicio y mux Alpha; Kodi ID aparente sin prueba de convergencia
+
+Operador ejecutó lectura combinada TVH `channel/grid`, `mpegts/service/grid`, `mpegts/mux/grid` y Kodi `PVR.GetChannels`, **sin reiniciar PVR antes**:
+
+```text
+=== TVHEADEND ===
+CANAL: G3AB Alpha
+UUID: 780608ad2385d70c9d46279e0f62250e
+UUID_ORIGINAL_ALPHA: False
+SERVICIO: 5a6962a3ab51cfec0c933f6cc7eda030
+MUX: f9e55f38b435969d396393edc3b7acc4
+URL_ALTERNATIVA: True
+---
+CANAL: G3AB Beta
+UUID: f08f75aa26b58386630d4b225adbb34f
+UUID_ORIGINAL_ALPHA: False
+SERVICIO: afe6f317e9b95eb03f6d91691e80f537
+MUX: 355a43f5f4c718478b87d3b6a1bc8408
+URL_ALTERNATIVA: False
+---
+=== KODI ===
+ID: 2 NOMBRE: G3AB Alpha
+ID: 1 NOMBRE: G3AB Beta
+TVH_TOTAL: 2
+KODI_TOTAL: 2
+```
+
+**Evidencia fuerte:** el Alpha actualmente activo en TVH usa URL alternativa real y UUID nuevos para canal, servicio y mux; el Alpha anterior usaba canal `185e5bdda6aafa6aa1aad2bb94ee703a`, servicio `18cd0031a734c2342ac3956d754fb63e`, mux `4d3f4f0b654e570dc39029bebaf5c555`. El Beta conserva canal `f08f75aa26b58386630d4b225adbb34f`, servicio `afe6f317e9b95eb03f6d91691e80f537`, mux `355a43f5f4c718478b87d3b6a1bc8408`.
+
+`G3AB_URL_TVH_APPLIED=YES`, `G3AB_URL_ALPHA_CHANNEL_UUID_REPLACED=YES`, `G3AB_URL_ALPHA_SERVICE_UUID_REPLACED=YES`, `G3AB_URL_ALPHA_MUX_UUID_REPLACED=YES`, `G3AB_URL_BETA_STABLE=YES`, `G3AB_KODI_ALPHA_CHANNELID_CURRENT=2`, pero **`G3AB_KODI_NEW_BACKEND_CHANNEL_ACCEPTED=UNPROVEN`**: mostrar ID 2 y nombre Alpha sin verificar la correspondencia backend puede ser estado previo/caché. `CUID` estable en M3U no evitó recreación en TVH. No afirmar persistencia Kodi ni corrección nativa ante cambios URL hasta reconexión PVR y captura posterior.
+
+Siguiente prueba aislada, controlada por operador: observar estado Kodi PVR tras un refresco manual del cliente que anteriormente funcionó (mecanismo exacto aún no documentado). Registrar ambos channelid, nombres y número total. No borrar DB ni activar borrados, no tocar producción, y no declarar reparación si no se comprueba que Kodi tiene el nuevo canal backend; idealmente contrastar el identificador HTSP con el UUID TVH mediante diagnóstico del cliente en un gate aparte.
