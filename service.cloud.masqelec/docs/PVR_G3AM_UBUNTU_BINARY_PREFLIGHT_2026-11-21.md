@@ -1034,3 +1034,27 @@ G3AM_KODI_HTSP_ASYNC_INITIALISED=PASS
 G3AM_KODI_CHANNEL_DB_BASELINE=NOT_YET_VERIFIED
 G3AM_KODI_RENAME_PUSH=NOT_TESTED
 ```
+
+## G3-AM — Kodi TV46.db baseline confirmado, previo a push dinámico (22/11/2026)
+
+Operador inspeccionó SQLite por conexión read-only a `runtime/g3am/kodi_home/.kodi/userdata/Database/TV46.db` (esquema Kodi 21.3, `channels` tiene `iClientId`, no `idClient`). Salida:
+
+```text
+G3AM KODI DATABASES COUNT=1
+DATABASE=TV46.db
+CHANNEL idChannel=1 iUniqueId=1473024293 sChannelName='G3AM Beta' bIsRadio=0
+CHANNEL idChannel=2 iUniqueId=1699146942 sChannelName='G3AM Alpha Renamed' bIsRadio=0
+CHANNEL_COUNT=2
+G3AM_KODI_DB_INSPECTION=COMPLETED
+```
+
+Los `iUniqueId` emparejan exactamente los `channelId` HTSP observados inicialmente por el cliente persistente: Beta 1473024293, Alpha 1699146942. En Kodi Alpha `idChannel=2`, Beta `idChannel=1`. **PASS importación inicial y correspondencia HTSP/Kodi**, pero todavía no está validada actualización de nombre recibida con `pvr.hts` vivo (Kodi arrancó tras renombrado). Prueba siguiente: observar socket HTSP Kodi (puerto efímero 34174 era histórico, confirmar nuevamente) y tomar muestra de TV46.db; ejecutar `prepare.py baseline` para Alpha sin 'Renamed' con Kodi vivo, esperar refetch máximo 60s más procesamiento, comprobar sin reinicio ni reconexión `idChannel` y `iUniqueId` constantes, canal count 2, Beta intacta; si PASS, segundo cambio `prepare.py rename` con las mismas condiciones. No escribir SQLite ni limpiar bases. Cuidado con que una lectura SQLite mientras Kodi está escribiendo puede ver un snapshot anterior; reintentar antes de declarar fallo, sin tocar journal/WAL.
+
+```text
+G3AM_KODI_TV46_INITIAL_IMPORT=PASS
+G3AM_KODI_ALPHA_IDCHANNEL=2
+G3AM_KODI_ALPHA_IUNIQUEID=1699146942
+G3AM_KODI_BETA_IDCHANNEL=1
+G3AM_KODI_BETA_IUNIQUEID=1473024293
+G3AM_KODI_LIVE_RENAME=NOT_TESTED
+```
