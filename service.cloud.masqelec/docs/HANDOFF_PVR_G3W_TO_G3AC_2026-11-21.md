@@ -1172,3 +1172,19 @@ La revisión adicional de **Tvheadend 8837853a6**, `src/idnode.c` líneas 1219�
 `G3AJ_PRODUCTION_TOUCHED=NO`
 
 Próximo: decidir entre parche Tvheadend a fuente (`iptv_auto.c` notificar canales vinculados cuando cambia nombre de servicio), o estudiar endpoint explícito de re-notificación de canal, con pruebas G3-AB aisladas. Preferencia: causa origen y no reconexiones periódicas. No alterar master CoreELEC ni SQLite, ni escribir propiedades de canales reales.
+
+## G3-AK: diseño de corrección selectiva al origen Tvheadend, NO desplegado (21/11/2026)
+
+Nueva documentación de auditoría exacta y gates:
+`docs/PVR_G3AK_TVH_CHANNEL_NOTIFY_DESIGN_2026-11-21.md`
+
+Hechos desde `tvheadend/tvheadend@8837853a6`:
+- Auto IPTV M3U en `iptv_auto.c` altera `im->mm_iptv_svcname` y notifica objeto mux, sin llamada directa a `htsp_channel_update`.
+- `channels.c` emite `htsp_channel_update` en su callback de cambio.
+- `mpegts_mux.c` documenta recorrido nativo `mm->mm_services` y `service->s_channels`; evita buscar por nombres y tocar bouquets.
+- `bouquet.c` incluye `bouquet_unmap_channel` que puede ejecutar `channel_delete`: **NO** usar rescan de bouquet como trigger.
+- `autoname=True` para Alpha y Beta, servicios y UUID estables; no fijar `name` ni alternar flags.
+- Se propone **únicamente en fuente TVH y laboratorio** emitir evento HTSP selectivo para canales realmente afectados tras renombrado efectivo, siempre que se verifiquen lock, nombre efectivo, deduplicación y compatibilidad de fuente. **Parche no creado, compilado ni desplegado**: `G3AK_PATCH_COMPILED=NO`, `G3AK_TVH_IMAGE_MODIFIED=NO`, `G3AK_PRODUCTION_MODIFIED=NO`.
+- La documentación incluye preflight lock/servicio, pruebas de nombre reversible, ausencia de eventos en no-change, invariantes de UUID/servicio/Kodi, y evaluación del coste de mantener fork TVH. No suponer que API idnode no-op dispara HTSP.
+
+Siguiente objetivo G3-AL: verificar contexto de lock del callback descarga y mecanismo de propagación de nombre efectivo; solo después preparar parche candidato `git apply --check` + imagen docker **distinta de latest** en laboratorio. Nunca tocar master CoreELEC / SQLite / grupos protegidos.
