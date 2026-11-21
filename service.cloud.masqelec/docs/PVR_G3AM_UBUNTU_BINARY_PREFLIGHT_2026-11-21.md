@@ -493,3 +493,14 @@ G3AM_PLAYLIST_LOCAL_TWO_CUIDS=PASS
 G3AM_IPTV_NETWORK_IMPORT=NOT_TESTED
 G3AM_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — 403 Forbidden tras crear superuser de ensayo (21/11/2026)
+
+Operador comunica exclusivamente `403 Forbidden` tras instrucción de crear `runtime/g3am/tvh_config/superuser` y reiniciar instancia experimental. No hay evidencia aún de salida `G3AM_SUPERUSER_CREATED=PASS`, reinicio, archivo de credenciales efectivamente presente/cargado, nombre de usuario introducido o diferencia entre respuesta de navegador y curl. **No atribuir 403 únicamente a ACL**, ni desactivar control de acceso. La fuente de TVH `8837853a6` confirma: `access_init` carga archivo `superuser`, y `access_get` devuelve `access_full` si credenciales superuser verifican; en `http.c:1224-1228`, HTTP 403 aparece cuando hay un nombre de usuario suministrado pero el recurso es rechazado. Puede ser contraseña errónea, cuenta no cargada, caché de autenticación del navegador o permisos, entre otros. Verificación siguiente exclusivamente G3-AM y sin revelar secretos: `stat` y extracción limitada de keys/username de `superuser`, estado del contenedor, respuesta HTTP anónima y prueba HTTP autenticada de forma interactiva con `curl --basic -u g3am-admin` pidiendo contraseña por TTY (sin ponerla en la línea de comandos, no compartir verbose/headers). Si autenticada 200 mientras navegador 403, probar sesión privada; si 403 persistente, examinar fuente/config sin agregar --noacl/--firstrun. No publicar configuración privada ni password.
+
+```text
+G3AM_ADMIN_LOGIN_BROWSER=HTTP_403_USER_REPORTED
+G3AM_SUPERUSER_FILE_CREATED=NOT_CONFIRMED
+G3AM_HTTP_AUTHENTICATED=NOT_TESTED
+G3AM_ACL_BYPASS=FORBIDDEN
+```
