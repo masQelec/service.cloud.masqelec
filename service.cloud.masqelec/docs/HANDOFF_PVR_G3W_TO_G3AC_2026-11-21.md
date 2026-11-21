@@ -947,3 +947,30 @@ Esto acredita presencia de paquetes con flags SYN, FIN y RST en la captura con 1
 `G3AG_HOT_REFRESH_CAUSE=STILL_UNPROVEN`
 
 **Siguiente gate**: leer únicamente metadatos de SYN/FIN/RST de pcap, agrupados por puertos y timestamp local; comprobar si se abrió nuevo socket cliente distinto de puerto anterior `46266`, y si mensajes `channelAdd` pertenecen a ese socket mediante analizador de flujo. No publicar PCAP bruto, ni alterar PVR/TVH/bouquet/master/SQL.
+
+
+## G3-AG: nueva conexión HTSP confirmada en control playback (operador, 2026-11-21)
+
+El operador compartió solo metadatos TCP SYN/FIN/RST del PCAP de playback, con puertos de cliente distintos:
+
+```text
+1795285835.185784 IP 127.0.0.1.46266 > 127.0.0.1.19992: Flags [F.]
+1795285835.186265 IP 127.0.0.1.49262 > 127.0.0.1.19992: Flags [S]
+1795285835.186299 IP 127.0.0.1.19992 > 127.0.0.1.49262: Flags [S.]
+1795285835.186633 IP 127.0.0.1.46266 > 127.0.0.1.19992: Flags [R]
+1795285853.118833 IP 127.0.0.1.49262 > 127.0.0.1.19992: Flags [F.]
+1795285853.119473 IP 127.0.0.1.40098 > 127.0.0.1.19992: Flags [S]
+1795285853.119528 IP 127.0.0.1.19992 > 127.0.0.1.40098: Flags [S.]
+1795285853.119732 IP 127.0.0.1.49262 > 127.0.0.1.19992: Flags [R]
+```
+
+Se confirmó **nueva sesión TCP por cambio de puerto de origen Kodi**, de 46266→49262 y más tarde 49262→40098. La conexión antigua había sido observada anteriormente durante el fallo de renombrado `channelid` Kodi Alpha 3/Beta 2. Durante el PCAP de reproducción se detectaron 1024 segmentos con datos de 1501 y coincidencias ASCII de `channelAdd` (4) y `channelName` (4); Kodi actualizó Alpha a `G3AB Alpha Renamed`. **Hipótesis ahora reforzada:** actualización de metadatos Kodi mediante sincronización de arranque en una reconexión HTSP; **todavía no probado** que las cuatro apariciones de `channelAdd` pertenezcan a las conexiones nuevas sin clasificar frames HTSP y su dirección. La reconexión puede ser periódica, de recuperación o iniciada por el comportamiento del cliente; no atribuirla automáticamente a la acción de reproducir.
+
+`G3AG_HTSP_TCP_RECONNECT_OBSERVED=YES`
+`G3AG_KODI_SOURCE_PORTS=46266,49262,40098`
+`G3AG_PLAYBACK_HTSP_INITIAL_SYNC_CAUSES_RENAME=PLAUSIBLE_NOT_PROVEN`
+`G3AG_RECONNECT_REASON=UNKNOWN`
+`G3AG_HTSP_VALID_CHANNELADD_PARSED=NO`
+`G3AG_NEXT_GATE=CLASSIFY_HTSP_FRAMES_BY_TCP_SESSION`
+
+No implementar reproducción forzada ni restart PVR como workaround; verificar primero que el protocolo emite/reentrega metadatos por nueva sincronización y por qué refetch IPTV no notifica al cliente persistente.
