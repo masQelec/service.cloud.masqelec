@@ -132,7 +132,8 @@ def compare(m3u_pairs, tags, channels):
         "match_gate": "PASS" if missing == 0 and extra == 0
                       and matching == len(channels)
                       and len(channels) == sum(m3u_pairs.values())
-                      and ambiguous == 0 else "INCOMPLETE",
+                      else "INCOMPLETE",
+        "identity_disambiguation": "NOT_PROVEN" if ambiguous else "DESCRIPTIVELY_UNIQUE",
         "cuid_mapping_proven": "NO",
         "refetch_event_proven": "NO",
         "kodi_convergence_proven": "NO",
