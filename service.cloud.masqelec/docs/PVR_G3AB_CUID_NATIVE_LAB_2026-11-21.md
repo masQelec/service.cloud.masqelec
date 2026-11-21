@@ -358,3 +358,17 @@ MUXES: 2
 ```
 
 Estos son los UUID ya observados en el baseline anterior al ensayo de URL. Por tanto `G3AB_TVH_CHANNEL_UUID_STABLE=YES_OBSERVED`, `G3AB_TVH_SERVICE_UUID_STABLE=YES_OBSERVED`, `G3AB_TVH_MUX_UUID_STABLE=YES_OBSERVED`, **pero** `G3AB_URL_FILE_CHANGED=NOT_REPORTED` y `G3AB_URL_APPLIED_TO_MUX=UNPROVEN`: la salida no incluye confirmación de `prepare.py url` ni comprobación del campo URL del mux. No inferir que TVH conserva los muxes ante un cambio de URL real hasta probar que se aplicó. Prioridad de arquitectura sigue en refresco nativo cliente PVR; no tocar SQLite, no eliminar servicios ni ejecutar en master.
+
+
+## G3-AB URL: nueva URL verificada en M3U, URL efectiva de TVH pendiente
+
+El operador ejecutó una lectura de `runtime/playlist/playlist.m3u` con el siguiente resultado:
+
+```text
+URL_ALTERNATIVA_EN_M3U: True
+URL_ORIGINAL_ALPHA_EN_M3U: False
+```
+
+Esto acredita que la M3U activa del laboratorio G3-AB contiene `http://streams/ch1-alt.ts` y **no** la URL base de Alpha `http://streams/ch1.ts`. El snapshot previo de TVH mantuvo UUID de canal/servicio/mux y recuentos 2/3/2, pero **no leyó el atributo URL efectivo del mux** y no determina si el refresco de TVH aplicó el cambio. Estado: `G3AB_URL_FILE_CHANGED=YES`; `G3AB_URL_TVH_APPLIED=NOT_YET_VERIFIED`; `G3AB_URL_TVH_UUID_STABLE=OBSERVED_SNAPSHOT_ONLY`; `G3AB_KODI_URL_PLAYBACK=NOT_TESTED`; `G3AB_CUID_CAUSALITY=UNPROVEN`.
+
+Siguiente gate: consultar `mpegts/mux/grid` con GET para el mux UUID Alpha y comprobar, sin imprimir URL, si los atributos de URL apuntan a `ch1-alt.ts` (y no `ch1.ts`). No inventar nombres de campos: enumerar únicamente nombres de campos relacionados con URL antes de extraer su valor. No reiniciar TVH/Kodi, no modificar SQLite, no tocar master. Si no está el campo en `grid`, consultar por GET el detalle read-only de `idnode/load` o marcar como no probado.
