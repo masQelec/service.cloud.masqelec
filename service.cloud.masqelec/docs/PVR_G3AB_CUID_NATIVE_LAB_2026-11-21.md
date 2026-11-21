@@ -287,3 +287,19 @@ G3AB_G3W_UNTOUCHED=YES
 ```
 
 Esto verifica **solo la salida del generador y su declaración de ámbito**, no confirma aún que TVH haya releído la M3U restaurada ni que Kodi haya recuperado `G3AB Alpha`. El snapshot esperado sigue siendo Alpha UUID `185e5bdda6aafa6aa1aad2bb94ee703a` / Kodi `2`, Beta UUID `f08f75aa26b58386630d4b225adbb34f` / Kodi `1`; inventarios 2/2. `G3AB_RESTORED_FILE_WRITTEN=YES`, `G3AB_RESTORED_TVH=NOT_YET_VERIFIED`, `G3AB_RESTORED_KODI=NOT_YET_VERIFIED`, `G3AB_URL_STAGE=BLOCKED_PENDING_RESTORED_BASELINE`. No cambiar todavía a `prepare.py url`.
+
+
+## G3-AB restored: TVH vuelve al baseline, Kodi Alpha aún obsoleto (operador, 2026-11-21)
+
+Consulta de lectura conjunta tras `prepare.py restored`:
+
+```text
+TVH_TOTAL: 2
+KODI_TOTAL: 2
+ALPHA_TVH_OK: True
+ALPHA_KODI_OK: False
+BETA_TVH_OK: True
+BETA_KODI_OK: True
+```
+
+`G3AB_RESTORED_TVH=PASS`; `G3AB_RESTORED_KODI_ALPHA=FAIL_LIVE`; `G3AB_RESTORED_KODI_BETA=PASS`. Ya había ocurrido la falta de propagación de la etiqueta al entrar en `rename`, resuelta entonces mediante cierre/reinicio normal de Kodi aislado, sin borrar `TVxx.db`. Diagnóstico propuesto: repetir reconexión normal del perfil G3-AB sin alterar TVH/M3U, verificar HTSP puerto 19992 y PVR.GetChannels. Si Alpha vuelve a `G3AB Alpha` con `channelid=2`, registrar `G3AB_RESTORED_KODI_AFTER_RESTART=PASS`. No pasar a `url` antes de confirmarlo. El patrón apoya un defecto de refresco en vivo del nombre, pero no identifica aún componente causal.
