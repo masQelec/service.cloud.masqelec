@@ -920,3 +920,30 @@ subscribe_COUNT: 5
 `G3AG_ROOT_CAUSE=UNPROVEN`
 
 **Siguiente gate:** construir analizador de PCAP offline estrictamente local que (1) lea cabecera PCAP y paquetes IP/TCP, (2) clasifique dirección 9982/19992→Kodi y Kodi→servidor, (3) reensamble TCP por sequence y descarte retransmisiones, (4) recupere frames HTSP longitud prefijada y parse `htsmsg` al menos `method`, `channelName`, `channelId` de forma segura, (5) emita solo estadísticas de eventos y reconstrucción nunca payload/tokens, y (6) compare con TCP SYN/FIN/RST y sesiones para saber si playback coincidió con nueva sincronización. **No subir PCAP** al repo ni compartir datos de autenticación. La alternativa de cliente pvr.hts sigue **sin modificación**; master y SQLite no tocados por estas pruebas.
+
+
+## G3-AG: conexiones nuevas/cierre durante captura playback; explicación por resync toma prioridad (operador, 2026-11-21)
+
+El operador inspeccionó solo metadatos TCP del `g3af_playback.pcap`:
+
+```text
+TOTAL: 1501
+SYN: 4
+FIN: 2
+RST: 2
+SERVIDOR_A_KODI: 1013
+KODI_A_SERVIDOR: 488
+```
+
+Esto acredita presencia de paquetes con flags SYN, FIN y RST en la captura con 1024 paquetes TCP que contienen datos y 4 apariciones ASCII de `channelAdd`/`channelName`. **Corrige el diagnóstico previo**: la reproducción pudo coincidir con establecimiento de nuevas conexiones HTSP/sincronización inicial, por lo que **NO se debe atribuir el refresco del label a una actividad de reproducción sobre la conexión preexistente** sin separar las sesiones TCP. Cuatro SYN no equivalen necesariamente a cuatro conexiones (SYN/SYN-ACK y retransmisiones); dos FIN y dos RST tampoco indican por sí mismos causalidad ni error de protocolo. El filtro de conteos puede sumar retransmisiones. Es posible que el cliente se reconectara y recibiera de nuevo `channelAdd` con nombre actualizado; esta es **hipótesis**, no decodificación de frames HTSP.
+
+`G3AG_PLAYBACK_SYN=4`
+`G3AG_PLAYBACK_FIN=2`
+`G3AG_PLAYBACK_RST=2`
+`G3AG_PLAYBACK_SERVER_TO_KODI_TCP_PACKETS=1013`
+`G3AG_PLAYBACK_KODI_TO_SERVER_TCP_PACKETS=488`
+`G3AG_RECONNECT_DURING_CAPTURE=STRONGLY_SUGGESTED_NOT_SESSION_CLASSIFIED`
+`G3AG_NEW_HTSP_INITIAL_CHANNEL_SYNC=PLAUSIBLE_NOT_PROVEN`
+`G3AG_HOT_REFRESH_CAUSE=STILL_UNPROVEN`
+
+**Siguiente gate**: leer únicamente metadatos de SYN/FIN/RST de pcap, agrupados por puertos y timestamp local; comprobar si se abrió nuevo socket cliente distinto de puerto anterior `46266`, y si mensajes `channelAdd` pertenecen a ese socket mediante analizador de flujo. No publicar PCAP bruto, ni alterar PVR/TVH/bouquet/master/SQL.
