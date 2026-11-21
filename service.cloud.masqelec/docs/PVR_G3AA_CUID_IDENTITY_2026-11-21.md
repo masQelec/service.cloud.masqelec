@@ -34,3 +34,17 @@ python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_cuid_o
 3. Distinguir expresamente correlación por cambios controlados de verdadera preservación del CUID por TVH. El hecho de que M3U contenga CUID **no implica** que TVH lo utilice internamente.
 4. Confirmar qué atributos del formato M3U reconoce Tvheadend (no asumir que `CUID` tiene significado para él). Si no transporta CUID hasta el backend, el plan puede requerir una tabla local de correspondencia construida y validada por ingestión, no deducida de nombres.
 5. Mantener `G3AA_CUTOVER_AUTHORIZED=NO`, sin tocar SQLite, TVH/Kodi master ni tags históricos.
+
+
+## Validación de pruebas offline — operador, 2026-11-21
+
+El operador comunicó la salida de `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_cuid_offline.py' -v`:
+
+```text
+----------------------------------------------------------------------
+Ran 15 tests in 0.002s
+
+OK
+```
+
+`G3AA_OFFLINE_UNIT=PASS_15_OF_15`. Es una validación de la comparación CUID en memoria, no una prueba de persistencia de identidad TVH/Kodi. `G3AA_TVH_CUID_PERSISTENCE=NOT_TESTED`, `G3AA_KODI_CUID_PERSISTENCE=NOT_TESTED`, `G3AA_CUTOVER_AUTHORIZED=NO`. Siguiente gate: fixture separado para cambios reales de metadatos con snapshots de IDs entre etapas, evitando alterar G3-W original ni las listas de producción.
