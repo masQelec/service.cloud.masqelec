@@ -124,3 +124,14 @@ SERVICIOS_SIN_CANAL: 1
 Correspondencia TVH del snapshot anterior: `G3AB Alpha`→`185e5bdda6aafa6aa1aad2bb94ee703a`; `G3AB Beta`→`f08f75aa26b58386630d4b225adbb34f`. El script comparó también nombre y servicios, aunque solo imprimió UUID. El tercer UUID Beta previo `e2bf26af3bd98f7ac3f11acb11ce12cc` ya no aparece. Conclusión acotada: `G3AB_TVH_BASELINE_STABLE_3_READS=PASS`; no se ha acreditado por qué surgió/desapareció el duplicado, ni estabilidad tras modificación de playlist. Se conserva un servicio MPEG-TS sin canal y no se autoriza eliminarlo.
 
 Próximo gate: **Kodi G3-AB aislado**, comprobar userdata efectiva y host HTSP 127.0.0.1:19992 (nunca 19982 de G3-W ni master), registrar dos `channelid` con `PVR.GetChannels`, y solo después ensayar `rename`. Las 16 pruebas unitarias del fixture G3-AB no constan aún reportadas por el operador.
+
+
+## Incidencia de perfil Kodi / puerto de laboratorio (operador, 2026-11-21)
+
+El operador indicó que **olvidó cambiar los puertos de Kodi y seguía con los del laboratorio anterior**. Una consulta JSON-RPC arrojó:
+```text
+KODI_ID: 2 NOMBRE: G3AB Alpha NUMERO: 1
+KODI_ID: 1 NOMBRE: G3AB Beta NUMERO: 2
+TOTAL: 2
+```
+**No validar aún la identidad Kodi G3-AB** con este snapshot: la declaración del operador sobre el puerto/configuración requiere verificar que `pvr.hts` está conectado efectivamente a `127.0.0.1:19992` y no `19982` del laboratorio G3-W, ni a otro cliente PVR. Los nombres visibles podrían ser persistidos en caché/configuración previa; la respuesta JSON-RPC por sí sola no revela el servidor de procedencia. Reiniciar solo Kodi del perfil `runtime/kodi_home` tras corregir/confirmar el endpoint y repetir la consulta de lectura; no borrar `TVxx.db`. Marcar `G3AB_KODI_BASELINE=BLOCKED_PENDING_ENDPOINT_PROOF`; no ejecutar `rename`.
