@@ -953,3 +953,26 @@ G3AM_TVH_PERSISTENT_UUID_POST_RENAME=NOT_YET_VERIFIED
 G3AM_HTSP_POST_SYNC_NO_CHURN=NOT_YET_VERIFIED
 G3AM_KODI_PVR_SYNC=NOT_TESTED
 ```
+
+## G3-AM — UUID persistente tras rename PASS (22/11/2026)
+
+Operador validó `GET /api/channel/grid?all=1` después de publicar `G3AM_STAGE=RENAME` y recibir `channelUpdate` en la misma conexión HTSP. Resultado:
+
+```text
+CHANNEL=G3AM Alpha Renamed RESULT=PASS
+UUID=beec46e5ab595d2474289e74c9ab9849 ACTUAL_NAME=G3AM Alpha Renamed
+CHANNEL=G3AM Beta RESULT=PASS
+UUID=2591ccd729867bffc24e8f4bd8b765af ACTUAL_NAME=G3AM Beta
+G3AM_RENAME_IDENTITY=PASS
+```
+
+La validación también comprobó que son exactamente 2 UUID conocidos, los nombres esperados, números 1/2 y autoname=True. Separadamente, HTSP entregó `channelUpdate` de Alpha con ID HTSP persistente `1699146942`. No constan todavía los contadores del cierre del observador para descartar todos los eventos `channelAdd` y `channelDelete` posteriores a INITIAL. **Gate de identidad Tvheadend PASS; gate end-to-end Kodi sigue pendiente.** Siguiente: preflight sólo lectura sobre binario Kodi, procesos, perfil activo y pvr.hts; preparar otro perfil, otro puerto JSON-RPC, sin reutilizar `/runtime/kodi_home/.kodi`, ni reemplazar ni detener la instancia G3-AB.
+
+```text
+G3AM_TVH_RENAME_IDENTITY=PASS
+G3AM_TVH_CHANNEL_COUNT=2
+G3AM_ALPHA_NAME=G3AM Alpha Renamed
+G3AM_BETA_NAME=G3AM Beta
+G3AM_PERSISTENT_HTSP_CHANNELUPDATE=PASS
+G3AM_KODI_G3AM_PROFILE=NOT_STARTED
+```
