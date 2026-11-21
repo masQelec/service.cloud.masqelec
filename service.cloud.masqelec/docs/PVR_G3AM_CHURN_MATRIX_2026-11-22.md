@@ -26,3 +26,26 @@ La opción --run url-probe repite fases safe y luego cambia la URL de Alpha a ch
 La herramienta todavía no se ha probado en el Ubuntu del operador. No subir datos runtime, DB, ni PCAP.
 
 Gates: G3AM_RENAME_E2E=PASS; G3AM_MATRIX_SAFE_UBUNTU=PENDING; G3AM_ORDER_GROUP_PROPAGATION=PENDING; G3AM_URL_IDENTITY=PENDING; G3AM_ADD_REMOVE=PENDING; G3AM_CORELEC_BUILD=PENDING.
+
+## Resultado real de fase safe (22/11/2026)
+
+El operador ejecutó dos preflight PASS y los tres escenarios con resultados:
+
+    G3AM_MATRIX_PREFLIGHT=PASS
+    MATRIX_STAGE=reorder PLAYLIST_ONLY=YES
+    OBSERVE stage=reorder t=0s tvh=2 services=3 kodi=[(1,1473024293,'G3AM Beta'),(2,1699146942,'G3AM Alpha Renamed')] reason=STABLE
+    STAGE=reorder RESULT=IDENTITY_ONLY
+    MATRIX_STAGE=group PLAYLIST_ONLY=YES
+    OBSERVE stage=group t=0s tvh=2 services=3 kodi=[(1,1473024293,'G3AM Beta'),(2,1699146942,'G3AM Alpha Renamed')] reason=STABLE
+    STAGE=group RESULT=IDENTITY_ONLY
+    MATRIX_STAGE=restore PLAYLIST_ONLY=YES
+    OBSERVE stage=restore t=0s tvh=2 services=3 kodi=[(1,1473024293,'G3AM Beta'),(2,1699146942,'G3AM Alpha Renamed')] reason=STABLE
+    STAGE=restore RESULT=IDENTITY_ONLY
+    G3AM_SAFE_IDENTITY=PASS
+    G3AM_GROUP_AND_ORDER_PROPAGATION=UNVERIFIED
+
+Por diseño los 75 segundos de cada etapa cubren nominalmente el refetch de 60 segundos, pero los reportes solo presentan identidad al t=0 de la *ventana de observación posterior*, no demuestran cuándo/si se procesó cada refetch; no afirmar actualización real de agrupación o posición. Canal y servicios siguen cardinalidad TVH 2/3, Kodi 2. UUID/idChannel/iUniqueId conservados.
+
+La siguiente operación de mayor riesgo es cambiar URL de Alpha manteniendo CUID. Se añadió opción `--run url-only` al ejecutor para no repetir las tres fases safe: requerirá `--preflight` tras actualizar develop, publicará solo la URL variante en la playlist sintética y observará hasta 150 segundos. La herramienta termina intencionalmente con retorno 3 `G3AM_MATRIX=STOP_FOR_OPERATOR_REVIEW` sin modificar DB ni mapeos, independientemente de que el resultado sea revisión o timeout. Es imprescindible registrar `OBSERVE`, servicio/mux y canales posteriores antes de decidir restauración y alta/baja; el estado nominal restored es el prerequisito. No ejecutar `url-probe` redundante si ya se superó safe.
+
+GATES: G3AM_SAFE_IDENTITY=PASS; G3AM_GROUP_PROPAGATION=UNVERIFIED; G3AM_ORDER_PROPAGATION=UNVERIFIED; G3AM_URL_CHANGE=NOT_TESTED.
