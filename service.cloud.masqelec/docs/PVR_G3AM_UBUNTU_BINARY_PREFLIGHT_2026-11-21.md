@@ -45,3 +45,31 @@ G3AM_PRODUCTION_DEPLOY=NO
 ```
 
 Documentos: `HANDOFF_TVH_CUSTOM_CORELEC_EPG_2026-11-21.md`, `RUNBOOK_G3AB_UBUNTU_LAB_2026-11-21.md`, `PVR_G3AL_TVH_PATCH_CANDIDATE_2026-11-21.md`.
+
+## G3-AM continuación — comprobación de puertos y red (operador, 21/11/2026)
+
+Salida read-only:
+```text
+PORT_29991=BIND_AVAILABLE
+PORT_29992=BIND_AVAILABLE
+NETWORK=masqelec-pvr-g3ab_pvr_g3ab
+NETWORK_DRIVER=bridge
+TVH_IMAGE=sha256:7f5d04ed7ea7f58cd50c2cf11a79d0823fa0a4aa4f6c64478360b9e3a8027c28
+STREAMS_IMAGE=sha256:62d1c420c34ae91f7bffd349903cd6846806b835129c8b7ba2da28b3be323cd1
+DOCKER=29.1.3 (29.1.3-0ubuntu4.1)
+COMPOSE=2.40.3+ds1-0ubuntu1
+G3AM_NETWORK_PREFLIGHT=COMPLETED
+```
+
+Los puertos estaban libres para `bind(127.0.0.1)` durante la medición, pero eso **no los reserva**. Los contenedores TVH/streams están conectados a la misma red bridge. No se ha demostrado todavía DNS interno para un futuro contenedor nuevo, ni un mecanismo válido de importar playlist sin tocar la original.
+
+**Decisión de diseño:** segunda instancia aislada con config y playlist privadas, sin publicar más de 29991/29992 en loopback, preferentemente sobre runtime glibc compatible con el ELF Ubuntu, no reemplazar LinuxServer ni montar config original como RW. Si se utiliza el servidor web `streams` compartido, conectarlo a la red `masqelec-pvr-g3ab_pvr_g3ab` y validar alcance después. Para la actualización de playlist, confirmar que el origen será HTTP(S): el parche G3-AL deliberadamente no notifica rutas file/pipe, por falta de auditoría de locks. No iniciar ensayo rename desde una URL file:// y declarar fallo del parche. Antes de crear nada, identificar fuente/argumentos de inicio y rutas HTTP de playlist sin revelar credenciales.
+
+```text
+G3AM_PORTS_29991_29992=AVAILABLE_AT_SAMPLE
+G3AM_SHARED_NETWORK=VERIFIED_BRIDGE
+G3AM_STREAMS_ACCESS_FROM_NEW_TVH=NOT_TESTED
+G3AM_HTTP_PLAYLIST_SOURCE=NOT_VERIFIED
+G3AM_PARALLEL_TVH=NOT_STARTED
+G3AM_HOT_RENAME=NOT_TESTED
+```
