@@ -144,3 +144,17 @@ Se revisó `configure` exacto `tvheadend/tvheadend@8837853a6`:
 `G3AL_HOST_CONFIGURE_1=FAIL_LIBDVBCSA_MISSING`
 `G3AL_C_SOURCE_COMPILATION=NOT_REACHED`
 `G3AL_TVH_LAB_CONTAINER_CHANGED=NO`
+
+## G3-AL: compilación con opciones reducidas alcanza enlace final; exit code pendiente (2026-11-21)
+
+Tras configure con `--python=python3 --disable-ffmpeg_static --disable-libav --disable-doc --disable-cwc --disable-cccam --disable-capmt --disable-constcw --disable-tvhcsa --disable-dvbscan --disable-vue_build`, el operador comunicó las últimas líneas:
+
+```text
+CC              src/input/mpegts/tvhdhomerun/tvhdhomerun.o
+CC              src/input/mpegts/tvhdhomerun/tvhdhomerun_frontend.o
+CC              src/docs.o
+CC              timestamp.o
+CC              tvheadend
+```
+
+Indican llegada a etapa de enlace final, sin error en el fragmento recibido. **No se ha recibido código de salida, ni verificación del binario, ni informe completo**. Estado `G3AL_BUILD_LINK_REACHED=YES`, `G3AL_COMPILE_PASS=PENDING_EXIT_CHECK`. El build reducido no asegura paridad funcional ni ABI con imagen LinuxServer `latest`, por lo que no usar el binario para sustituir servicio. Siguiente comando en checkout experimental: `make -j2 && test -x build.linux/tvheadend && echo G3AL_COMPILE=PASS` con comprobación de ruta del ejecutable antes de asumir el destino concreto; si ruta distinta, consultar `find build.* -type f -name tvheadend`. No arranque ni deploy.
