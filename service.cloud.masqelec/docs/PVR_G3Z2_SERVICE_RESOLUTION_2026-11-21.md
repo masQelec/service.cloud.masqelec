@@ -38,3 +38,26 @@ Basta TVH lab en 19981; Kodi puede estar cerrado. No ejecutar en CoreELEC.
 Si devuelve `TVH_SERVICE_UUID_RELATION_PASS` habrá quedado demostrada **solo** la relación canal→servicio en TVH del laboratorio. `CUID_MAPPING_PROVEN=NO` y `TVH_TO_KODI_IDENTITY_PROVEN=NO` permanecerán bloqueados. La relación exacta con la playlist y el backend Kodi exige pruebas adicionales con fixture CUID y/o metadatos HTSP.
 
 **Producción no alterada. Cambio de algoritmo legacy no autorizado.**
+
+
+## Resultado real operador — G3-Z2 PASS, 2026-11-21
+
+```text
+Ran 13 tests in 0.001s
+OK
+G3Z2=TVH_SERVICE_UUID_RELATION_PASS
+CHANNEL_COUNT=2
+AVAILABLE_SERVICE_COUNT=3
+SERVICE_REFERENCE_COUNT=2
+UNIQUE_REFERENCED_SERVICES=2
+UNRESOLVED_REFERENCES=0
+TVH_CHANNEL_SERVICE_REFERENCE_PROVEN=YES
+CUID_MAPPING_PROVEN=NO
+TVH_TO_KODI_IDENTITY_PROVEN=NO
+DELETION_AUTHORIZED=NO
+PRODUCTION_TOUCHED=NO
+```
+
+`G3Z2_UNIT=PASS_13` y `G3Z2_LAB_TVH_SERVICE_UUID_RELATION=PASS`. Las dos referencias se resuelven en catálogo service/list de TVH. Este gate **no** acredita una vinculación CUID→servicio, ni TVH UUID→Kodi ID, ni eliminación segura.
+
+**Observación adicional importante:** 3 servicios descubiertos, 2 referenciados por los 2 canales, sin referencias pendientes. Puede tratarse de un servicio residual del paso 2→3→2, pero **no está demostrado**: contar disponibles menos referenciados no identifica por sí solo un huérfano que debiera eliminarse. Siguiente gate: estudiar por API GET la relación de servicios no vinculados con muxes y con el conjunto IPTV sintético, sin borrar ni alterar configuración, y distinguir limpieza de canales frente a retención legítima de servicios/muxes.
