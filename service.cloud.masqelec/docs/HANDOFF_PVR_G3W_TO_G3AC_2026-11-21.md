@@ -1084,3 +1084,35 @@ https://github.com/tvheadend/tvheadend/blob/master/src/input/mpegts/iptv/iptv_au
 `G3AH_CAPTURE_GAPS_NEW_SESSIONS=0`
 `G3AH_ROOT_CAUSE_UPSTREAM=STRONG_HYPOTHESIS_NOT_FINAL`
 `G3AH_PRODUCTION_CHANGES=NO`
+
+
+## G3-AI: identificación EXACTA de TVheadend y comprobación de código fuente en mismo commit (21/11/2026)
+
+El operador obtuvo del laboratorio, sin reiniciar ni modificar servicios:
+
+```text
+TVH API /api/serverinfo SW_VERSION: 4.3-2897~g8837853a6
+API_VERSION: 20
+LinuxServer label build_version: Linuxserver.io version:- 8837853a-ls288 Build-date:- 2026-10-17T17:55:41+00:00
+Container image: sha256:7f5d04ed7ea7f58cd50c2cf11a79d0823fa0a4aa4f6c64478360b9e3a8027c28
+Image repository/tag: lscr.io/linuxserver/tvheadend:latest
+Published localhost HTTP:19991 HTSP:19992
+```
+
+La auditoría recuperó **fuente de Tvheadend de GitHub en `ref=8837853a6`**, verificando que son las líneas relevantes de la revisión concreta, y no extrapolación del master:
+
+* `src/input/mpegts/iptv/iptv_auto.c` líneas ~228–231: para multiplexor IPTV con `mm_iptv_url_cmpid` coincidente, un nombre cambiado causa `im->mm_iptv_svcname=strdup(name)` y `change=1`; línea ~281: `if(change) idnode_notify_changed(&im->mm_id)`.
+* `src/idnode.c` línea ~1909: `idnode_notify_changed(void *in) { idnode_notify(in, "change"); }`, un mecanismo de notificación de idnode. **No equivale a `idnode_changed` del canal**.
+* `src/channels.c` líneas ~78–94: `channel_class_changed(idnode_t *self)` llama a `htsp_channel_update(ch)` en la ruta de cambios de propiedades del canal.
+* `src/htsp_server.c` ~3783–3835: `_htsp_channel_update` recorre clientes asíncronos y `htsp_channel_update` construye `channelUpdate` con metadatos para clientes autorizados.
+
+**Inferencia de alta confianza, todavía condicionada a rutas indirectas**: recargar solo el nombre de servicio IPTV actualiza la metadata efectiva consultada en TVH, pero la rama de `iptv_auto.c` no dispara directamente el callback HTSP del canal, dando cuenta del silencio HTSP capturado y el label Kodi obsoleto. La nueva sesión HTSP sí emite `channelAdd` + `initialSyncCompleted` y Kodi converge sin cambiar IDs.
+
+**No es una corrección implementada.** Antes de probar cambios, precisar si una API TVH puede provocar `idnode_changed` o notificación segura del canal sin alterar datos, o bien si el fallo requiere un parche del servidor: `idnode_notify_changed` de mux no basta por sí solo. No implementar updates masivos, borrado/recreación, interruptores bouquet, SQL ni restart de PVR. G3-AI read-only hasta diseñar gate y rollback.
+
+`G3AI_TVH_VERSION_VERIFIED=4.3-2897_g8837853a6`
+`G3AI_TVH_IMAGE_SHA256=7f5d04ed7ea7f58cd50c2cf11a79d0823fa0a4aa4f6c64478360b9e3a8027c28`
+`G3AI_EXACT_SOURCE_REF_FETCHED=8837853a6`
+`G3AI_IPTV_MUX_NOTIFY_VS_CHANNEL_HTSP_DIFFERENCE=VERIFIED_DIRECT_PATHS`
+`G3AI_PRODUCTION_CHANGE=NO`
+`G3AI_SAFE_REFRESH_MECHANISM=NOT_YET_VERIFIED`
