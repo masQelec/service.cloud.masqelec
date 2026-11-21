@@ -135,3 +135,16 @@ KODI_ID: 1 NOMBRE: G3AB Beta NUMERO: 2
 TOTAL: 2
 ```
 **No validar aún la identidad Kodi G3-AB** con este snapshot: la declaración del operador sobre el puerto/configuración requiere verificar que `pvr.hts` está conectado efectivamente a `127.0.0.1:19992` y no `19982` del laboratorio G3-W, ni a otro cliente PVR. Los nombres visibles podrían ser persistidos en caché/configuración previa; la respuesta JSON-RPC por sí sola no revela el servidor de procedencia. Reiniciar solo Kodi del perfil `runtime/kodi_home` tras corregir/confirmar el endpoint y repetir la consulta de lectura; no borrar `TVxx.db`. Marcar `G3AB_KODI_BASELINE=BLOCKED_PENDING_ENDPOINT_PROOF`; no ejecutar `rename`.
+
+
+## Segunda lectura de Kodi tras indicación de revisar puerto
+
+El operador comunicó otro GET JSON-RPC `PVR.GetChannels(channelgroupid=alltv)`:
+
+```text
+ID: 2 NOMBRE: G3AB Alpha
+ID: 1 NOMBRE: G3AB Beta
+TOTAL: 2
+```
+
+Los IDs y etiquetas son **idénticos** a la lectura anterior. Esto comprueba estabilidad entre esas dos respuestas, pero **no** la conexión efectiva al HTSP `127.0.0.1:19992`: el usuario no ha confirmado explícitamente qué puerto dejó configurado, ni JSON-RPC expone la procedencia. Siguiente gate leer conexiones TCP reales del proceso Kodi y comprobar `127.0.0.1:19992` ESTAB y ausencia de `127.0.0.1:19982` ESTAB. No repetir innecesariamente PVR.GetChannels ni ejecutar `rename` antes de confirmar el endpoint.
