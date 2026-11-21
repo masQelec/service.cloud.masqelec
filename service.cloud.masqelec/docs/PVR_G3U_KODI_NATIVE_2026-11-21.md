@@ -45,3 +45,25 @@ Kodi debe tener habilitado su servidor JSON-RPC HTTP local tal como los probes G
 4. Ejecutar pruebas/CI y PR develop→main; distribución ZIP exclusiva del operador.
 
 **Estado:** `KODI_NATIVE_READONLY_PREPARED=YES`, `KODI_NATIVE_MASTER_TEST=PENDING`, `SQLITE_WRITES_NEW_CODE=NO`, `LEGACY_CUTOVER=NO`, `PRODUCTION_CHANGED=NO`, `ZIP_PUBLISHED=NO`.
+
+
+## Corrección G3-U — ID especial alltv (2026-11-21)
+
+El operador ejecutó el diagnóstico en el master y obtuvo:
+
+```text
+KODI_NATIVE_READONLY=BLOCKED
+REASON=KODI_ALLTV_NOT_UNAMBIGUOUS
+SQLITE_TOUCHED=NO
+TVH_MUTATION=NO
+```
+
+**Causa en nuestro código:** el instrumento exigía que `PVR.GetChannelGroups` enumerase literalmente el ID especial `alltv`. La API documentada `PVR.ChannelGroup.Id` admite expresamente `"alltv"` como argumento de `PVR.GetChannels` **sin** que deba aparecer como una fila en la lista normal de grupos. En esta versión, los grupos enumerados pueden tener identificadores numéricos. Por tanto, el bloqueo era un supuesto inválido del probe, no evidencia de canales ausentes.
+
+Fuente oficial: https://kodi.wiki/view/JSON-RPC_API/v13 (tipos `PVR.ChannelGroup.Id` y método `PVR.GetChannels`).
+
+El probe ahora llama exclusivamente `PVR.GetChannels(channelgroupid="alltv")`; elimina la selección previa basada en la lista de grupos. Solo JSON-RPC de lectura y GET TVH; no SQLite ni acciones mutadoras.
+
+Se han actualizado las pruebas para incluir grupo especial sin enumeración, error de JSON-RPC y respuesta parcial. El resultado del master **debe volver a ejecutarse**; esta corrección no acredita todavía convergencia Kodi. Repetir solo la suite G3-U (10 pruebas previstas).
+
+**NUEVO_PROBE_DESPLEGADO=NO**; **KODI_RESULTADO_POST_CORRECCION=PENDIENTE**; **MANTENIMIENTO_HEREDADO_ACTIVO=SI**.
