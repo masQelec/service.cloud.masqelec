@@ -259,3 +259,17 @@ NOMBRE: G3AB Beta
 El TVH de laboratorio ya presentaba `G3AB Alpha Renamed` y su UUID preservado. **No hay convergencia de etiqueta en Kodi**, aunque se conservaron 2 canales y el ID 2. El protocolo HTSP documenta la notificación **`channelUpdate`** con campo opcional `channelName`, así como el mecanismo de metadatos asíncronos: https://docs.tvheadend.org/documentation/development/htsp/server-to-client-methods y https://docs.tvheadend.org/documentation/development/htsp/client-to-server-rpc-methods. La existencia del mecanismo **no demuestra** que TVH emitiera efectivamente el evento ni que pvr.hts lo procesara.
 
 `G3AB_RENAME_TVH=PASS`; `G3AB_RENAME_KODI_LABEL=FAIL_CURRENT_STATE`; `G3AB_RENAME_KODI_ID=STABLE`; `G3AB_HTSP_CHANNEL_UPDATE_SEEN=NOT_TESTED`. Próxima prueba de diagnóstico **sin limpiar base de datos ni resetear el cliente**: cerrar solo Kodi de laboratorio y reiniciarlo con el mismo HOME G3-AB, verificar el socket al puerto 19992 y consultar otra vez PVR.GetChannels para distinguir reimportación inicial de actualización en vivo. No seguir con `prepare.py url` mientras el rename no se resuelva. Si reiniciar Kodi corrige la etiqueta, hay un fallo de actualización en vivo o notificación (no necesariamente del lado TVH); si sigue incorrecta, investigar opciones de nombres locales y persistencia de metadatos de Kodi sin borrar `TVxx.db`.
+
+
+## G3-AB rename: Kodi muestra el nuevo nombre tras reinicio normal (operador, 2026-11-21)
+
+Después de cerrar y reiniciar **únicamente Kodi G3-AB** con el mismo perfil `runtime/kodi_home`, sin limpieza de TVxx.db, sin deshabilitar pvr.hts y sin eliminar canales, el operador reportó:
+
+```text
+ID: 2 NOMBRE: G3AB Alpha Renamed
+ID: 1 NOMBRE: G3AB Beta
+```
+
+TVH previamente confirmó `G3AB Alpha Renamed` con UUID `185e5bdda6aafa6aa1aad2bb94ee703a`; Kodi mantiene ID `2`. `G3AB_RENAME_TVH=PASS`, `G3AB_RENAME_KODI_AFTER_RESTART=PASS`, `G3AB_RENAME_IDS_STABLE=YES_OBSERVED`, `G3AB_KODI_LIVE_NAME_REFRESH=NOT_OBSERVED`, `G3AB_HTSP_CHANNELUPDATE_CAUSE=UNPROVEN`, `G3AB_CUID_CAUSALITY=UNPROVEN`.
+
+**Control metodológico antes de G3-AB URL:** `prepare.py url` restaura los metadatos `name`/`group` del baseline al mismo tiempo que cambia la URL, por diseño de etapas independientes. Por tanto, NO transicionar directamente `rename → url`: ejecutar `prepare.py restored`, esperar convergencia TVH/Kodi y confirmar el nombre original `G3AB Alpha` con los identificadores conservados. Solo entonces ejecutar `prepare.py url`. Si el nombre de Kodi no vuelve a baseline en vivo, reiniciar solo Kodi de laboratorio y registrar el hecho; no borrar SQLite ni datos PVR. Tampoco se debe interpretar la estabilidad de UUID ante URL como prueba del uso causal de CUID.
