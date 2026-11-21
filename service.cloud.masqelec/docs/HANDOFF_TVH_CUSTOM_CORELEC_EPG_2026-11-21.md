@@ -212,3 +212,31 @@ WORKFLOW_PRODUCTION_NO_CHANGE_WITHOUT_APPROVAL=YES
 WORKFLOW_CORELEC_EXISTING_BUILDER_REUSE=YES
 WORKFLOW_HANDOFF_REQUIRED=YES
 ```
+
+
+## 11. LABORATORIO DEL OPERADOR — runbook obligatorio para continuidad
+
+**Consultar antes de iniciar G3-AM:** `docs/RUNBOOK_G3AB_UBUNTU_LAB_2026-11-21.md`.
+
+El laboratorio de Ubuntu **ya existe y es persistente**. Se han documentado rutas absolutas, servicios Docker, puertos, volúmenes, perfil Kodi, playlist de pruebas, capturas PCAP, UUID/servicios/CUID, estado histórico, checkout upstream parcheado, binario compilado, preflight read-only y cautelas de respaldo/reversión. No reconstruirlo desde cero ni asumir que sigue en ejecución sin comprobar `docker compose ps`.
+
+Elementos destacados:
+```text
+LAB=/home/ubuntu/GitHub/service.cloud.masqelec/service.cloud.masqelec/lab/pvr_g3ab
+COMPOSE=lab/pvr_g3ab/compose.yaml
+TVH_HTTP=127.0.0.1:19991
+TVH_HTSP=127.0.0.1:19992
+KODI_JSONRPC=127.0.0.1:8080
+TVH_CONFIG=runtime/tvh_config (RW SOLO CONTENEDOR ORIGINAL)
+KODI_PROFILE=runtime/kodi_home/.kodi
+PLAYLIST=runtime/playlist/playlist.m3u
+HTSP_CAPTURES=runtime/htsp_capture/
+TVH_PATCHED_UPSTREAM=/home/ubuntu/tvheadend-g3al-upstream
+TVH_PATCHED_BIN=build.linux/tvheadend (Ubuntu; COMPILACIÓN PASS, RUNTIME PENDIENTE)
+```
+
+**No compartir volúmenes de configuración en escritura con otra instancia TVH, no borrar `runtime/`, no resetear estado Kodi, no reiniciar contenedores para empezar la conversación.** G3-AM usará un entorno paralelo con configuración independiente y puertos diferentes si supera la verificación ABI. El entorno de build CoreELEC preparado por el usuario es distinto del checkout fuente Ubuntu: sus detalles no se han inspeccionado.
+
+`WORKFLOW_READ_LAB_RUNBOOK_FIRST=YES`
+`WORKFLOW_REUSE_EXISTING_LAB=YES`
+`WORKFLOW_CURRENT_LAB_STATUS_RECHECK_REQUIRED=YES`
