@@ -191,3 +191,18 @@ Estas operaciones no arrancan el servidor ni alteran la biblioteca. Evitar mostr
 `G3AL_BINARY_RUN=NO`
 `G3AL_CONTAINER_REPLACED=NO`
 `G3AL_NEXT_GATE=G3AM_BINARY_ABI_AND_ISOLATED_CONFIG`
+
+## Cierre de chat: compilación CoreELEC preparada y EPG-01 pendiente (21/11/2026)
+
+**Leer primero el nuevo handoff central**: `docs/HANDOFF_TVH_CUSTOM_CORELEC_EPG_2026-11-21.md`. Consolida evidencias G3-AH/G3-AL, gates pendientes y la siguiente incidencia.
+
+El usuario informa que **ya tiene preparado su entorno build CoreELEC** para un eventual Tvheadend personalizado. No se ha inspeccionado su plataforma/arch/toolchain; el `build.linux/tvheadend` de Ubuntu compiló PASS, **sin prueba runtime**, y no es binario listo para CoreELEC. No modificar master ni instalar nada en producción sin autorización.
+
+El usuario añade **EPG-01**: géneros de la guía aparecen sistemáticamente como `Otros` o `Desconocidos`; **no hay todavía evidencia del origen**. Analizar en próximo chat tras completar G3-AM y prueba runtime de la actualización nativa: XMLTV `<category>` → mapping/import Tvheadend → eventos HTSP → Kodi/pvr.hts/UI. No asumir que el XML esté mal.
+
+`G3AL_BUILD_HOST=PASS`
+`G3AM_ISOLATED_RUNTIME=PENDING`
+`CORELEC_BUILDER_USER_READY=YES_REPORTED`
+`CORELEC_BINARY_BUILD=NOT_STARTED`
+`EPG01_CAUSE=UNKNOWN`
+`EPG01_ANALYSIS=NOT_STARTED`
