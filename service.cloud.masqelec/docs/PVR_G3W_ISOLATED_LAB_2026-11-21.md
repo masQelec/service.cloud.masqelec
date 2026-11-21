@@ -103,3 +103,10 @@ El operador confirmó **web funcional y M3U configurada** y aportó una captura 
 **Siguiente paso obligatorio:** conectar un Kodi con perfil separado al HTSP del TVH de laboratorio (host Ubuntu, puerto localhost 19982 o túnel SSH controlado), registrar sus dos canales iniciales y sus IDs. No cambiar a etapa `added` antes de completar esa línea base. La suite G3-W no se declara confirmada numéricamente solo porque la salida presentada por el operador incluyera «OK», sin cabecera de número de tests.
 
 **Estado:** `G3W_WEB_PORTS=WORKING`, `G3W_TVH_INITIAL_TWO_CHANNELS=PASS_VISUAL`, `G3W_KODI_LAB_BASELINE=PENDING`, `G3W_REAL_DELTA=PENDING`, `PRODUCTION_UNTOUCHED=YES`.
+
+
+## Baseline visual Kodi aislado — 2026-11-21 10:48 CET
+
+El operador aporta captura de **TV → Canales → Todos los canales** en Kodi de Ubuntu, mostrando exclusivamente `G3W Synthetic 1` (número 1) y `G3W Synthetic 2` (número 2), indicador `1 / 2`. TVH de laboratorio ya había mostrado 2/2.
+
+`G3W_KODI_LAB_BASELINE_VISUAL=PASS_2_OF_2`. Todavía **no** constan IDs internos Kodi `channelid` ni UUID de TVH, ni se ha observado alta/baja. Registrar IDs por APIs de solo lectura antes de ejecutar `prepare.py added`, para validar identidad persistente. Kodi JSON-RPC HTTP local debe habilitarse solo en perfil Ubuntu de laboratorio, sin exponerlo a la LAN.
