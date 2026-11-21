@@ -73,3 +73,16 @@ G3AM_HTTP_PLAYLIST_SOURCE=NOT_VERIFIED
 G3AM_PARALLEL_TVH=NOT_STARTED
 G3AM_HOT_RENAME=NOT_TESTED
 ```
+
+## G3-AM — parámetros CLI y disponibilidad de imagen (operador, 21/11/2026)
+
+La consulta read-only `docker image ls --filter reference='ubuntu:*'` no imprimió imágenes (no se constató ninguna imagen `ubuntu:*` local). `./build.linux/tvheadend --help` confirmó `--config`, `--user`, `--group`, `--bindaddr`, `--http_port`, `--htsp_port`, `--htsp_port2`, `--fork`, `--nobackup` y otros parámetros. El marcador de comando fue `G3AM_RUNTIME_SELECTION_PREFLIGHT=COMPLETED`.
+
+**No** se comprobó aún la imagen Ubuntu concreta (versión de glibc), ni existe contenedor paralelo. Opción preferida: imagen compatible glibc con bind-mount binario solo lectura, identidad de usuario restringida, config/playlist propia; red existente para streams, HTTP playlist propia; sin tocar LinuxServer original. Antes de crearla, verificar release host, bibliotecas mínimas (GLIBC symbol requirements), red y recursos disponibles; no realizar descargas o instalaciones automáticamente.
+
+```text
+G3AM_TVH_CLI_FLAGS=VERIFIED
+G3AM_LOCAL_UBUNTU_IMAGE=NOT_LISTED
+G3AM_COMPATIBLE_RUNTIME_IMAGE=NOT_SELECTED
+G3AM_PARALLEL_RUNTIME=NOT_STARTED
+```
