@@ -974,3 +974,33 @@ Se confirmó **nueva sesión TCP por cambio de puerto de origen Kodi**, de 46266
 `G3AG_NEXT_GATE=CLASSIFY_HTSP_FRAMES_BY_TCP_SESSION`
 
 No implementar reproducción forzada ni restart PVR como workaround; verificar primero que el protocolo emite/reentrega metadatos por nueva sincronización y por qué refetch IPTV no notifica al cliente persistente.
+
+
+## G3-AG: coincidencias channelAdd/channelName asociadas a dos nuevas conexiones HTSP (operador 2026-11-21)
+
+El operador corrigió la inspección textual de `tcpdump -A` y obtuvo este recuento de substrings en la dirección servidor (19992) → Kodi por puerto de destino:
+
+```text
+=== MENSAJES POR PUERTO DESTINO ===
+PUERTO: 40098 MENSAJE: channelAdd VECES: 2
+PUERTO: 40098 MENSAJE: channelName VECES: 2
+PUERTO: 40098 MENSAJE: subscriptionStart VECES: 1
+PUERTO: 46266 MENSAJE: subscriptionStart VECES: 1
+PUERTO: 49262 MENSAJE: channelAdd VECES: 2
+PUERTO: 49262 MENSAJE: channelName VECES: 2
+PUERTO: 49262 MENSAJE: subscriptionStart VECES: 1
+```
+
+**Observación robusta de nivel de segmentos**: las cadenas `channelAdd` y `channelName` en la captura de reproducción están en tráfico de **servidor→cliente** y aparecen exclusivamente en las dos conexiones nuevas 49262 y 40098, dos coincidencias por conexión; no aparecen en la antigua 46266. Se habían confirmado SYN para 49262 y 40098 y FIN/RST de conexiones anteriores; Kodi acabó mostrando `G3AB Alpha Renamed` con `channelid=3` estable, Beta `channelid=2`. No hay evidencia de `channelUpdate` en la captura de renombrado anterior (28 paquetes, 0 payload, ventana que cubrió escritura M3U).
+
+**Hipótesis reforzada**: los `channelAdd` pueden corresponder a sincronización inicial de canales HTSP por nueva conexión, y la convergencia Kodi coincide con esa resincronización, no con una notificación activa durante el refetch de playlist. **No equivale a decodificación semántica**: `tcpdump -A` no reensambla frames HTSP, ni verifica límites de mensaje, IDs o repetición de payload. Tampoco prueba aún cuál de las dos reconexiones activó el refresco, ni por qué ocurrieron.
+
+`G3AG_SERVER_TO_NEW_PORT_49262_CHANNELADD_STRING_COUNT=2`
+`G3AG_SERVER_TO_NEW_PORT_40098_CHANNELADD_STRING_COUNT=2`
+`G3AG_SERVER_TO_OLD_PORT_46266_CHANNELADD_STRING_COUNT=0`
+`G3AG_CHANNELNAME_NEW_SESSIONS=2_EACH`
+`G3AG_KODI_LABEL_REFRESH_AFTER_HTSP_RECONNECT=OBSERVED_TEMPORAL_CORRELATION`
+`G3AG_INITIAL_HTSP_SYNC_REFRESH=LIKELY_NOT_FRAME_VERIFIED`
+`G3AG_REFETCH_M3U_HTSP_PUSH_ABSENT=LIKELY_NOT_SERVER_INSTRUMENTED`
+
+**Próxima fase G3-AH**: construir decodificador PCAP/HTSP offline local read-only limitado a las capturas sintéticas, con separación por puerto/dirección, reensamblado TCP seguro, framing HTSP prefijado, identificación estructural `method`, `channelId`, `channelName` y eventos `channelAdd` / `channelUpdate`, sin imprimir ni subir bytes, credenciales, URL, tokens o pcap. Verificar tests sintéticos antes de ejecutar sobre captura real. Luego diseñar prueba causal del refetch Tvheadend sin tocar Kodi/PVR/master. No introducir reproducción forzada ni reconexiones periódicas como workaround.
