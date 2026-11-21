@@ -51,7 +51,9 @@ class IdentityTests(unittest.TestCase):
         channels = CHANNELS + [{"uuid": "c3", "name": "One", "tags": ["tag-a"]}]
         got = M.compare(m3u, TAGS, channels)
         self.assertEqual(got["m3u_ambiguous_duplicate_entries"], 2)
-        self.assertEqual(got["match_gate"], "INCOMPLETE")
+        self.assertEqual(got["match_gate"], "PASS")
+        self.assertEqual(got["identity_disambiguation"], "NOT_PROVEN")
+        self.assertEqual(got["cuid_mapping_proven"], "NO")
 
     def test_missing_group_in_m3u_blocks(self):
         with self.assertRaisesRegex(M.Blocked, "INVALID_EXTINF"):
