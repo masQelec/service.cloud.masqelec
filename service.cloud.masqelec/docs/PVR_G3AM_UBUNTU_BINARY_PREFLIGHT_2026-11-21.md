@@ -237,3 +237,22 @@ G3AM_PARALLEL_TVH=NOT_STARTED
 G3AM_HTTP_PLAYLIST=NOT_RUNNING
 G3AM_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — primer arranque, HTTP sin respuesta (operador, 21/11/2026)
+
+Tras ejecutar el bloque propuesto de preparación, arranque y curl:
+```text
+G3AM_HTTP_CODE=000
+G3AM_BOOT_COMMANDS=COMPLETED
+```
+
+El operador **no proporcionó** salida de `docker compose ps`, exit codes ni logs. `curl 000` prueba ausencia de respuesta HTTP válida, no demuestra si falló el proceso TVH, el bind o el transporte. Marcador `COMPLETED` no es PASS. En este punto **no** reejecutar `up`, no regenerar playlist, no tocar G3-AB y no modificar config ni permisos a ciegas.
+
+Siguiente paso exclusivamente read-only: `docker compose -f g3am/compose.yaml ps -a` con IDs, status, exit-code y Health (sin volcar env/volúmenes); `docker inspect` limitado a State.Status, State.ExitCode, State.Error (sanitizar si contiene rutas sensibles); estado de puertos con `ss -ltn`; búsqueda de firmas de error en logs solo de contenedores G3-AM con supresión de posibles secretos. No volcar logs completos ni URLs. A partir de evidencia real, elegir corrección mínima.
+
+```text
+G3AM_HTTP_FIRST_PROBE=FAIL_HTTP_000
+G3AM_TVH_PROCESS_STATUS=UNKNOWN
+G3AM_G3AB_ORIGINAL_MODIFIED=NOT_REPORTED
+G3AM_HTSP_HOT_RENAME=NOT_TESTED
+```
