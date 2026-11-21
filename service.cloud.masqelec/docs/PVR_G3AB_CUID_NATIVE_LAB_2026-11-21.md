@@ -303,3 +303,12 @@ BETA_KODI_OK: True
 ```
 
 `G3AB_RESTORED_TVH=PASS`; `G3AB_RESTORED_KODI_ALPHA=FAIL_LIVE`; `G3AB_RESTORED_KODI_BETA=PASS`. Ya había ocurrido la falta de propagación de la etiqueta al entrar en `rename`, resuelta entonces mediante cierre/reinicio normal de Kodi aislado, sin borrar `TVxx.db`. Diagnóstico propuesto: repetir reconexión normal del perfil G3-AB sin alterar TVH/M3U, verificar HTSP puerto 19992 y PVR.GetChannels. Si Alpha vuelve a `G3AB Alpha` con `channelid=2`, registrar `G3AB_RESTORED_KODI_AFTER_RESTART=PASS`. No pasar a `url` antes de confirmarlo. El patrón apoya un defecto de refresco en vivo del nombre, pero no identifica aún componente causal.
+
+
+## G3-AB restored: operador informa actualización al reiniciar PVR, sin reiniciar Kodi completo
+
+El operador aclara que **en Kodi, al reiniciar PVR sí se produjo el cambio de nombre**, tras haber restaurado la etapa `restored` en TVH. La acción precisa de "reiniciar PVR" (reiniciar cliente HTSP, servicio PVR o alternar estado del complemento) **no se ha especificado todavía**, y no debe equipararse a un reinicio completo de Kodi.
+
+Evidencia declarada: `G3AB_RESTORED_KODI_LABEL_AFTER_PVR_RESTART=UPDATED_OPERATOR_REPORTED`. **No se han vuelto a imprimir** los `channelid` después de esta acción, por lo que `G3AB_RESTORED_KODI_ID_STABLE_AFTER_PVR_RESTART=NOT_YET_VERIFIED`. El nombre de TVH había vuelto al original con los UUID esperados.
+
+Implicación: reiniciar la capa PVR refrescó el nombre sin reiniciar Kodi entero, opción potencialmente preferible a reinicio total, pero **no autoriza** recomendar ciclos de desactivación/activación masivos, ni constituye solución validada para uso periódico o durante reproducción. Investigar mecanismo mínimo de actualización y si emite los eventos HTSP necesarios. Antes de pasar a `url`, verificar Kodi Alpha=`G3AB Alpha` ID=2 y Beta=`G3AB Beta` ID=1. `G3AB_URL_STAGE=PENDING_RESTORED_ID_CONFIRMATION`. No borrar SQLite.
