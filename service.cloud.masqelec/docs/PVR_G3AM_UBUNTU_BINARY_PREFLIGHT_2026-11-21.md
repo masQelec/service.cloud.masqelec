@@ -287,3 +287,33 @@ G3AM_TVH_PORTS=NOT_CONNECTABLE
 G3AM_ABORT_CAUSE=UNKNOWN
 G3AM_HTTP_CHANNELUPDATE=NOT_TESTED
 ```
+
+## G3-AM — causa inmediata del aborto TVH acotada por log (operador, 21/11/2026)
+
+El operador proporcionó log filtrado del único contenedor TVH G3-AM. Secuencia:
+```text
+INFO config: Using configuration from '/config'
+INFO http: Starting HTTP server 0.0.0.0:9981
+INFO htsp: Starting HTSP server 0.0.0.0:9982
+INFO config: loaded
+INFO config: scanfile (re)initialization with path <none>
+ALERT profile: no default streaming profile! reinstall data files
+ALERT CRASH: Signal: 6 in PRG: /opt/g3al/tvheadend
+... pthread_kill, gsignal, abort ...
+UID=1000 GID=1000 MODE=775 TYPE=directory
+EXIT=134 OOM=false
+```
+
+Se confirma SIGABRT y ausencia de perfil streaming predeterminado **durante la inicialización**; no se demuestra todavía si es ausencia de data files, configuración interna vacía o parámetros/ruta de instalación. El binario compilado en host fue montado sin árbol de datos de Tvheadend, lo que hace esa hipótesis prioritaria. La salida HTTP/HTSP indica intento de puesta en escucha, pero no funcionamiento sostenido; ambos puertos quedaron inaccesibles tras aborto. No atribuir a parche G3-AL sin evidencia.
+
+Hay precedentes upstream del mismo mensaje al ejecutar Tvheadend compilado sin instalación/ajuste adecuado de datos, pero eso tampoco identifica el archivo ausente en este build: https://tvheadend.org/d/4492-manual-building-deb-packages-on-clean-ubuntu-or-other-debian-distros?page=4 .
+
+Siguiente gate **solo lectura del checkout original**: identificar rutas de data/manifest real de configuración desde `.config.mk`, `Makefile` y `src/profile.c`, sin ejecutar `make install`, sin copiar perfiles del G3-AB original, sin reiniciar ni eliminar contenedores. Después se diseñará un montaje RO de datos o una inicialización legítima aislada.
+
+```text
+G3AM_ABORT_SIGNAL=6_CONFIRMED
+G3AM_MISSING_DEFAULT_STREAM_PROFILE=OBSERVED
+G3AM_ROOT_CAUSE_DATA_PATH=HYPOTHESIS_UNVERIFIED
+G3AM_TVH_HTTP_HTSP=NOT_RUNNING_AFTER_ABORT
+G3AM_ORIGINAL_G3AB=NOT_CHANGED_BY_DIAGNOSIS
+```
