@@ -784,3 +784,32 @@ El PCAP fue modificado ~116 s después del fichero M3U. **mtime de PCAP no da ho
 `G3AF_SERVER_CHANNELUPDATE_EMITTED=UNKNOWN`
 
 Próxima prueba read-only inmediata: ver primeras y últimas marcas temporales del PCAP con `tcpdump -tt` (sin `-A/-X`) para determinar si la captura se inició antes del cambio de playlist; y verificar hora de modificación de los ficheros, recordando que TVH refetch ocurrió más tarde que la M3U. Para comprobar si el enlace/captura puede ver datos de aplicación, usar el propio laboratorio y tráfico HTSP conocido y capturado, no inferir un evento a partir de ACKs. No reiniciar Kodi/PVR, no alternar bouquet, no tocar master/SQLite y no subir pcap.
+
+
+## G3-AF: PCAP abarca modificación M3U y no contiene payload TCP (2026-11-21)
+
+Resultado del operador leyendo localmente `runtime/htsp_capture/g3af_rename.pcap` con `tcpdump -tt`:
+
+```text
+CAPTURA_PRIMER_PAQUETE: 2026-11-21T19:25:29
+CAPTURA_ULTIMO_PAQUETE: 2026-11-21T19:28:48
+PLAYLIST_MODIFICADA: 2026-11-21T19:25:36
+PAQUETES: 28
+PAQUETES_CON_DATOS: 0
+```
+
+La ventana de paquetes va de 7 s **antes** del `mtime` de la M3U hasta 192 s **después**, y un snapshot TVH anterior verificó renombrado efectivo mientras Kodi conservaba etiqueta previa con el socket HTSP establecido. En la captura observada del puerto loopback 19992 no se registró **ningún paquete TCP con payload**. Esto es evidencia fuerte de ausencia de datos HTSP sobre **esa conexión capturada** durante la ventana (si el filtro y punto de captura eran correctos). **No identifica directamente la causa**: no hay llamada de servidor `htsp_channel_update()` instrumentada, y no tenemos timestamp exacto del refetch TVH. No afirmar que TVH jamás genera `channelUpdate` ni que la librería `pvr.hts` lo descarta. No confundir bytes HTSP con datos stream AV.
+
+**Corrección numérica**: una lectura previa del PCAP informó `PAQUETES_TOTAL=12, PAQUETES_CON_DATOS=0` mientras otra posterior inspección del mismo nombre de archivo informó 28 paquetes y cero datos. Es compatible con lectura antes del cierre completo de `tcpdump` o variación de filtros, pero **no está demostrado por qué hubo diferencia**. Usar resultado posterior `28/0` como conteo comunicado final, sin atribuir causa de discrepancia.
+
+`G3AF_PCAP_FIRST_PACKET_LOCAL=19:25:29`
+`G3AF_M3U_MTIME_LOCAL=19:25:36`
+`G3AF_PCAP_LAST_PACKET_LOCAL=19:28:48`
+`G3AF_PCAP_TOTAL_PACKETS_LATEST=28`
+`G3AF_PCAP_DATA_PACKETS_LATEST=0`
+`G3AF_RENAME_APPLIED_IN_TVH=YES`
+`G3AF_KODI_STALE_LABEL_AFTER_RENAME=YES`
+`G3AF_HTSP_PAYLOAD_ON_OBSERVED_LOOPBACK_CONNECTION=NO_IN_CAPTURE`
+`G3AF_TVH_CHANNELUPDATE_EMISSION_ROOT_CAUSE=UNPROVEN`
+
+Siguiente discriminación sin cambios: inspeccionar timestamps de importación de TVH en log Docker (solo metadatos filtrados), y si hace falta instrumentar lado TVH HTSP de laboratorio con un evento nativo seguro (sin reiniciar bouquet/PVR) o verificar configuración de suscripción HTSP, antes de cualquier workaround. Nunca publicar PCAP sin sanitizar.
