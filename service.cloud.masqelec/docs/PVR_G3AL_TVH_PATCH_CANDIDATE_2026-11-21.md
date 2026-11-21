@@ -110,3 +110,37 @@ No ejecutar `make install` en host, no lanzar servidor ni reiniciar contenedores
 `G3AL_COMPILE=NOT_YET_EXECUTED`
 `G3AL_CONTAINER_SWAPPED=NO`
 `G3AL_RELEASE_AUTHORIZED=NO`
+
+## G3-AL host configure #1: falló por libdvbcsa, NO por compilación del parche (21/11/2026)
+
+El operador ejecutó en checkout upstream aislado `/home/ubuntu/tvheadend-g3al-upstream`:
+```text
+G3AL_PATCH_APPLIED=PASS
+checking for python binary ... WARN: no python binary found
+checking for py module gzip ... fail
+libpcre2-8 ... fail
+libpcre ... fail
+liburiparser ... fail
+avahi-client ... fail
+dvbcsa/dvbcsa.h ... fail
+ERROR: Failed to find dvbcsa library
+./configure output is old, please re-run
+Makefile:770: /support/.mk: No existe ...
+make: *** No hay ninguna regla para construir el objetivo '/support/.mk'.
+```
+
+**Resultado**: `git apply` y `git diff --check` PASS. La compilación C del parche NO fue alcanzada porque `configure` abortó; el error Makefile es secundario por falta de `.config.mk` generado. No declarar error de tipo o falla de parche en C, ni gate de compilación PASS.
+
+Se revisó `configure` exacto `tvheadend/tvheadend@8837853a6`:
+- defaults `cwc:yes,cccam:yes,capmt:yes,constcw:yes,tvhcsa:auto`, `iptv:yes`, `dvbscan:yes`, `vue_build:auto`.
+- líneas ~812–824: si cardclient está habilitado, `tvhcsa` se activa y exige cabecera/librería `dvbcsa`; `--disable-cwc --disable-cccam --disable-capmt --disable-constcw --disable-tvhcsa` evita esa ruta únicamente para compilar, sin representar build con paridad de funcionalidades.
+- `--python=python3` corrige el `python` ausente si python3 está instalado, sin symlinks de sistema.
+- `--disable-dvbscan` evita descarga innecesaria durante preflight, `--disable-vue_build` evita build frontend. `--disable-ffmpeg_static --disable-libav --disable-doc` ya indicados.
+- Faltas `libpcre2`, `liburiparser`, Avahi eran comprobaciones opcionales en esta configuración, pero pueden aparecer otros fallos más adelante.
+- Nuevo gate propuesto: ejecutar solo `./configure ...` con flags reducidos, usando `&& make -j2` **únicamente si configure termina con éxito**. No instalar paquetes de host automáticamente ni modificar contenedor TVH.
+- Aunque compile con funciones reducidas, **NO autoriza usar este binario en el contenedor** (no incluye mismas prestaciones/ABI que imagen LinuxServer).
+
+`G3AL_PATCH_APPLIED_TO_ISOLATED_UPSTREAM=PASS`
+`G3AL_HOST_CONFIGURE_1=FAIL_LIBDVBCSA_MISSING`
+`G3AL_C_SOURCE_COMPILATION=NOT_REACHED`
+`G3AL_TVH_LAB_CONTAINER_CHANGED=NO`
