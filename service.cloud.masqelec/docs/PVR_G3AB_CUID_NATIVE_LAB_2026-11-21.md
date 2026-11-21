@@ -55,3 +55,18 @@ TVH G3-AB en `http://127.0.0.1:19991`. Crear red Automatic IPTV **exclusiva** pa
 5. No afirmar que CUID es soportado por TVH hasta que exista evidencia específica de lectura de dicho atributo; estabilidad de UUID ante modificaciones es solo comportamiento observado, no causalidad CUID.
 
 `G3AB_LAB_CREATED=YES`; `G3AB_UNIT_TESTS=PENDING`; `G3AB_NATIVE_IDENTITY=NOT_TESTED`; `CUTOVER_AUTHORIZED=NO`; `PRODUCTION_TOUCHED=NO`.
+
+
+## Arranque inicial comunicado por el operador — 2026-11-21
+
+```text
+G3AB_STAGE=BASELINE
+G3AB_CUID_COUNT=2
+G3AB_MASTER_UNTOUCHED=YES
+G3AB_G3W_UNTOUCHED=YES
+Docker network masqelec-pvr-g3ab_pvr_g3ab created
+masqelec-pvr-g3ab-streams-1 Up (80/tcp interno)
+masqelec-pvr-g3ab-tvh-1 Up (127.0.0.1:19991->9981/tcp, 127.0.0.1:19992->9982/tcp)
+```
+
+Estado `G3AB_COMPOSE_STARTED=YES`, `G3AB_BASELINE_FILE_WRITTEN=YES`, `G3AB_UNIT_TESTS=NOT_REPORTED`, `G3AB_TVH_CHANNELS=NOT_YET_VERIFIED`, `G3AB_KODI_CHANNELS=NOT_YET_VERIFIED`. Puertos publicados en localhost, sin evidencia de lectura efectiva por TVH o mapeo a canales. Siguiente paso: configurar Automatic IPTV apuntando exclusivamente a `file:///lab_playlist/playlist.m3u`, mapear dos servicios, consultar el baseline de TVH por API y luego conectar perfil Kodi aislado. No ejecutar etapa `rename` antes de registrar ambos snapshots.
