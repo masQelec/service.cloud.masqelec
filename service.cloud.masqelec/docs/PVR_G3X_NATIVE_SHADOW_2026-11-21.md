@@ -50,3 +50,16 @@ El número de pruebas y el resultado de compilación están **pendientes de ejec
 3. Probar en laboratorio el caso de huérfanos históricos y fallos de red/lectura interrumpida.
 4. Diseñar el mantenimiento de tags con propiedad demostrable, preservando los seis históricos.
 5. Solo entonces modificar las rutas heredadas y probar el paquete completo. No ejecutar código de desarrollo en el master hasta pasar gates.
+
+## Validación del operador: 16 pruebas PASS (2026-11-21)
+
+El operador ejecutó `python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_pvr_native_convergence.py' -v` y comunicó:
+
+```text
+----------------------------------------------------------------------
+Ran 16 tests in 0.001s
+
+OK
+```
+
+`G3X_UNIT_TESTS=PASS_16_OF_16`. El resultado confirma las pruebas unitarias del comparador puro, no valida aún `update_pvr.py` contra sistemas reales ni autoriza conmutación. La salida de `py_compile` no se adjuntó explícitamente: `G3X_PY_COMPILE=NOT_REPORTED`. El corte sigue `NOT_AUTHORIZED`.
