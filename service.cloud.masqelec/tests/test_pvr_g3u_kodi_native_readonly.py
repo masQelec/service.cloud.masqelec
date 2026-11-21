@@ -44,33 +44,27 @@ class KodiNativeTests(unittest.TestCase):
         with self.assertRaisesRegex(M.Blocked, "CHANNEL_NAME_UNAVAILABLE"):
             M.summarize([{"name": "A"}], [{"label": ""}])
 
-    def test_only_alltv_group_is_queried(self):
+    def test_alltv_special_group_queried_without_enumeration(self):
         calls = []
         def fake(method, params):
             calls.append((method, params))
-            if method == "PVR.GetChannelGroups":
-                return {"channelgroups": [
-                    {"channelgroupid": "alltv", "label": "All channels"},
-                    {"channelgroupid": 15, "label": "Other"},
-                ]}
             return {"channels": [{"label": "A"}],
                     "limits": {"start": 0, "end": 1, "total": 1}}
         with patch.object(M, "kodi", side_effect=fake):
             self.assertEqual(len(M.kodi_all_tv()), 1)
-        self.assertEqual(calls[1][1]["channelgroupid"], "alltv")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "PVR.GetChannels")
+        self.assertEqual(calls[0][1]["channelgroupid"], "alltv")
 
-    def test_no_alltv_blocks(self):
-        with patch.object(M, "kodi", return_value={"channelgroups": []}):
-            with self.assertRaisesRegex(M.Blocked, "KODI_ALLTV_NOT_UNAMBIGUOUS"):
+    def test_readonly_rpc_error_blocks(self):
+        with patch.object(M, "kodi", side_effect=M.Blocked("KODI_RPC_ERROR")):
+            with self.assertRaisesRegex(M.Blocked, "KODI_RPC_ERROR"):
                 M.kodi_all_tv()
 
     def test_partial_jsonrpc_channels_blocks(self):
-        def fake(method, params):
-            if method == "PVR.GetChannelGroups":
-                return {"channelgroups": [{"channelgroupid": "alltv"}]}
-            return {"channels": [{"label": "A"}],
-                    "limits": {"total": 2}}
-        with patch.object(M, "kodi", side_effect=fake):
+        with patch.object(M, "kodi", return_value={
+            "channels": [{"label": "A"}], "limits": {"total": 2},
+        }):
             with self.assertRaisesRegex(M.Blocked, "KODI_CHANNELS_PARTIAL"):
                 M.kodi_all_tv()
 
