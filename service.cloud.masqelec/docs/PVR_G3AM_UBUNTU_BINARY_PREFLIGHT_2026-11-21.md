@@ -331,3 +331,27 @@ G3AM_CONFIG_BUNDLE=NOT_YET_VERIFIED
 G3AM_PROFILE_ABORT_CAUSE=BUNDLE_OR_DATA_LOAD_HYPOTHESIS
 G3AM_TVH_BOOT=FAIL_EXIT_134
 ```
+
+## G3-AM — CONFIG_BUNDLE=no confirmado; bootstrap mínimo por montaje RO (21/11/2026)
+
+Operador, auditoría local `8837853a6`:
+```text
+CONFIG_BUNDLE=no
+data/conf/profiles=PRESENT
+SHA256(data/conf/profiles)=8ef2420d92cf67b1b50959438e7850462282cccfae760f41803023788e758121
+build.linux/bundle.c=MISSING
+build.linux/bundle.o=MISSING
+```
+
+Causa del aborto **suficientemente identificada para un ensayo específico**: sin bundle embebido, `profile_init` necesita cargar los perfiles de `data/conf/profiles`; en `src/settings.c:326-343`, si falta configuración `/config/profiles`, la ruta de fallback es **relativa** `data/conf/profiles`. La imagen G3-AM define `WORKDIR /tmp` y antes carecía de montaje `/tmp/data/conf`. Código upstream `src/filebundle.c` admite buscar archivos físicos. Dado esto, se modifica **solo** `lab/pvr_g3ab/g3am/compose.yaml` con `/home/ubuntu/tvheadend-g3al-upstream/data/conf:/tmp/data/conf:ro`. No hay recompilación, ni copia de configuración original, ni cambio del addon ni G3-AL.
+
+**Próximo gate**: actualizar develop en Ubuntu; verificar checksum y existencia de perfiles y `docker compose config --quiet`; ejecutar `docker compose -f g3am/compose.yaml up -d --no-deps tvh` (recrea solo el TVH experimental si cambió montaje, sin reiniciar nginx, G3-AB ni ejecutar `prepare.py`). Releer estado y HTTP/HTSP. Si no arranca, conservar logs y exit code; no asegurar PASS sin evidencia. La configuración G3-AM puede persistir y ser modificada por TVH al primer arranque; el volumen privado está separado por diseño.
+
+```text
+G3AM_CONFIG_BUNDLE=NO_CONFIRMED
+G3AM_DEFAULT_PROFILE_SOURCE=VERIFIED
+G3AM_DEFAULT_PROFILE_SHA256=8ef2420d92cf67b1b50959438e7850462282cccfae760f41803023788e758121
+G3AM_PROFILE_FALLBACK_RELATIVE_PATH=SOURCE_VERIFIED
+G3AM_COMPOSE_DEFAULT_PROFILES_RO_MOUNT=COMMITTED
+G3AM_TVH_BOOT_AFTER_FIX=NOT_TESTED
+```
