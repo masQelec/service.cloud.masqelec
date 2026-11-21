@@ -575,3 +575,27 @@ CATEGORIAS: FAILED
 Estas cuatro líneas satisfacen la regex `(pvr|htsp).*(error|failed|disconnect|reconnect)` y contienen `failed`; **no** tenemos el mensaje ni la causa, ni sabemos si se refieren a `channelUpdate`, reconexión, HTTP o reproducción. Es posible que algunas correspondan a ensayos anteriores. La marca de modificación del log a las 19:10:38 no data por sí sola el instante del fallo de refresco. En particular no concluir causalidad por cercanía temporal hasta confrontar la cronología del renombrado. `G3AE_PVR_FAILED_LINES=4`, `G3AE_FAILED_ACTIONS=UNKNOWN`, `G3AE_HTSP_EMISSION_CAPTURE=NOT_DONE`, `G3AE_ROOT_CAUSE=UNKNOWN`.
 
 Próximo diagnóstico: obtener solamente los tipos y palabras clave de error con sanitización o inspección local de líneas 224,296,363,446 sin publicar URLs, tokens, contraseñas, IPs o datos de producción. Mantener el estado TVH Alpha Renamed / Kodi Alpha, sin reinicios ni alternancia bouquet; si los mensajes no corresponden a eventos, pasar a instrumentación HTSP aislada.
+
+
+## G3-AE: cuatro errores pvr.hts de igual longitud, sin clasificación técnica (operador 2026-11-21)
+
+Clasificador de líneas locales 224, 296, 363, 446 devolvió:
+
+```text
+LINEA: 224
+CATEGORIAS: ERROR_PVR
+LONGITUD: 103
+LINEA: 296
+CATEGORIAS: ERROR_PVR
+LONGITUD: 103
+LINEA: 363
+CATEGORIAS: ERROR_PVR
+LONGITUD: 103
+LINEA: 446
+CATEGORIAS: ERROR_PVR
+LONGITUD: 103
+```
+
+Las cuatro entradas tienen misma longitud (103 caracteres) y contienen algún indicador de `pvr.hts`/`pvr client`/`pvr addon` sin activar categorías de búsqueda para conexión, auth, subscription, stream, channel, HTSP, timeout, configuración o base de datos. **Igual longitud no equivale a igual contenido ni causa**. La definición amplia de `ERROR_PVR` no revela la operación que falló. No hay prueba de que estos eventos sean `channelUpdate`, ni de que expliquen el renombrado estancado.
+
+Siguiente paso: comparar hashes SHA-256 de las cuatro líneas localmente y, si hace falta, extraer únicamente patrones de error tras sanitización estricta sin publicar tokens, URL/IP/credenciales ni log completo. Si las entradas son genéricas o no relacionadas, detener la búsqueda textual y preparar un diagnóstico pasivo HTSP en el laboratorio G3-AB, sin reiniciar Kodi/PVR ni escribir SQLite.
