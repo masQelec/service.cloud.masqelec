@@ -1004,3 +1004,15 @@ G3AM_KODI_RUNNING=NO_AT_PREFLIGHT
 G3AM_KODI_PROFILE_CREATED=NOT_YET_CONFIRMED
 G3AM_KODI_PVR_SYNC=NOT_TESTED
 ```
+
+## G3-AM — Kodi aislado iniciado; bloqueo puerto HTSP (22/11/2026)
+
+El operador confirma `G3AM_ORIGINAL_PROFILE_UNTOUCHED=YES`, `G3AM_KODI_HOME_READY=PASS`, `G3AM_KODI_PROFILE=CREATED`, `G3AB_ORIGINAL_PROFILE=PRESENT`. Proceso activo `/usr/lib/x86_64-linux-gnu/kodi/kodi.bin --windowing=wayland` PID 25626. `pvr.hts v21.2.6` instalado, `UpdateClients` creó cliente, pero Kodi log repite `unable to connect to 127.0.0.1:9982`; `ss -tn | grep ':29992'` sin resultados. **Diagnóstico probado:** configuración inicial de cliente apunta al puerto HTSP por defecto 9982 en host, mientras G3-AM publica `127.0.0.1:29992`; no es fallo de parche HTSP ni de aislamiento. Próxima acción operador en UI Kodi: addon `pvr.hts` Configurar, host `127.0.0.1`, puerto `29992`, sin credenciales por --noacl laboratorio; guardar y verificar socket `ss -tnp`, log conexión y canales. No reutilizar 19992 G3-AB. Aún no existe prueba Kodi PVR de actualización.
+
+```text
+G3AM_KODI_ISOLATED_PROFILE=PASS
+G3AM_KODI_PVR_HTS_STARTED=YES
+G3AM_KODI_HTSP_TARGET_PORT=9982_WRONG
+G3AM_KODI_HTSP_CONNECTED=NO
+G3AM_KODI_PVR_RENAME=NOT_TESTED
+```
