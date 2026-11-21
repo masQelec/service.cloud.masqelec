@@ -189,3 +189,25 @@ Se completa el ciclo de inventarios observado **TVH 2→3→2, Kodi 2→3→2**,
 **Alcance y cautelas:** la coincidencia por API de dos snapshots no acredita por sí sola fecha exacta del evento de refetch ni que el mismo comportamiento exista en la versión CoreELEC/pvr.hts del master. El gate G3-V aún exige una declaración verificable del evento de refetch y conexión exclusiva Kodi laboratorio→TVH laboratorio antes de producir `LAB_DELTA=PASS` en su validador offline. La ausencia de escritura SQL se deduce del procedimiento realizado, no de auditoría de todos los procesos en el equipo. No se activó el nuevo sistema ni se retiró fallback legacy en producción.
 
 **Próximo paso:** comparar versiones Kodi/pvr.hts en Ubuntu y CoreELEC; comprobar baja nativa en CoreELEC solo mediante piloto seguro y autorizado, sin eliminar canales de la M3U maestra. Solo tras eso decidir la refactorización de `update_pvr.py`, manteniendo rutas de recuperación y verificaciones de inventario.
+
+
+## Comparación inicial de versiones — 2026-11-21
+
+Evidencia directa del operador:
+
+```text
+UBUNTU
+kodi 2:21.3+dfsg-1ubuntu1
+kodi-pvr-hts 21.2.6+ds-1.1
+
+CORELEC
+VERSION="21.2.5-Omega_devel_20250919152246"
+VERSION_ID="21.2.5"
+LIBREELEC_ARCH="Amlogic-ng.arm"
+LIBREELEC_BUILD="community"
+LIBREELEC_PROJECT="Amlogic-ce"
+```
+
+No apareció línea `<version>` de addon.xml en las dos rutas inicialmente inspeccionadas del master: **la versión `pvr.hts` CoreELEC sigue desconocida**. Kodi Ubuntu 21.3 y CoreELEC 21.2.5 son cercanos pero no idénticos. `G3W_VERSION_EQUIVALENCE=NOT_PROVEN`; `G3W_CORELEC_NATIVE_REMOVE=NOT_TESTED`; no activar corte del mantenimiento legado por este parecido.
+
+Para identificar la versión del addon sin alterar master, buscar en rutas Kodi propias del sistema (solo metadatos de addon.xml) o usar JSON-RPC `Addons.GetAddonDetails` en lectura. La clave SSH del operador solicitó passphrase tres veces; los resultados de `os-release` prueban conexión efectiva, no la ubicación de pvr.hts.
