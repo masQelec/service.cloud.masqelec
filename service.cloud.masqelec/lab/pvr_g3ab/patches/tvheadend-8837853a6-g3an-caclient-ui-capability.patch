@@ -1,7 +1,7 @@
 diff --git a/src/main.c b/src/main.c
 --- a/src/main.c
 +++ b/src/main.c
-@@ -154,7 +154,12 @@
+@@ -154,6 +154,12 @@
  const char      *tvheadend_cwd;
  const char      *tvheadend_webroot;
  const tvh_caps_t tvheadend_capabilities[] = {
