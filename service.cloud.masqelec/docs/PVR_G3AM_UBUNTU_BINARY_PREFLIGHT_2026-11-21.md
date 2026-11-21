@@ -408,3 +408,21 @@ G3AM_PROFILE_MOUNT_RW=FALSE
 G3AM_PROFILE_VISIBILITY=NOT_TESTED_BAD_DIAGNOSTIC_COMMAND
 G3AM_TVH_BOOT=FAIL_EXIT_134
 ```
+
+## G3-AM — archivo profiles legible, aún no prueba carga interna (operador, 21/11/2026)
+
+El operador ejecutó `docker run --network none --user 1000:1000 --read-only` sobre el runtime, con montaje explícito de `data/conf` en `/tmp/data/conf`; observó:
+```text
+WORKDIR=/tmp
+G3AM_PROFILE_FILE=READABLE
+SHA256(/tmp/data/conf/profiles)=8ef2420d92cf67b1b50959438e7850462282cccfae760f41803023788e758121
+G3AM_PROFILE_VISIBILITY=PASS
+```
+
+La prueba demuestra accesibilidad del archivo montado en un contenedor auxiliar del mismo tipo, sin demostrar que `hts_settings_load("profiles")` lo haya localizado o interpretado durante el arranque fallido. Con código exacto `8837853a6`, `src/settings.c:326-343` intenta primero `/config/profiles` y luego `data/conf/profiles`; `src/filebundle.c:133-175` resuelve paths relativos mediante `tvheadend_cwd` y `TVHEADEND_DATADIR` (**no usar el shell pwd como prueba de tvheadend_cwd**). `src/profile.c:2851-2877` carga perfiles y busca `pass`. El siguiente diagnóstico es identificar **dónde se establece tvheadend_cwd** y el valor compilado de `TVHEADEND_DATADIR` sin arrancar servidor; confirmar el mapeo del bind montado en el contenedor fallido, no asumir que coincide con la prueba Docker auxiliar.
+
+```text
+G3AM_PROFILE_FILE_READABLE_IN_AUX_CONTAINER=PASS
+G3AM_PROFILE_INTERNAL_LOAD=NOT_PROVEN
+G3AM_TVH_BOOT=FAIL_EXIT_134
+```
