@@ -1,0 +1,37 @@
+# G3-AM experimental compose. Never combine with ../compose.yaml or use its project name.
+name: masqelec-pvr-g3am
+services:
+  playlist:
+    image: nginx:alpine
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    volumes:
+      - ../runtime/g3am/playlist:/usr/share/nginx/html:ro
+    networks:
+      pvr_g3ab:
+        aliases: [g3am-playlist]
+    restart: "no"
+
+  tvh:
+    image: masqelec/tvh-g3am-runtime:noble
+    command: ["--config", "/config", "--bindaddr", "0.0.0.0", "--http_port", "9981", "--htsp_port", "9982", "--nosyslog"]
+    user: "1000:1000"
+    init: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:29991:9981"
+      - "127.0.0.1:29992:9982"
+    volumes:
+      - /home/ubuntu/tvheadend-g3al-upstream/build.linux/tvheadend:/opt/g3al/tvheadend:ro
+      - ../runtime/g3am/tvh_config:/config
+    networks: [pvr_g3ab]
+    depends_on: [playlist]
+    restart: "no"
+
+networks:
+  pvr_g3ab:
+    external: true
+    name: masqelec-pvr-g3ab_pvr_g3ab
