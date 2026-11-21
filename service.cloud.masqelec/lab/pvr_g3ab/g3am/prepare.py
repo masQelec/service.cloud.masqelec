@@ -51,6 +51,9 @@ def run(stage):
     content = playlist("baseline" if stage == "init" else stage)
     fd, temp = tempfile.mkstemp(dir=target.parent, prefix=".g3am-")
     try:
+        # mkstemp defaults to 0600. The nginx worker in the separate
+        # playlist container must be able to read this synthetic, public M3U.
+        os.fchmod(fd, 0o644)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
             f.flush()
