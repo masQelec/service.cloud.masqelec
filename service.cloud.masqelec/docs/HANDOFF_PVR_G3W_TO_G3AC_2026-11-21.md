@@ -527,3 +527,23 @@ El observador `pvr_g3ad_rename_watch.py` devuelve este marcador al agotar su ven
 `G3AD_HOT_REFRESH_ROOT_CAUSE=UNPROVEN`
 
 **Diagnóstico concluyente en alcance estricto:** la actualización de nombre se refleja en TVH pero no en el nombre de Kodi dentro del intervalo observado **sin reinicio PVR reportado**. Con el código inspeccionado de pvr.hts Omega, hay un recorrido `channelUpdate → ParseChannelAddOrUpdate → TriggerChannelUpdate`; falta saber si el mensaje es emitido, recibido y si produce trigger. No saltar a soluciones destructivas (borrar SQLite, recrear canales, alternar bouquet, reiniciar PVR automáticamente). Conservar temporalmente el estado Alpha Renamed en TVH frente a Alpha en Kodi para una inspección del log y, si es necesario, una medición HTSP pasiva; no imprimir tokens, secretos ni URL del master.
+
+
+## G3-AE: Kodi log después de la divergencia de rename (operador, 2026-11-21)
+
+Captura read-only realizada con TVH `G3AB Alpha Renamed` y Kodi `G3AB Alpha` después del marcador `G3AD=TVH_RENAMED_KODI_NOT_OBSERVED`:
+
+```text
+LOG_LINES: 629
+PVR_HTS_COUNT: 84
+HTSP_MESSAGES_COUNT: 0
+CHANNEL_TRIGGER_COUNT: 0
+CHANNEL_RENAMED_COUNT: 0
+CHANNEL_ORIGINAL_COUNT: 0
+PVR_ERRORS_COUNT: 4
+LOG_LAST_MODIFIED: 1795284638.4809587
+```
+
+El script cuenta coincidencias de expresiones regulares, **no** comprueba si las 4 líneas son incidentes durante la ventana G3-AD ni si el log tiene suficiente granularidad para instrumentar HTSP. El conteo de cero no demuestra que el servidor dejara de emitir `channelUpdate`, ni que el cliente dejara de procesarlo. No se ha revisado todavía el texto de esas 4 líneas, que puede contener URLs/credenciales. El fichero sí existe. `G3AE_KODI_LOG_LINES=629`; `G3AE_CHANNELUPDATE_LITERAL_COUNT=0`; `G3AE_PVR_ERRORS_REGEX_MATCHES=4_UNCLASSIFIED`; `G3AE_HTSP_EVENT_DELIVERY=NOT_MEASURED`; `G3AE_ROOT_CAUSE=UNKNOWN`.
+
+**Siguiente acción de mínimo riesgo**: diagnóstico de líneas de error con sanitización local de direcciones, credenciales y tokens, devolviendo tipo/nivel/posición temporal y mensaje redactado. Verificar si los incidentes son históricos y, si la telemetría es insuficiente, diseñar observación HTSP de laboratorio separada, sin tocar `pvr.hts` en master ni reiniciar bouquet/PVR. Evitar publicación de logs brutos.
