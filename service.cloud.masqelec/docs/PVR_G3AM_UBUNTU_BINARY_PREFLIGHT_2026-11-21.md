@@ -355,3 +355,34 @@ G3AM_PROFILE_FALLBACK_RELATIVE_PATH=SOURCE_VERIFIED
 G3AM_COMPOSE_DEFAULT_PROFILES_RO_MOUNT=COMMITTED
 G3AM_TVH_BOOT_AFTER_FIX=NOT_TESTED
 ```
+
+## G3-AM — recheck tras montaje de perfiles: inicio parcial (operador, 21/11/2026)
+
+Salida operador:
+```text
+G3AM_PROFILES_HASH=PASS
+docker compose config --quiet=SUCCESS (sin texto de error)
+docker compose up -d --no-deps tvh=STARTED
+G3AM_PLAYLIST=Up 4 minutes
+G3AM_TVH=Up Less than a second
+PORT_29991=published_loopback
+PORT_29992=published_loopback
+curl: (52) Empty reply from server
+G3AM_HTTP_CODE=000
+G3AM_HTSP_TCP=PASS
+G3AM_BOOT_RECHECK=COMPLETED
+```
+
+`G3AM_TVH=Up Less than a second` es observación en un instante inmediatamente posterior a crear contenedor, **no** uptime sostenido ni prueba de servicio estable. La conexión HTSP fue solo TCP; no se intercambió un frame HTSP. En HTTP, error 52 significa conexión cerrada sin respuesta válida: es compatible con inicialización en curso u otra falla, no permite atribuir causa. Se confirma que el nuevo volumen RO con perfiles pasó verificación de integridad, pero no declarar el aborto definitivamente corregido hasta ver estado mantenido y API HTTP.
+
+Siguiente gate lectura tras intervalo natural sin restart: `docker compose -f g3am/compose.yaml ps -a`, estado/exit/restart count, `curl` separado a `/api/serverinfo` con control de errores, conexión HTSP TCP si sigue vivo, y clasificación de logs TVH sin exponer URLs/tokens. Si no responde, investigar logs y status antes de alterar datos.
+
+```text
+G3AM_PROFILE_MOUNT_HASH=PASS
+G3AM_TVH_START_COMMAND=PASS
+G3AM_HTTP_INITIAL_PROBE=FAIL_EMPTY_REPLY_52
+G3AM_HTSP_TCP_INITIAL_PROBE=PASS
+G3AM_TVH_STABLE_RUNTIME=NOT_VERIFIED
+G3AM_HTSP_PROTOCOL=NOT_TESTED
+G3AM_CHANNELUPDATE=NOT_TESTED
+```
