@@ -273,3 +273,17 @@ ID: 1 NOMBRE: G3AB Beta
 TVH previamente confirmó `G3AB Alpha Renamed` con UUID `185e5bdda6aafa6aa1aad2bb94ee703a`; Kodi mantiene ID `2`. `G3AB_RENAME_TVH=PASS`, `G3AB_RENAME_KODI_AFTER_RESTART=PASS`, `G3AB_RENAME_IDS_STABLE=YES_OBSERVED`, `G3AB_KODI_LIVE_NAME_REFRESH=NOT_OBSERVED`, `G3AB_HTSP_CHANNELUPDATE_CAUSE=UNPROVEN`, `G3AB_CUID_CAUSALITY=UNPROVEN`.
 
 **Control metodológico antes de G3-AB URL:** `prepare.py url` restaura los metadatos `name`/`group` del baseline al mismo tiempo que cambia la URL, por diseño de etapas independientes. Por tanto, NO transicionar directamente `rename → url`: ejecutar `prepare.py restored`, esperar convergencia TVH/Kodi y confirmar el nombre original `G3AB Alpha` con los identificadores conservados. Solo entonces ejecutar `prepare.py url`. Si el nombre de Kodi no vuelve a baseline en vivo, reiniciar solo Kodi de laboratorio y registrar el hecho; no borrar SQLite ni datos PVR. Tampoco se debe interpretar la estabilidad de UUID ante URL como prueba del uso causal de CUID.
+
+
+## G3-AB: etapa restored escrita por el operador; convergencia pendiente
+
+El operador ejecutó `python3 prepare.py restored` y obtuvo:
+
+```text
+G3AB_STAGE=RESTORED
+G3AB_CUID_COUNT=2
+G3AB_MASTER_UNTOUCHED=YES
+G3AB_G3W_UNTOUCHED=YES
+```
+
+Esto verifica **solo la salida del generador y su declaración de ámbito**, no confirma aún que TVH haya releído la M3U restaurada ni que Kodi haya recuperado `G3AB Alpha`. El snapshot esperado sigue siendo Alpha UUID `185e5bdda6aafa6aa1aad2bb94ee703a` / Kodi `2`, Beta UUID `f08f75aa26b58386630d4b225adbb34f` / Kodi `1`; inventarios 2/2. `G3AB_RESTORED_FILE_WRITTEN=YES`, `G3AB_RESTORED_TVH=NOT_YET_VERIFIED`, `G3AB_RESTORED_KODI=NOT_YET_VERIFIED`, `G3AB_URL_STAGE=BLOCKED_PENDING_RESTORED_BASELINE`. No cambiar todavía a `prepare.py url`.
