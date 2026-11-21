@@ -448,3 +448,29 @@ G3AM_PREVIOUS_MOUNT_PATH=WRONG_/tmp/data/conf
 G3AM_COMPOSE_PROFILE_MOUNT_CORRECTED=/opt/data/conf:ro
 G3AM_POST_CORRECTION_BOOT=NOT_TESTED
 ```
+
+## G3-AM — primer arranque estable observado y API autenticada (operador, 21/11/2026)
+
+Salida operador con montaje corregido `/opt/data/conf:ro`:
+```text
+docker compose -f g3am/compose.yaml config --quiet=PASS
+G3AM_PLAYLIST=Up 11 minutes
+G3AM_TVH=Up 5 seconds
+G3AM_TVH_STATUS=running
+GET /api/serverinfo => HTTP 401 CURL_EXIT=0
+STATUS=running EXIT=0 RESTARTS=0
+G3AM_CORRECTED_BOOT_CHECK=COMPLETED
+```
+
+El montaje correcto permitió superar el SIGABRT anterior y el servidor devolvió respuesta HTTP válida `401` (autenticación requerida). Se acredita **arranque inicial y servicio HTTP activo**, no estabilidad prolongada, no autenticación HTSP, no red IPTV ni `channelUpdate`. El `401` no prueba que exista un usuario de laboratorio ya autorizado ni una red creada.
+
+**Siguiente gate**: a) consulta read-only del uptime y de la playlist desde el interior de la red sin revelar configuración; b) configurar acceso administrativo **solo en instancia G3-AM** desde interfaz HTTP loopback, sin copiar contraseñas del G3-AB ni publicarlas en GitHub o chat; c) crear red **IPTV Automatic Network** apuntando al recurso `http://g3am-playlist/playlist.m3u` en G3-AM con `refetch_period=1`, sin modificar identidad ni datos originales. Registrar red y canal ID antes del rename; no proceder a prueba de eventos sin baseline.
+
+```text
+G3AM_BOOT_INITIAL=PASS
+G3AM_HTTP_AUTH_REQUIRED=401
+G3AM_RUNTIME_STABILITY_LONG=NOT_TESTED
+G3AM_IPTV_NETWORK=NOT_CONFIGURED
+G3AM_HTSP_PROTOCOL=NOT_TESTED
+G3AM_CHANNELUPDATE=NOT_TESTED
+```
