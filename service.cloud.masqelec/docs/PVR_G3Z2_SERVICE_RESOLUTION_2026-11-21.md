@@ -117,3 +117,18 @@ TIENE_ULTIMA_DETECCION: False
 `G3Z4_UNLINKED_SERVICE=1`, `G3Z4_SERVICE_ENABLED=NO`, `G3Z4_SERVICE_MUX_EXISTS=YES`, `G3Z4_SID_EQUALS_3=NO`, `G3Z4_LAST_SEEN_NONEMPTY=NO`. Interpretar `False` de `bool(last_seen)` solamente como falsy (no garantiza nunca detectado). **No se demuestra** que el servicio corresponda al flujo eliminado `G3W Synthetic 3`. Tampoco se demuestra por simple conteo que el mux del canal 3 haya desaparecido, aunque queden 2 muxes.
 
 Eliminación de servicios/muxes **NO AUTORIZADA**. Siguiente comprobación segura: establecer si el servicio deshabilitado comparte mux UUID con uno de los servicios aún enlazados a canales, a partir de las respuestas GET, publicando solo valores booleanos y recuentos, sin UUID, direcciones, URLs, nombres ni credenciales. Si lo comparte, es una razón adicional para no borrar por condición 'sin canal'.
+
+
+## G3-Z5: servicio sin canal comparte mux con canal existente (2026-11-21)
+
+Evidencia obtenida por el operador mediante solo GET a `channel/grid` y `mpegts/service/grid`:
+
+```text
+MUXES_CON_CANALES_ACTIVOS: 2
+SERVICIOS_SIN_CANAL: 1
+COMPARTE_MUX_CON_CANAL: True
+```
+
+Interpretación: el único servicio no vinculado a canales comparte `multiplex_uuid` con al menos un servicio que sí está vinculado a un canal. El servicio permanece deshabilitado según G3-Z4. Esto no prueba qué contenido representa ni su origen histórico, pero sí que **una poda de mux basada únicamente en la existencia de servicios huérfanos podría afectar a canales válidos**. También demuestra que 'servicio sin canal' no implica 'mux sin canales'. No eliminar servicios ni muxes. `G3Z5_SHARED_MUX=YES`; `G3Z5_SERVICE_DELETE_AUTHORIZED=NO`; `G3Z5_MUX_DELETE_AUTHORIZED=NO`.
+
+Cierre de esta investigación preliminar: reconciliar **canales publicados** separadamente de la retención de servicios/muxes, y priorizar el siguiente gate con fixture que incluya CUID real, cambios de nombre, URL y grupo, y rastreo de identidad. El experimento actual G3-W no incluía CUID y no puede demostrar su persistencia.
