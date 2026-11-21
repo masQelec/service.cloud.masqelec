@@ -426,3 +426,25 @@ G3AM_PROFILE_FILE_READABLE_IN_AUX_CONTAINER=PASS
 G3AM_PROFILE_INTERNAL_LOAD=NOT_PROVEN
 G3AM_TVH_BOOT=FAIL_EXIT_134
 ```
+
+## G3-AM — causa raíz de ruta de perfiles y corrección en Compose (21/11/2026)
+
+Auditoría operador del mismo checkout `8837853a6`:
+```text
+src/main.c:982 tvheadend_cwd0 = dirname(tvh_strdupa(argv[0]));
+src/main.c:983 tvheadend_cwd = dirname(tvh_strdupa(tvheadend_cwd0));
+build.linux/build.h:177 #define TVHEADEND_DATADIR "/usr/local/share/tvheadend"
+CONFIG_BUNDLE=no
+```
+
+Con ejecutable invocado en `/opt/g3al/tvheadend`, el directorio base calculado es `/opt` (el argumento exacto lo aporta Docker ENTRYPOINT). `filebundle.c` busca `data/conf/profiles` bajo ese directorio o bajo `TVHEADEND_DATADIR`. La ruta previa `/tmp/data/conf` no coincide. El archivo sí era legible en un contenedor auxiliar, lo que no probaba que Tvheadend lo buscara allí. Por tanto, se actualizó exclusivamente `g3am/compose.yaml` de montaje `/tmp/data/conf:ro` a `/opt/data/conf:ro`, conservando fuente original exacta y solo lectura. No se tocó `../compose.yaml`, el binario parcheado, la configuración ni Kodi G3-AB.
+
+**Próximo gate**: sincronizar `develop`, `docker compose -f g3am/compose.yaml config --quiet`, comprobar que el volumen se proyecta en `/opt/data/conf`, y ejecutar un contenedor efímero sin servidor para leer `/opt/data/conf/profiles` como UID 1000; después `up -d --no-deps tvh` únicamente en G3-AM, esperar breve intervalo y verificar estado continuado, GET `/api/serverinfo` HTTP (200/401/403 son respuestas HTTP válidas), y ningún SIGABRT en logs de *esa ejecución*. No confundir mensajes anteriores en logs acumulados con los nuevos. La mera compilación o comprobación de mount no es `BOOT_PASS`. Mantener NGinx/playlist G3-AM y G3-AB intactos.
+
+```text
+G3AM_TVH_CWD_CALCULATION=SOURCE_VERIFIED_/opt
+G3AM_COMPILED_DATADIR=/usr/local/share/tvheadend
+G3AM_PREVIOUS_MOUNT_PATH=WRONG_/tmp/data/conf
+G3AM_COMPOSE_PROFILE_MOUNT_CORRECTED=/opt/data/conf:ro
+G3AM_POST_CORRECTION_BOOT=NOT_TESTED
+```
