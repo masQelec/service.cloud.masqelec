@@ -143,3 +143,23 @@ G3W_MASTER_UNTOUCHED=YES
 ```
 
 Interpretación precisa: **playlist de laboratorio escrita con tres entradas**, todavía **NO** comprobado que TVH haya hecho refetch ni que Kodi haya recibido canal 3. Solicitar ambos snapshots de sólo lectura. No pasar a `removed` hasta registrar TVH 3/Kodi 3 y estabilidad de UUID/IDs originales.
+
+
+## Alta real 2→3 confirmada (operador, 2026-11-21)
+
+Salida de observación real de TVH (API GET) y Kodi (JSON-RPC de lectura) tras `python3 prepare.py added`:
+
+```text
+=== TVHEADEND ===
+UUID: 01acdb29035f6789d905cfd14f8ef5b0 NOMBRE: G3W Synthetic 1
+UUID: 918d272bf55884716e5fff5177ee8b08 NOMBRE: G3W Synthetic 2
+UUID: 29639cb6a761cc5523a10aae45c45404 NOMBRE: G3W Synthetic 3
+TOTAL: 3
+=== KODI ===
+ID: 1 NOMBRE: G3W Synthetic 1
+ID: 2 NOMBRE: G3W Synthetic 2
+ID: 3 NOMBRE: G3W Synthetic 3
+TOTAL: 3
+```
+
+`G3W_TVH_ADD=PASS_3_OF_3`; `G3W_KODI_ADD=PASS_3_OF_3`; `G3W_RETAINED_IDS_STABLE_DURING_ADD=YES`. Esto comprueba recepción del nuevo canal sin reinicio solicitado; el suceso exacto de refetch y el borrado automático de huérfanos **no** están aún acreditados. El siguiente paso es cambiar **solo** la M3U sintética de laboratorio con `prepare.py removed` y consultar TVH/Kodi por interfaces de solo lectura. No tocar master, PVR real ni SQLite.
