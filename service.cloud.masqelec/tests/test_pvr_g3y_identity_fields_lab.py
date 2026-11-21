@@ -2,6 +2,9 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest import mock
+import urllib.error
+import io
 
 source = Path(__file__).resolve().parents[1] / "tools" / "pvr_g3y_identity_fields_lab.py"
 spec = importlib.util.spec_from_file_location("pvr_g3y_identity_fields_lab", source)
@@ -68,6 +71,43 @@ class IdentityFieldTests(unittest.TestCase):
                        [{"channelid": 1, "label": "A"}, {"channelid": 2}])
         self.assertEqual(r["tvh_fields_present_all"], ["uuid"])
         self.assertEqual(r["kodi_fields_present_all"], ["channelid"])
+
+    def test_tvh_unreachable_is_specific(self):
+        with mock.patch.object(m.urllib.request, "urlopen",
+                               side_effect=urllib.error.URLError("secret-host")):
+            with self.assertRaisesRegex(m.Blocked, "^TVH_UNREACHABLE$"):
+                m._fetch(object(), "TVH")
+
+    def test_kodi_auth_is_specific(self):
+        error = urllib.error.HTTPError("http://localhost/jsonrpc", 401, "secret", {}, None)
+        with mock.patch.object(m.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(m.Blocked, "^KODI_AUTH_REQUIRED$"):
+                m._fetch(object(), "KODI")
+
+    def test_kodi_404_is_specific(self):
+        error = urllib.error.HTTPError("http://localhost/jsonrpc", 404, "missing", {}, None)
+        with mock.patch.object(m.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(m.Blocked, "^KODI_ENDPOINT_NOT_FOUND$"):
+                m._fetch(object(), "KODI")
+
+    def test_invalid_json_is_specific(self):
+        response = mock.MagicMock()
+        response.status = 200
+        response.read.return_value = b"<html>not json</html>"
+        with mock.patch.object(m.urllib.request, "urlopen") as opener:
+            opener.return_value.__enter__.return_value = response
+            with self.assertRaisesRegex(m.Blocked, "^TVH_INVALID_JSON$"):
+                m._fetch(object(), "TVH")
+
+    def test_failure_omits_sensitive_exception(self):
+        with mock.patch.object(m.urllib.request, "urlopen",
+                               side_effect=urllib.error.URLError("private-password")):
+            try:
+                m._fetch(object(), "KODI")
+            except m.Blocked as error:
+                self.assertNotIn("private-password", str(error))
+            else:
+                self.fail("expected blocked")
 
 
 if __name__ == "__main__":
