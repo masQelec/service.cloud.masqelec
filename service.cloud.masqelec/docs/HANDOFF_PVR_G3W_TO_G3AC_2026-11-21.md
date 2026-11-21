@@ -757,3 +757,30 @@ Hay dos capturas con solo ACKs y ningún payload observadas en dos transiciones,
 `G3AF_SECOND_PCAP_DATA_PACKETS=0`
 `G3AF_KODI_AFTER_SECOND_RENAME=NOT_RECHECKED`
 `G3AF_HTSP_CHANNELUPDATE_EMITTED=UNPROVEN`
+
+
+## G3-AF: 2.º rename con PVR conectado; PCAP sin payload (operador, 21/11/2026)
+
+Tras `prepare.py rename` y lectura TVH que verificó `G3AB Alpha Renamed` con UUID Alpha `dba29285ca808eb6486d364f994b05db`, el operador aportó:
+
+```text
+2026-11-21 19:27:32.634983541 +0100 | 1500 bytes | runtime/htsp_capture/g3af_rename.pcap
+2026-11-21 19:25:36.886159434 +0100 | 296 bytes | runtime/playlist/playlist.m3u
+ESTAB 0 0 127.0.0.1:19992 127.0.0.1:46266 users:(("docker-proxy",pid=177108,fd=12))
+ESTAB 0 0 127.0.0.1:46266 127.0.0.1:19992 users:(("kodi.bin",pid=187296,fd=30))
+ERROR: None
+KODI: G3AB Alpha ID: 3
+KODI: G3AB Beta ID: 2
+```
+
+El PCAP fue modificado ~116 s después del fichero M3U. **mtime de PCAP no da hora de inicio; por tanto no prueba solape exacto de la captura con refetch/aplicación del renombrado**. El análisis anterior del mismo PCAP encontró `PAQUETES_TOTAL: 12`, `PAQUETES_CON_DATOS: 0`; la consulta `ss` posterior confirma que el enlace TCP seguía establecido, pero no que estuviera conectado continuamente durante todo el intervalo o que recibiera un mensaje HTSP. El JSON-RPC posterior fue correcto, Alpha conservaba etiqueta antigua y ID 3 y Beta ID 2. El rename TVH estaba aplicado previamente, sin recrear UUID.
+
+`G3AF_KODI_STALE_NAME_AFTER_SECOND_RENAME=CONFIRMED`
+`G3AF_HTSP_TCP_ESTABLISHED_POST_TEST=YES`
+`G3AF_PCAP_BYTES=1500`
+`G3AF_PCAP_PACKETS=12`
+`G3AF_PCAP_DATA_PACKETS=0`
+`G3AF_PCAP_WINDOW_COVERS_RENAME=NOT_PROVEN_BY_TIMESTAMPS`
+`G3AF_SERVER_CHANNELUPDATE_EMITTED=UNKNOWN`
+
+Próxima prueba read-only inmediata: ver primeras y últimas marcas temporales del PCAP con `tcpdump -tt` (sin `-A/-X`) para determinar si la captura se inició antes del cambio de playlist; y verificar hora de modificación de los ficheros, recordando que TVH refetch ocurrió más tarde que la M3U. Para comprobar si el enlace/captura puede ver datos de aplicación, usar el propio laboratorio y tráfico HTSP conocido y capturado, no inferir un evento a partir de ACKs. No reiniciar Kodi/PVR, no alternar bouquet, no tocar master/SQLite y no subir pcap.
