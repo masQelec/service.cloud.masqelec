@@ -97,3 +97,23 @@ SERVICIOS_SIN_CANAL_EN_GRID: 1
 Campos observados para esa entrada: `uuid`, `network`, `multiplex`, `multiplex_uuid`, `sid`, `srcid`, `svcname`, `created`, `last_seen`, `enabled`, `channel` (list), `auto`, entre otros.
 
 Conclusión estricta: el servicio sin referencias desde canales existe efectivamente en `mpegts/service/grid`, pero **no está acreditado que proceda del canal G3W Synthetic 3**, ni que su mux haya sido eliminado, ni que deba borrarse. `G3Z3_UNLINKED_SERVICE_IN_GRID=PASS_1`; `G3Z3_RESIDUAL_ORIGIN=UNPROVEN`; `G3Z3_DELETE_AUTHORIZED=NO`. Próximo análisis: inspeccionar solo metadatos de muxes `mpegts/mux/grid` y relacionar el UUID del mux con el del servicio, sin divulgar direcciones/URLs/credenciales.
+
+
+## G3-Z4 — servicio no asociado, deshabilitado y con mux existente
+
+El operador realizó consultas GET de `channel/grid`, `mpegts/service/grid` y `mpegts/mux/grid`, sin mutación:
+
+```text
+SERVICIOS_SIN_CANAL: 1
+MUXES_TOTALES: 2
+MUX_EXISTE: True
+SID_ES_3: False
+SERVICIO_HABILITADO: False
+CANAL_ASOCIADO_EN_SERVICE_GRID: False
+TIENE_FECHA_CREACION: True
+TIENE_ULTIMA_DETECCION: False
+```
+
+`G3Z4_UNLINKED_SERVICE=1`, `G3Z4_SERVICE_ENABLED=NO`, `G3Z4_SERVICE_MUX_EXISTS=YES`, `G3Z4_SID_EQUALS_3=NO`, `G3Z4_LAST_SEEN_NONEMPTY=NO`. Interpretar `False` de `bool(last_seen)` solamente como falsy (no garantiza nunca detectado). **No se demuestra** que el servicio corresponda al flujo eliminado `G3W Synthetic 3`. Tampoco se demuestra por simple conteo que el mux del canal 3 haya desaparecido, aunque queden 2 muxes.
+
+Eliminación de servicios/muxes **NO AUTORIZADA**. Siguiente comprobación segura: establecer si el servicio deshabilitado comparte mux UUID con uno de los servicios aún enlazados a canales, a partir de las respuestas GET, publicando solo valores booleanos y recuentos, sin UUID, direcciones, URLs, nombres ni credenciales. Si lo comparte, es una razón adicional para no borrar por condición 'sin canal'.
