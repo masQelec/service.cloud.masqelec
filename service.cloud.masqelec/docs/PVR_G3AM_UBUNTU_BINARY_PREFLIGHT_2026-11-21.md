@@ -861,3 +861,14 @@ G3AM_ACTIVE_SERVICES=2
 G3AM_CHANNEL_MAPPING=NOT_YET_EXECUTED
 G3AL_RENAME_EFFECTIVE_NAME_BEHAVIOR=UNVERIFIED
 ```
+
+## G3-AM — mapeo sin efecto tras inventario (22/11/2026)
+
+El operador volvió a ejecutar el baseline: CHANNEL_COUNT=0 y todas las listas `channel` de servicios vacías (Signal 1 SID1 enabled, Signal 2 SID2 enabled, Beta provisional SID1 disabled). El botón `Map Selected` de ExtJS no mapea inmediatamente: upstream `src/webui/static/app/servicemapper.js:96-127` abre ventana `Map services to channels`, selecciona UUID y solo el botón de guardado `Map services` ejecuta `api/service/mapper/save`; luego cambia a pestaña de seguimiento `service_mapper`. API dispone de endpoint `api/service/mapper/status` (`src/api/api_service.c`) con contadores total/ok/fail/ignore y opcional active. Si se usó la ventana y guardado realmente, la causa todavía desconocida; hay que comprobar status/errores de `service_mapper`, especialmente opción `Check availability`. No borrar ni mapear el servicio inactivo, ni ejecutar rename. Hay evidencia adicional en parche G3-AL: solo se notifica a canales ch_autoname cuyo nombre efectivo cambia, lo que puede no suceder si se usan nombres internos G3AB Signal 1/2; gate HTSP necesita evaluar nombre efectivo antes del renombrado.
+
+```text
+G3AM_CHANNEL_COUNT=0
+G3AM_ACTIVE_SERVICE_CHANNEL_LINKS=EMPTY
+G3AM_MAPPER_SAVE_CONFIRMED=NO
+G3AM_MAPPER_STATUS=UNKNOWN
+```
