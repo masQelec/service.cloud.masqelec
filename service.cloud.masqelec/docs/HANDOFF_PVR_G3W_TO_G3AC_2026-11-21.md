@@ -850,3 +850,33 @@ El operador comunica durante el experimento de control de `tcpdump` (reproducci�
 `G3AF_PLAYBACK_TRIGGERS_PVR_CHANNEL_REFRESH=HYPOTHESIS_UNPROVEN`
 
 Prioridad inmediata: antes de nuevas operaciones o playlist changes, ejecutar `PVR.GetChannels` de Kodi, leer TVH `channel/grid` y contar segmentos de payload de `g3af_playback.pcap` (no publicar pcap). Si la convergencia se confirma, diseñar un ensayo de causalidad seguro que contraste reproducción vs actividad de otros comandos/HTSP y event logs, **sin** declarar como solución reproducir un canal artificialmente. No reiniciar PVR, alternar bouquet ni modificar SQLite/master.
+
+
+## G3-AF: reproducción coincide con refresco REAL de label Kodi; captura HTSP validada con datos
+
+El operador confirmó, **después de iniciar G3AB Alpha desde Kodi**, lo siguiente:
+
+```text
+ERROR: None
+KODI: G3AB Alpha Renamed ID: 3
+KODI: G3AB Beta ID: 2
+PAQUETES_TOTAL: 1501
+PAQUETES_CON_DATOS: 1024
+```
+
+Frente al renombrado anterior, donde TVH ya reportaba `G3AB Alpha Renamed`, Kodi retenía `G3AB Alpha`, y `g3af_rename.pcap` registró 28 paquetes TCP con **0** paquetes con payload durante una ventana que abarcó la modificación M3U, esta captura `g3af_playback.pcap` demuestra **1024 segmentos TCP con datos dentro de 1501 paquetes** sobre el puerto HTSP 19992 durante la reproducción. Kodi JSON-RPC **ahora informa el nombre actualizado y conserva IDs 3/2**. Esto valida que el punto de observación loopback puede capturar tráfico de aplicación HTSP, y que el nombre puede converger sin reiniciar manualmente PVR en este ensayo (según acciones reportadas), en correlación temporal con una reproducción.
+
+**No está identificado todavía el mecanismo causal**: reproducción puede provocar un mensaje distinto, nueva suscripción/trigger, sincronización tardía o actividad que desbloquee el estado interno. No afirmar que `channelUpdate` esté presente en el PCAP ni que disparar playback sea una solución segura. La captura playback puede contener autenticación, sesiones y TS; **nunca subir `.pcap` bruto** a GitHub/chat.
+
+`G3AF_PLAYBACK_KODI_ALPHA_LABEL=G3AB_Alpha_Renamed`
+`G3AF_PLAYBACK_KODI_ALPHA_CHANNELID=3`
+`G3AF_PLAYBACK_KODI_BETA_CHANNELID=2`
+`G3AF_PLAYBACK_PCAP_PACKETS=1501`
+`G3AF_PLAYBACK_PCAP_DATA_PACKETS=1024`
+`G3AF_RENAME_PCAP_PACKETS=28`
+`G3AF_RENAME_PCAP_DATA_PACKETS=0`
+`G3AF_HTSP_CAPTURE_POINT_VALIDATED_FOR_APPLICATION_TRAFFIC=YES_DURING_PLAYBACK`
+`G3AF_PVR_METADATA_REFRESH_CAUSE=UNPROVEN`
+`G3AF_PVR_REFRESH_WITHOUT_EXPLICIT_RESTART=OBSERVED`
+
+**Siguiente gate G3-AG**: análisis **local y privado** de ambos PCAP, inicialmente inspección direccional y búsqueda de términos HTSP solo en payload (no compartir bruto), idealmente reensamblar TCP, separar mensajes HTSP por longitud y decodificar `htsmsg` con verificación de estructura y dirección para identificar `channelUpdate`/ `channelAdd`/ `channelDelete`, diferenciando `subscriptionStart` y stream packets. No asumir que texto ASCII hallado entre bytes constituye mensaje HTSP válido. Comparar contra paso rename y reproducir otra vez solo si instrumentación resulta insuficiente. Preferir código stdlib sin instalación de `tshark`, no alterar master/SQLite, no alternar bouquet ni reiniciar PVR.
