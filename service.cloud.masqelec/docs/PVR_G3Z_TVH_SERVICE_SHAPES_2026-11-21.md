@@ -27,3 +27,25 @@ Basta que TVH del laboratorio siga activo en 19981; no hace falta abrir Kodi par
 ## Siguiente paso
 
 Conocer si las referencias `services` son UUID, cadenas descriptivas u objetos permite decidir qué API de solo lectura puede identificar la configuración y persistencia de servicios/muxes TVH. Solo después diseñaremos el fixture con CUID y una prueba longitudinal de identidad. No dar por demostrado un vínculo de backend de Kodi por su `channelid`.
+
+
+## G3-Z, resultado real comunicado por operador (2026-11-21)
+
+```text
+Ran 10 tests in 0.000s
+OK
+G3Z=SHAPES_ONLY
+STATUS="TVH_SERVICE_REFERENCE_SHAPES_ONLY"
+CHANNELS=2
+CHANNELS_WITH_NO_SERVICES=0
+SERVICE_REFERENCES=2
+REFERENCE_SHAPES={"str": 2}
+CUID_MAPPING_PROVEN="NO"
+TVH_TO_KODI_IDENTITY_PROVEN="NO"
+DELETION_AUTHORIZED="NO"
+MASTER_TOUCHED="NO"
+```
+
+`G3Z_UNIT=PASS_10`; `G3Z_SERVICE_SHAPES=PASS`. Las dos referencias son cadenas, pero este resultado por sí solo no prueba que sean UUID válidos de objetos de servicio, que resuelvan en `service/list`, ni que puedan vincularse a CUID o a Kodi.
+
+La documentación oficial de la API Tvheadend describe `channel/grid.services` como referencias a servicios mediante UUID y `service/list?enum=1` como un inventario de pares `key`/`val` (donde `key` es el identificador de servicio). El próximo gate debe **comprobar efectivamente** que todas las referencias de los canales sintéticos resuelven en el inventario de servicios, sin divulgar valores privados ni utilizar ese resultado para hacer un mapeo a Kodi.
