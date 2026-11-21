@@ -81,3 +81,26 @@ REASON=KODI_UNREACHABLE
 `G3Y_UNIT=PASS_17`. La lectura de TVH sí avanzó hasta intentar Kodi; el bloqueo se produce en el acceso HTTP al servidor JSON-RPC de Kodi `127.0.0.1:8080`, sin evidencia de fallo del cliente HTSP. El estado `docker compose ps` solo acredita contenedores y publicación de puertos, no las tres capas funcionando. No se autoriza ningún cutover.
 
 Próxima comprobación en Ubuntu: comprobar proceso Kodi, socket 8080 y `curl` JSON-RPC read-only; si Kodi se cerró, reabrir el perfil de laboratorio y habilitar servidor HTTP solo local. No tocar master.
+
+
+## G3-Y — ejecución real PASS; campos expuestos (2026-11-21)
+
+Tras reabrir Kodi Ubuntu, `JSONRPC.Ping` respondió `pong` y el operador ejecutó `pvr_g3y_identity_fields_lab.py` con resultado:
+
+```text
+G3Y=FIELD_INVENTORY_ONLY
+TVH_COUNT=2
+KODI_COUNT=2
+TVH_FIELDS_PRESENT_ALL=["autoname", "bouquet", "dvr_pre_time", "dvr_pst_time", "enabled", "epg_running", "epgauto", "epggrab", "epglimit", "icon", "icon_public_url", "name", "number", "services", "tags", "uuid"]
+KODI_FIELDS_PRESENT_ALL=["channelid", "channelnumber", "label", "subchannelnumber"]
+TVH_IDENTITY_FIELD_TYPES={"bouquet": ["str"], "name": ["str"], "number": ["int"], "services": ["list"], "tags": ["list"], "uuid": ["str"]}
+KODI_IDENTITY_FIELD_TYPES={"channelid": ["int"], "channelnumber": ["int"], "label": ["str"], "subchannelnumber": ["int"]}
+CUID_TO_TVH_UUID_PROVEN="NO"
+TVH_UUID_TO_KODI_CHANNELID_PROVEN="NO"
+IDENTITY_DELETION_AUTHORIZED="NO"
+SQLITE_TOUCHED="NO"
+```
+
+`G3Y_LAB_FIELD_INVENTORY=PASS` (sin demostrar mapa entre capas). Kodi `channelid` no debe tratarse como el UUID TVH; no hay CUID probado ni expuesto en los campos observados. `services` existe en TVH, pero su contenido y sus relaciones aún no se han examinado. Próximo gate: estudiar por interfaces de solo lectura el vínculo servicio/mux ↔ canal TVH y, solo en entorno aislado, verificar si `pvr.hts` expone una identidad de backend. No usar nombres o números como claves.
+
+**Riesgo adicional observado:** `ss -ltnp` muestra servidor Kodi HTTP escuchando en `0.0.0.0:8080` y `[::]:8080`. Restringir a loopback o aislar con firewall antes de considerar el laboratorio apto para operar en redes no confiables. No registrar ni publicar credenciales.
