@@ -49,3 +49,51 @@ Interpretación: `NAMES_MATCH=true` describe solo convergencia del snapshot y **
 `G3AC_HOT_REFRESH_CAUSE=UNPROVEN`
 `G3AC_PRODUCTION_CUTOVER=NO`
 `G3AC_MASTER_TOUCHED=NO`
+
+
+## Resultado real G3-AC del operador — 9/9 y tres observaciones coherentes
+
+```text
+Ran 9 tests in 0.000s
+OK
+G3AC_SAMPLE=1
+STATUS="OBSERVED_ONLY"
+TVH_COUNT=2
+KODI_COUNT=2
+NAMES_MATCH=true
+ID_PRESERVED=true
+TVH_NAMES=["G3AB Alpha", "G3AB Beta"]
+KODI_NAMES=["G3AB Alpha", "G3AB Beta"]
+HTSP_EVENT_SEEN="NOT_MEASURED"
+KODI_TRIGGER_SEEN="NOT_MEASURED"
+CUID_MAPPING_PROVEN=false
+SQLITE_TOUCHED=false
+G3AC_SAMPLE=2
+STATUS="OBSERVED_ONLY"
+TVH_COUNT=2
+KODI_COUNT=2
+NAMES_MATCH=true
+ID_PRESERVED=true
+TVH_NAMES=["G3AB Alpha", "G3AB Beta"]
+KODI_NAMES=["G3AB Alpha", "G3AB Beta"]
+HTSP_EVENT_SEEN="NOT_MEASURED"
+KODI_TRIGGER_SEEN="NOT_MEASURED"
+CUID_MAPPING_PROVEN=false
+SQLITE_TOUCHED=false
+G3AC_SAMPLE=3
+STATUS="OBSERVED_ONLY"
+TVH_COUNT=2
+KODI_COUNT=2
+NAMES_MATCH=true
+ID_PRESERVED=true
+TVH_NAMES=["G3AB Alpha", "G3AB Beta"]
+KODI_NAMES=["G3AB Alpha", "G3AB Beta"]
+HTSP_EVENT_SEEN="NOT_MEASURED"
+KODI_TRIGGER_SEEN="NOT_MEASURED"
+CUID_MAPPING_PROVEN=false
+SQLITE_TOUCHED=false
+```
+
+`G3AC_UNIT_TESTS=PASS_9`; `G3AC_OBSERVER_LAB=PASS_3_OBSERVATIONS`; `G3AC_CURRENT_TVH_KODI_NAMES_MATCH=YES`; `G3AC_KODI_IDS_BASELINE_MATCH=YES`; `G3AC_HOT_REFRESH=NOT_TESTED_BY_STATIC_OBSERVATIONS`; `G3AC_HTSP_EVENT=NOT_MEASURED`; `G3AC_TRIGGER_CHANNEL_UPDATE=NOT_MEASURED`. **Importante:** el valor `SQLITE_TOUCHED=false` es una propiedad del script observador, no prueba que ningún otro proceso haya escrito en la base de datos. En estos tres snapshots no se introdujo ningún cambio entre muestras; por tanto **no prueban** actualización en caliente. La ejecución no comunicó fallos.
+
+El siguiente ensayo debe preparar un cambio de nombre de una sola dimensión sobre el **estado real actual** de la M3U, observar simultáneamente TVH/Kodi y, en paralelo, el registro de eventos de `pvr.hts` si es técnicamente observable sin recompilar el cliente. No reiniciar PVR durante el segmento de observación en caliente. Mantener el master fuera de alcance.
