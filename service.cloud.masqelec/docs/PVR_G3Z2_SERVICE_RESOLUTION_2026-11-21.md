@@ -82,3 +82,18 @@ SERVICIO_3_SIN_CANAL: False
 El operador ejecutó la consulta diagnóstica posterior y obtuvo `SERVICE_GRID_ERROR: HTTPError` al solicitar `/api/service/grid`. La documentación oficial de Tvheadend **no enumera** `service/grid` como API del inventario MPEGts; la ruta documentada es **`/api/mpegts/service/grid`**. Los muxes se consultan mediante `/api/mpegts/mux/grid`. Fuentes: https://docs.tvheadend.org/documentation/development/json-api/api-description/mpegts y https://docs.tvheadend.org/documentation/development/json-api/api-description/service.
 
 `HTTPError` es genérico: no consta si fue 404, 401, 403, 400 u otro código. No inferir corrupción de TVH ni afirmar el código hasta verlo. Corregir la consulta de metadatos de servicio y mantener exclusivamente GET. La posible presencia de un servicio no vinculado a un canal no justifica eliminarlo. `PRODUCTION_TOUCHED=NO`.
+
+
+## G3-Z3: servicio sin canal encontrado en inventario MPEG-TS
+
+Operador ejecutó GET `mpegts/service/grid?start=0&limit=20000&hidemode=none` y contrastó con `channel/grid` y `service/list?enum=1`. Resultado:
+
+```text
+SERVICE_GRID_TOTAL: 3
+SERVICIOS_SIN_CANAL: 1
+SERVICIOS_SIN_CANAL_EN_GRID: 1
+```
+
+Campos observados para esa entrada: `uuid`, `network`, `multiplex`, `multiplex_uuid`, `sid`, `srcid`, `svcname`, `created`, `last_seen`, `enabled`, `channel` (list), `auto`, entre otros.
+
+Conclusión estricta: el servicio sin referencias desde canales existe efectivamente en `mpegts/service/grid`, pero **no está acreditado que proceda del canal G3W Synthetic 3**, ni que su mux haya sido eliminado, ni que deba borrarse. `G3Z3_UNLINKED_SERVICE_IN_GRID=PASS_1`; `G3Z3_RESIDUAL_ORIGIN=UNPROVEN`; `G3Z3_DELETE_AUTHORIZED=NO`. Próximo análisis: inspeccionar solo metadatos de muxes `mpegts/mux/grid` y relacionar el UUID del mux con el del servicio, sin divulgar direcciones/URLs/credenciales.
