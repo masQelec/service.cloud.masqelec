@@ -50,3 +50,30 @@ ssh root@192.168.1.102 'python3 /storage/.cache/masqelec-g3-audit/pvr_g3t_identi
 5. Mantener seis tags históricos protegidos mientras la propiedad no esté demostrada.
 
 **Estado actual:** `G3T_DESCRIPTIVE_CROSSCHECK_PREPARED=YES`, `G3T_MASTER_RESULT=PENDING`, `G3T_UNIT_TESTS=PENDING`, `LEGACY_CUTOVER=NO`, `API_TAG_WRITES_ACTIVE=NO`, `ZIP_PUBLISHED=NO`.
+
+
+## Resultado real G3-T (operador) y ajuste de criterio
+
+```text
+M3U_CHANNELS=720
+TVH_CHANNELS=720
+M3U_DISTINCT_NAME_GROUP_PAIRS=707
+EXACT_NAME_GROUP_MATCHES=720
+MISSING_NAME_GROUP_PAIRS=0
+EXTRA_TVH_NAME_GROUP_PAIRS=0
+M3U_AMBIGUOUS_DUPLICATE_ENTRIES=24
+TVH_MULTITAG_CHANNELS=0
+MATCH_GATE=INCOMPLETE
+CUID_MAPPING_PROVEN=NO
+REFETCH_EVENT_PROVEN=NO
+KODI_CONVERGENCE_PROVEN=NO
+API_WRITE_EXECUTED=NO
+```
+
+**Interpretación:** se han observado las **720/720 coincidencias por multiconjunto nombre+grupo**, sin faltantes ni extras. Las **707 parejas distintas** implican 13 ocurrencias extra por duplicidad descriptiva y 24 entradas pertenecientes a parejas repetidas. No hay evidencia de un error de canal por esos duplicados; la asociación individual por CUID no está demostrada. Las seis categorías históricas siguen protegidas.
+
+**Corrección del instrumento (G3-T v2):** el `MATCH_GATE` se refiere ahora exclusivamente a coincidencia descriptiva completa de multiconjunto. Cuando faltantes/extras son cero y coinciden las cantidades será `PASS`, aunque existan nombres repetidos. La bandera independiente `IDENTITY_DISAMBIGUATION=NOT_PROVEN` conserva el bloqueo de identidad técnica y `CUID_MAPPING_PROVEN=NO` permanece. Un `MATCH_GATE=PASS` **NO autoriza el corte, limpieza Kodi ni fusión de duplicados**.
+
+El operador no confirmó explícitamente los 30 tests del conjunto G3-T/G3-S/G3-R. Tras esta corrección de criterio, debe ejecutarse como mínimo `test_pvr_g3t_identity_crosscheck.py`; ninguna prueba unitaria nueva se declara PASS todavía. Producción intacta.
+
+**Condición de cierre real:** ensayo aislado de refetch con delta de canales; contraste de identidad técnica CUID↔TVH y propagación de bajas a Kodi (preferiblemente mecanismos nativos), y sustitución del escritor heredado antes de conectar API. El resultado real G3-T demuestra coincidencia descriptiva, no resolución de esos tres requisitos.
