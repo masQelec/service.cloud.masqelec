@@ -46,3 +46,9 @@ G3AN_BUILD_UBUNTU=PENDING
 G3AN_ISOLATED_RUNTIME=PENDING
 G3AN_NEGATIVE_CUID_TESTS=PENDING
 G3AN_CORELEC_BUILD=NOT_AUTHORIZED
+
+## Revisión de guardas antes del primer build
+
+Se endureció el candidato para abortar, sin cambiar playlist ni muxes, si desaparece el CUID de una URL ya asociada a un mux identificado, o si la URL está asignada a un CUID distinto. También se sincroniza mm_iptv_url_cmpid incluso cuando el setter de URL decide que la forma normalizada de stream no ha variado. Ejecutar únicamente en nuevo worktree separado, nunca sobre binario G3-AL montado por Docker. Fuente candidata HEAD de herramienta en develop: commit 84252a70cd734620b31e87a7c0e3686c700b6df2.
+
+**Auditoría pendiente de código:** el primer gate es `--dry-run` y `git diff --check`, no resultado de compatibilidad. La semántica de las rutas mixtas CUID/no-CUID, refetch abortado por reproducción activa, manejo de errores de memoria y regresión completa por CUID aún requiere pruebas; no se autoriza instalación. El build en Ubuntu y los ensayos de runtime deben confirmarse por evidencia del operador.
