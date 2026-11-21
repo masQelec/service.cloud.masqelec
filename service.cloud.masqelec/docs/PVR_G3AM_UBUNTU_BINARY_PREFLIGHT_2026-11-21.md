@@ -152,3 +152,14 @@ G3AM_PARALLEL_TVH_BOOT=NOT_TESTED
 G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
 G3AM_KODI_HOT_UPDATE=NOT_TESTED
 ```
+
+## G3-AM — Corrección de localización de configuración IPTV (21/11/2026)
+
+El operador ejecutó un script diagnóstico anterior que asumía `runtime/tvh_config/iptv` como único directorio. Resultado: `G3AM_IPTV_CONFIG=NOT_FOUND`. **No inferir ausencia ni pérdida de configuración:** la ruta fue incorrectamente presupuesta por el diagnóstico. Tvheadend habitualmente organiza datos IPTV bajo subárboles `input/iptv/networks`, y LinuxServer puede ubicar config bajo niveles adicionales. Hay que inspeccionar la estructura realmente montada mediante una búsqueda limitada de directorios en lectura y, solo después, leer claves de archivos JSON de redes sin publicar URL completa, credenciales ni nombres de archivos que puedan contener secretos. Esta corrección reemplaza la inferencia del script anterior; no se ha modificado el estado del laboratorio.
+
+```text
+G3AM_IPTV_CONFIG_ORIGINAL=UNKNOWN
+G3AM_PREVIOUS_PATH_ASSUMPTION=INVALID
+G3AM_ORIGINAL_CONFIG_MISSING=NOT_PROVEN
+G3AM_LAB_MODIFIED=NO
+```
