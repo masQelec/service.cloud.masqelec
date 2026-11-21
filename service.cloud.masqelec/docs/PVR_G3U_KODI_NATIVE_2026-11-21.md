@@ -67,3 +67,28 @@ El probe ahora llama exclusivamente `PVR.GetChannels(channelgroupid="alltv")`; e
 Se han actualizado las pruebas para incluir grupo especial sin enumeración, error de JSON-RPC y respuesta parcial. El resultado del master **debe volver a ejecutarse**; esta corrección no acredita todavía convergencia Kodi. Repetir solo la suite G3-U (10 pruebas previstas).
 
 **NUEVO_PROBE_DESPLEGADO=NO**; **KODI_RESULTADO_POST_CORRECCION=PENDIENTE**; **MANTENIMIENTO_HEREDADO_ACTIVO=SI**.
+
+
+## Resultado de lectura real G3-U tras corregir el ID especial alltv
+
+El operador confirma en el master:
+
+```text
+=== KODI PVR READ-ONLY INVENTORY ===
+TVH_CHANNELS=720
+KODI_CHANNELS=720
+MATCHING_NAMES_MULTISET=720
+KODI_UNMATCHED_NAMES=0
+TVH_MISSING_IN_KODI_NAMES=0
+AMBIGUOUS_TVH_NAMES=24
+AMBIGUOUS_KODI_NAMES=24
+NATIVE_ORPHAN_REMOVAL_PROVEN=NO
+CUID_MAPPING_PROVEN=NO
+SQLITE_TOUCHED=NO
+TVH_MUTATION=NO
+STATUS=DESCRIPTIVE_MATCH
+```
+
+**G3U_MASTER_DESCRIPTIVE_MATCH=PASS**: 720/720 nombres coincidentes contando duplicados; no hay diferencias descriptivas observadas en este instante. **G3U_NATIVE_ORPHAN_REMOVAL_PROVEN=NO**: una instantánea estable no muestra cómo se comportará Kodi ante una baja real. Tampoco demuestra equivalencia individual CUID ni identidad en presencia de nombres duplicados. Las 6 categorías TVH históricas siguen protegidas.
+
+Siguiente gate para retirar el mantenimiento heredado: prueba de alta/baja real con lista y red TVH aisladas, más observación de Kodi si el laboratorio está conectado a cliente PVR de pruebas; si no se puede aislar, no perturbar el master. Solo sustituir SQLite tras demostrar mecanismo nativo o implementar fallback seguro versionado. Tests G3-U unitarios tras corrección no confirmados explícitamente por el operador.
