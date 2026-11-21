@@ -49,3 +49,29 @@ Verificar de forma controlada el comportamiento en la **versión de Tvheadend in
 **Sin confirmación de trigger inmediato, mantener refetch periódico natural y no activar el corte sin reset.**
 
 `TVH_URL_CHANGED=NO`, `REFETCH_PERIOD_CHANGED=NO`, `NETWORK_SCAN_EXECUTED=NO`, `KODI_DB_TOUCHED=NO`, `LEGACY_CUTOVER_AUTHORIZED=NO`, `ZIP_PUBLISHED=NO`.
+
+
+## Resultado del master — inspección real confirmada por operador
+
+Salida de `tools/pvr_g3r_tvh_refetch_readonly.py` sobre CoreELEC master:
+
+```text
+=== G3-R TVH IPTV NETWORK / GET ONLY ===
+TARGET_NETWORK_FOUND=YES
+PROPERTY_SCHEMA=PARAMS
+PLAYLIST_PATH_EXISTS=YES
+SOURCE_URL_STATUS=EXPECTED_LOCAL_FILE
+REFETCH_PERIOD_MINUTES=1
+TVH_NETWORKS=1
+GET_ONLY=YES
+TRIGGER_EXECUTED=NO
+TVH_RESTART_EXECUTED=NO
+KODI_SQLITE_TOUCHED=NO
+TRIGGER_SUPPORTED_PROVEN=NO
+```
+
+**Interpretación limitada:** TVH expone mediante `idnode/load` el esquema `params`; la URL configurada coincide con `file:///storage/.user/playlist.m3u` y el período configurado es **1 minuto**, temporalmente reducido para laboratorio. Esto **no** demuestra que una relectura haya sucedido en los últimos 60 segundos, que la relectura actualice adecuadamente nombres/UUID/vínculos de canales, ni que Kodi sincronice bajas. Tampoco verifica un disparador inmediato de refetch por API.
+
+**Próximo gate de solo lectura:** dos inventarios consecutivos después del período, contraste de M3U/TVH (canales, categorías y asociaciones) y eventos de logs de TVH cuando estén disponibles, sin modificar M3U, TVH, Kodi, ni EPG. Para demostrar *cambios* se requiere posteriormente una prueba aislada con diferencia controlada; comparar dos snapshots idénticos por sí solo no demuestra un refresco.
+
+El usuario todavía no ha confirmado explícitamente la ejecución del lote actualizado de **8 tests** G3-R; no consignar PASS de esa batería.
