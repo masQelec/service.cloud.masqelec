@@ -734,3 +734,32 @@ G3AM_PREPARE_FCHMOD_0644_PATCH=COMMITTED
 G3AM_EXISTING_PLAYLIST_PERMISSIONS=UNKNOWN
 G3AM_HTTP_PLAYLIST_AFTER_FIX=NOT_TESTED
 ```
+
+## G3-AM — HTTP M3U reparado y verificado (22/11/2026)
+
+El operador ejecutó la reparación acotada al archivo `runtime/g3am/playlist/playlist.m3u` con marca sintética y validación de propietario/symlinks. Evidencia:
+
+```text
+G3AM_MODE_BEFORE=0o600
+G3AM_MODE_AFTER=0o644
+G3AM_PERMISSIONS_REPAIRED=PASS
+#EXTM3U
+#EXTINF:-1 CUID="g3am-001" tvg-chno="1" tvh-chnum="1" tvg-name="G3AM Alpha" group-title="G3AM SYNTHETIC",G3AM Alpha
+http://streams/ch1.ts
+#EXTINF:-1 CUID="g3am-002" tvg-chno="2" tvh-chnum="2" tvg-name="G3AM Beta" group-title="G3AM SYNTHETIC",G3AM Beta
+http://streams/ch2.ts
+G3AM_PLAYLIST_HTTP=PASS
+```
+
+**Diagnóstico confirmado:** archivo previo creado 0600 por `tempfile.mkstemp()` impedía lectura del worker nginx; chmod 0644 en el archivo existente eliminó HTTP 403. El generador ya quedó corregido con `os.fchmod(fd, 0o644)` para próximas publicaciones. El contenido HTTP mantiene exactamente dos CUID y los nombres baseline, sin ejecutar rename. No se prueba con esto importación IPTV de Tvheadend, mapeado a canales ni propagación de `channelUpdate` a HTSP.
+
+Próximo gate: configurar exclusivamente en la web G3-AM puerto 29991 una red `IPTV Automatic Network` con URL HTTP interna `http://g3am-playlist/playlist.m3u`, revisar los Muxes/Services y el mapeado de canales, registrar identidades originales antes de cambiar el nombre. No ejecutar `prepare.py rename` hasta que esté preparada la captura HTSP persistente; mantener intacto el entorno G3-AB y su configuración.
+
+```text
+G3AM_PLAYLIST_FILE_MODE=0644
+G3AM_PLAYLIST_HTTP=PASS
+G3AM_PLAYLIST_CHANNEL_COUNT=2
+G3AM_PLAYLIST_BASELINE_CUIDS=PASS
+G3AM_IPTV_NETWORK=NOT_YET_CONFIRMED
+G3AM_HTSP_CHANNELUPDATE=NOT_TESTED
+```
