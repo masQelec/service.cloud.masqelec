@@ -337,3 +337,13 @@ Operator confirmed private lab synthetic `runtime/streams/ch1.ts` and `ch2.ts` b
     G3AO_TVH_SOURCE_HTTP_GET=200
     G3AO_SUSTAINED_STREAM=FAIL_OBSERVED
     G3AO_FINITE_SOURCE_EXHAUSTION=HYPOTHESIS
+
+## G3-AP continuous source preflight (22/11/2026)
+
+Operator confirmed `/usr/bin/ffmpeg` and `/usr/bin/ffprobe` installed on Ubuntu host. `ffprobe` for G3-AB synthetic `ch1.ts`: one MPEG-2 video stream `mpeg2video`, one MP2 audio stream `mp2`, duration `12.010023` seconds, bit_rate `691387` bps. `ch1.ts` and `ch2.ts` each 1,037,948 bytes. This reinforces finite-source exhaustion hypothesis under persistent `epggrab` subscriptions. It is not itself a validated continuous stream or a live-playback gate. Proposed G3-AP **separate** continuously paced TS emitter using `ffmpeg -stream_loop -1 -re ... -c copy -f mpegts`, with source and runtime isolated to G3-AN only; do NOT alter original G3-AB `streams` Nginx, source files, Docker configs, or existing production. First run offline remux sanity check in `/tmp` and `ffprobe` on 30-40 seconds output, including absence of ffmpeg timestamps/codec errors, before adding an HTTP transport. No URL playlist changes until continuous source verified.
+
+    G3AP_FFMPEG_AVAILABLE=YES
+    G3AP_SOURCE_CODEC=mpeg2video+mp2
+    G3AP_SOURCE_DURATION_SEC=12.010023
+    G3AP_LOOP_REMUX=NOT_YET_TESTED
+    G3AO_LIVE_CONTINUITY=PENDING
