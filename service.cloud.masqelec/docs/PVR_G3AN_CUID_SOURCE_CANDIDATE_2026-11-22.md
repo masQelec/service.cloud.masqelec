@@ -327,3 +327,13 @@ Operator executed bounded curl GET on G3-AN `http://127.0.0.1:39991/stream/chann
     G3AO_STREAM_BYTES=0
     G3AO_SOURCE_HEALTH=UNVERIFIED
     G3AO_LIVE_URL_SWITCH=BLOCKED_NO_MEDIA
+
+## G3-AO upstream verified; finite MPEG-TS suspected causing zero throughput (22/11/2026)
+
+Operator confirmed private lab synthetic `runtime/streams/ch1.ts` and `ch2.ts` both exist, each **1,037,948 bytes**, length divisible by 188, first byte `0x47`. Shared G3-AB Nginx `masqelec-pvr-g3ab-streams-1` remains Up 11h. Via G3-AN playlist container (same Docker network) `wget` completed 100% for `http://streams/ch1.ts`, `http://streams/ch1.ts?g3an_url_test=1`, and `http://streams/ch2.ts` with HTTP 200, `Content-Type: video/mp2t`, `Content-Length: 1037948`. Nginx access logs prove TVH G3-AN (172.20.0.7) GET `/ch1.ts?g3an%5Furl%5Ftest=1` HTTP 200 fully served at 10:16:12 and 10:22:36 (plus Beta); no corresponding fresh GET during subsequent 10:23–10:24 HTTP subscriptions while EPG maintained input running; status API showed `bps=0`. **Likely** finite TS is exhausted while mux is still considered active by EPG subscriptions, causing new HTTP subscribers to remain `Testing` with 0 delivered bytes. This hypothesis is not yet proven; inspect stream lifecycle without disturbing forensic labs. Existing finite TS validates parsing/identity but not streaming continuity. Plan: add independent G3-AN-only looping MPEG-TS HTTP server/container and use dedicated hostname (not G3-AB `streams`), preserving CUID and service mapping, then measure bytes delivered and real mid-playback URL change; alternate inspect underlying read lifecycle first. Do not change G3-AB streams, G3-AM, G3-AN CUID baseline, or release to CoreELEC.
+
+    G3AO_SOURCE_FILES=PASS
+    G3AO_SOURCE_HTTP_GET=200
+    G3AO_TVH_SOURCE_HTTP_GET=200
+    G3AO_SUSTAINED_STREAM=FAIL_OBSERVED
+    G3AO_FINITE_SOURCE_EXHAUSTION=HYPOTHESIS
