@@ -196,3 +196,12 @@ Próximo gate: mantener `/tmp/g3an-baseline-identity.json` pre-restart (API con 
     G3AN_RESTART_RECOVERY=PENDING
     G3AN_URL_UPDATE_IDENTITY=PENDING
     G3AN_KODI_PVR_IDENTITY=PENDING
+
+## G3-AN recuperación real tras reinicio: PASS (22/11/2026)
+
+Operador reinició exclusivamente servicio Tvheadend del Docker Compose G3-AN (`docker compose ... restart tvh`) y comparó vía API contra snapshot persistente `/tmp/g3an-baseline-identity.json`. Resultado `G3AN_RESTART_IDENTITY=PASS`: muxes 2→2, UUID estables `True`; servicios 3→3, UUID estables `True`; canales 2→2, UUID estables `True`; `G3AN_CUID_g3an-001_RESTORED=True`, `G3AN_CUID_g3an-002_RESTORED=True`. G3-AM original permaneció `Up 11 hours`. Se da por superada la persistencia de CUID tras reinicio real. El tercer servicio no vinculado persiste y permanece bajo observación. **El cambio de URL de Alpha con CUID fijo, la continuidad de servicio/HTSP en vivo y la estabilidad Kodi PVR aún NO están certificados.** Siguiente paso `g3an/prepare.py url`, comprobar que el playlist HTTP incorpora `?g3an_url_test=1`, esperar actualización de IPTV automática y comparar contra baseline exacta, sin modificar G3-AB/G3-AM.
+
+    G3AN_CUID_DISK=PASS
+    G3AN_RESTART_IDENTITY=PASS
+    G3AN_URL_CHANGE=READY_TO_TEST
+    G3AN_KODI_IDENTITY=PENDING
