@@ -185,3 +185,14 @@ Operador examinó archivos exactos de mux G3-AN: 2 ficheros cuyos nombres/UUID c
     G3AN_MUX_UUID_MATCH_API=PASS
     G3AN_DISK_BINARY_FORMAT=CONFIRMED_SOURCE
     G3AN_CUID_PERSISTENCE=REQUIRES_DECOMPRESSED_CHECK
+
+## G3-AN CUID serializado en los dos muxes: PASS (22/11/2026)
+
+Operador leyó de forma no destructiva los dos archivos persistentes (HTSMSG2 con cabecera `ff ff GZIP01`), descomprimió `raw[12:]` usando gzip y verificó tamaño original, presencia de clave `iptv_cuid` y valor respectivo. Mux Alpha UUID `afa32f8f8223bdff59057f7790448c92`: `FILE_SIZE=702`, `DECOMPRESS=PASS`, `SIZE_MATCH=True`, `CUID_KEY_PRESENT=True`, `CUID_VALUE_PRESENT=True` para `g3an-001`. Mux Beta UUID `c96721109b182b2d53fbba80bdc5820c`: `FILE_SIZE=784`, mismos cuatro checks PASS para `g3an-002`. Resultado `G3AN_CUID_DISK=PASS`. Esta prueba acredita los bytes serializados correctamente en los archivos; la supervivencia tras recarga real de proceso, la reutilización de UUID tras cambio URL y la estabilidad PVR/Kodi siguen sin probarse.
+
+Próximo gate: mantener `/tmp/g3an-baseline-identity.json` pre-restart (API con 2 muxes, 3 servicios, 2 canales) y ejecutar `docker compose -f .../g3an/compose.yaml restart tvh` sólo si el snapshot existe; reconsultar APIs, comparar UUID de mux, service, channel, CUID y URLs esperadas y verificar 3 servicios incl. provisional, G3-AM permanece activo. No ejecutar `prepare.py url` antes de dar PASS al reinicio.
+
+    G3AN_CUID_DISK=PASS
+    G3AN_RESTART_RECOVERY=PENDING
+    G3AN_URL_UPDATE_IDENTITY=PENDING
+    G3AN_KODI_PVR_IDENTITY=PENDING
