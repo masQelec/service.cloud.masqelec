@@ -56,3 +56,26 @@ Se endureció el candidato para abortar, sin cambiar playlist ni muxes, si desap
 ## Incidencia primer ensayo local — AUTO_CUID ancla no única (22/11/2026)
 
 Usuario confirmó checkout separado existente en HEAD 8837853a, sólo `src/input/mpegts/iptv/iptv_auto.c` modificado (82 líneas añadidas, 2 eliminadas: G3-AL ya aplicado). G3-AM sigue vivo. `python3 -m py_compile` de transformador PASS; `--dry-run` falló `G3AN=BLOCKED_SOURCE_ANCHOR_MISMATCH_AUTO_CUID`, exit 2, por lo que **no se escribieron cambios G3-AN** ni se compiló. La causa del ancla es que el helper g3an_preflight, insertado durante el análisis en memoria, contiene otra sentencia idéntica `url = htsmsg_get_str(item, "m3u-url");`; la función replace_one requiere ocurrencia única. Ajustado el ancla a secuencia única que incluye `if (url == NULL ||`, commit `a19368ea3a6333f6edb647865442a7e88ac41a8b`. PENDIENTE que operador ejecute otra vez dry-run y se obtenga `G3AN_SOURCE_ANCHORS=PASS`; no afirmar compilación hasta ejecutarla. Nunca aplicar G3-AL de nuevo en el mismo worktree, no borrar ni resetear.
+
+## Gate de transformación de fuentes superado en Ubuntu (22/11/2026)
+
+Salida real comunicada por el operador tras corrección de ancla AUTO_CUID:
+
+    G3AN_SOURCE_ANCHORS=PASS
+    G3AN_APPLY=DRY_RUN
+    G3AN_DRY_RUN_EXIT=0
+    G3AN_SOURCE_ANCHORS=PASS
+    G3AN_SOURCE_APPLIED=YES
+    G3AN_APPLY_EXIT=0
+    src/input/mpegts/iptv/iptv_auto.c    | 224 ++++++++++++++++++++++++++++++++++-
+    src/input/mpegts/iptv/iptv_mux.c     |   8 ++
+    src/input/mpegts/iptv/iptv_private.h |   1 +
+    3 files changed, 229 insertions(+), 4 deletions(-)
+    G3AN_SOURCE_RESULT=0
+
+`git diff --check` devolvió 0 dentro del flujo. Esto sólo valida aplicación y formato: la compilación todavía no se ha ejecutado. Siguiente gate: configurar con `--disable-ffmpeg_static --disable-libav --disable-doc`, `make -j2` en **worktree G3-AN aislado**, guardando stdout/stderr en `/tmp/g3an-build.log`, sin `set -e` en la shell interactiva y sin sustituir ejecutable de G3-AM. Si falla mostrar líneas de error y log; no ejecutar `make install`. Confirmar G3AN_BUILD=PASS únicamente con salida del operador.
+
+    G3AN_SOURCE_APPLY_UBUNTU=PASS
+    G3AN_GIT_DIFF_CHECK=PASS
+    G3AN_BUILD_UBUNTU=PENDING
+    G3AN_RUNTIME_TEST=PENDING
