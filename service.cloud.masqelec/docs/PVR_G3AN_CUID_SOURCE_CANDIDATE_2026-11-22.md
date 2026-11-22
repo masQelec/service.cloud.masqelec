@@ -91,3 +91,25 @@ Operador: `G3AN_CONFIGURE_EXIT=0` con `--disable-tvhcsa`; `G3AN_MAKE_EXIT=2`, `G
 ## G3-AN webui build blocker — causa confirmada (22/11/2026)
 
 Diagnóstico operador: `G3AN_CONFIGURE_EXIT=0`, `G3AN_MAKE_EXIT=2`. La primera excepción fatal está en Makefile.webui:278, generación `src/webui/static/tvh.js.gz`: `/bin/sh: 1: python: not found`, Error 127. En `.config.mk`: `PYTHON ?= python`; el ejecutable disponible es `/usr/bin/python3`, pero no existe comando `python` en PATH. Por tanto se trata de dependencia de build, no de error C/CUID. El mensaje `Folder name "Ubuntu 26.04" not found` y aviso de npm no constan como causa fatal identificada. Reanudar sin clean/reconfigure con `make -j2 PYTHON=python3` dentro exclusivamente del checkout aislado `/home/ubuntu/tvheadend-g3an-upstream`, redirigir registro `/tmp/g3an-build-python3.log`. La variable Make de línea de comandos se propaga a submakes. No hacer symlink de python en sistema ni alterar contenedor G3-AM. `G3AN_WEBUI_PYTHON_MISSING=ROOT_CAUSE_CONFIRMED`, `G3AN_MAKE_PYTHON3_RETRY=PENDING`, `G3AN_BUILD=PENDING`.
+
+## G3-AN binario Ubuntu compilado — gate real PASS (22/11/2026)
+
+Operador reanudó build en worktree aislado G3-AN con `make -j2 PYTHON=python3` (sin reinstalar ni alterar G3-AM) y reportó:
+
+    Python 3.14.4
+    G3AN_MAKE_EXIT=0
+    G3AN_BUILD=PASS
+    ./build.linux/tvheadend: version 0.0.0~unknown
+    CC timestamp.o
+    CC src/docs.o
+    CC tvheadend
+
+El compilador y enlazador terminaron con exit 0; queda binario `build.linux/tvheadend`. El version string `0.0.0~unknown` no acredita upstream SHA por sí mismo: mantener trazabilidad por checkout HEAD 8837853a6 + diff aplicado G3-AL/G3-AN. No afirmar que el CUID funciona todavía en runtime, ni que sea seguro en producción. G3-AM mantiene el estado forense de cambio URL con Alpha sustituito y Kodi conectado; G3-AB original no debe tocarse.
+
+Siguiente gate REQUERIDO: desplegar binario G3-AN en **otro** contenedor aislado con volumen nuevo para TVH y playlist sintética exclusiva, puertos HTTP/HTSP distintos de G3-AM 29991/29992 y de G3-AB 19991/19992. No reutilizar config TVH/Kodi ni probar cambios en lista G3-AM. Verificar versión real del binario, copiar plantilla sintética identificada, baseline de canal por CUID y refetch; probar URL query/host/path tras CUID persistido, TVH UUID mux/servicio/canal y Kodi iUniqueId antes/después, cold restart, duplicados y ausencia CUID, reproducción activa. Si UUID cambia, gate FAIL. Mantener el binario en aislamiento hasta gates positivos. Inspeccionar el diff de 229 inserciones y posibles rutas de estado antes de usar siquiera lab de larga duración.
+
+    G3AN_SOURCE_APPLY=PASS
+    G3AN_CONFIGURE=PASS
+    G3AN_BUILD_UBUNTU=PASS
+    G3AN_CUID_RUNTIME=NOT_TESTED
+    G3AN_CORELEC_BUILD=NOT_AUTHORIZED
