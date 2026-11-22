@@ -187,3 +187,38 @@ G3AT_P2I_PERSISTENCE=PASS
 **G3AT_P2_FINAL=PASS**: alta Gamma validada de M3U → TVH mux/servicio/canal → HTSP → Kodi SQLite, con retención de las filas antiguas y tres nuevas relaciones de grupos. Identidad Gamma: CUID `g3an-003`, mux `aae864752fce1c09379c630a048f8f25`, servicio `095c73b01bb2a1c1f331f88aee1d3e20`, canal `0b86e3113c756785e2e976245c3101e1`, HTSP/Kodi id `300123659`, Kodi idChannel `3`.
 
 **Inicio P3 (eliminación y reaparición Gamma) NO AUTORIZADO aún**: eliminar CUID de playlist puede causar borrado de mux y canal vía bouquet; la reaparición quizá genere UUID/iUniqueId nuevos. No aplicar `prepare.py reorder`, no iniciar Kodi ni sincronizar borrado hasta obtener snapshot previo de TVH y copia SQLite verificada y examinar secuencia en dos fases. Proteger referencias G3-AB/G3-AM, Kodi habitual y CoreELEC. Estado activo `add-gamma`.
+
+
+## G3-AT-P3A — Baja real Gamma TVH/HTSP, PASS (22/11/2026)
+
+Preflight backup `/home/ubuntu/g3at-evidence/G3AT-P3-before` validado con hash de 5 ficheros: `TV46.db`, `playlist.m3u`, `muxes.json`, `services.json`, `channels.json`. Sin suscripciones activas y Kodi cerrado. Se ejecutó solo `g3an/prepare.py reorder`, quitando el CUID `g3an-003` de la playlist privada G3-AN.
+
+Al refrescar Tvheadend:
+```text
+G3AT_P3A_MUXES_COUNT=2
+G3AT_P3A_MUXES_GAMMA_PRESENT=False
+G3AT_P3A_SERVICES_COUNT=3
+G3AT_P3A_SERVICES_GAMMA_PRESENT=False
+G3AT_P3A_CHANNELS_COUNT=2
+G3AT_P3A_CHANNELS_GAMMA_PRESENT=False
+G3AT_P3A_REFRESH_OBSERVED=True
+G3AT_P3A_MUXES_OLD_PRESERVED=True
+G3AT_P3A_SERVICES_OLD_PRESERVED=True
+G3AT_P3A_CHANNELS_OLD_PRESERVED=True
+G3AT_P3A_EXISTING_IDENTITY=PASS
+G3AT_P3A_GAMMA_DELETION=PASS
+G3AQ_HTSP_VERSION=44
+G3AQ_INITIAL_SYNC=PASS
+G3AQ_CHANNEL_COUNT=2
+G3AQ_HTSP_IDENTITY=PASS
+G3AT_P3A_EVIDENCE=COLLECTED
+```
+Para muxes, servicios y canales: `UNEXPECTED_NEW=[]` y `UNEXPECTED_LOST=[]`. Alpha HTSP `874874340` UUID `e4852534cdb2fd64f54fd861d4d00767` y Beta HTSP `1137851149` UUID `0d3bd243f67184e9adb9ceadf4a51c50` intactos. Log:
+```text
+2026-11-22 11:32:44.790 iptv: m3u parse: 0 new mux(es) ... (total 2)
+2026-11-22 11:32:44.790 mpegts: playlist.m3u - G3AN Gamma ... - deleting
+2026-11-22 11:32:44.790 bouquet: G3AN Gamma / IPTV LOCAL/.../Service01: unmapped from IPTV LOCAL
+2026-11-22 11:32:44.790 channel: G3AN Gamma - deleting
+2026-11-22 11:32:44.790 iptv: removed 1 mux(es) from network 'IPTV LOCAL'
+```
+Respaldo evidencias P3A `/home/ubuntu/g3at-evidence/G3AT-P3A/`, 7 ficheros con SHA256 verificados. **No concluir limpieza Kodi**: el Kodi aislado aún no ha sincronizado la baja. **No iniciar reaparición Gamma** hasta snapshot SQLite post-baja y revisión de grupos sin huérfanos. El estado actual de la playlist privada es `reorder`; Gamma ausente TVH.
