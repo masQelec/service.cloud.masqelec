@@ -238,3 +238,35 @@ G3AT_P3B_SQLITE=PASS
 G3AT_P3B_BACKUP=PASS
 ```
 Respaldo de evidencia postbaja en `/home/ubuntu/g3at-evidence/G3AT-P3B/TV46-after-removal.db`, SQLite íntegra. Con el alcance de estas cuatro tablas, Kodi no dejó filas ni relaciones de Gamma tras su baja. **G3AT_P3B=PASS**; aún no hay evidencia de otras tablas no examinadas. Playlist activa `reorder`; TVH 2 mux / 3 servicios / 2 canales y HTSP 2 identidades originales. Siguiente P3C: reintroducir `add-gamma`, auditar nuevos UUID, mapeo bidireccional, HTSP y comprobar la ausencia de cambios en Alpha/Beta; reaparición Kodi como subgate posterior P3D. Prohibido asumir que los UUID de Gamma se conservan tras eliminación destructiva.
+
+
+## G3-AT-P3C — Reaparición real Gamma TVH, PASS (22/11/2026)
+
+El operador volvió a introducir Gamma usando exclusivamente `prepare.py add-gamma`, tras verificar respaldo P3A y estado TVH de dos canales. La verificación automatizada mostró:
+
+```text
+G3AT_P3C_BASELINE=PASS
+G3AT_P3C_MUXES_NEW=['d74624c6a724a31e957e892acd2fb03e']
+G3AT_P3C_MUXES_OLD_GAMMA_REUSED=False
+G3AT_P3C_SERVICES_NEW=['bc650fd22d3cbb558cc38b1b0e6781a7']
+G3AT_P3C_SERVICES_OLD_GAMMA_REUSED=False
+G3AT_P3C_CHANNELS_NEW=['a1740c422bfc2d4166e4ebc6fa92cb4e']
+G3AT_P3C_CHANNELS_OLD_GAMMA_REUSED=False
+G3AT_P3C_MUXES_OLD_PRESERVED=True
+G3AT_P3C_MUXES_ONE_NEW=True
+G3AT_P3C_SERVICES_OLD_PRESERVED=True
+G3AT_P3C_SERVICES_ONE_NEW=True
+G3AT_P3C_CHANNELS_OLD_PRESERVED=True
+G3AT_P3C_CHANNELS_ONE_NEW=True
+G3AT_P3C_GAMMA_MUX=True
+G3AT_P3C_GAMMA_BIDIRECTIONAL_MAPPING=True
+G3AT_P3C_STABLE_REFRESH=True
+G3AT_P3C_TVH=PASS
+G3AT_P3C_EVIDENCE=PASS
+```
+
+TVH log 11:36:44 nuevo mux y mapeo bouquet; 11:36:59 fin de escaneo; 11:37:00 suscripción EPG. Evidencias con SHA256 bajo `/home/ubuntu/g3at-evidence/G3AT-P3C/`.
+
+Hallazgo: conservar el CUID no recupera UUID de mux/servicio/canal tras borrado destructivo. UUID original Gamma mux `aae864752fce1c09379c630a048f8f25` → nuevo `d74624c6a724a31e957e892acd2fb03e`; servicio `095c73b01bb2a1c1f331f88aee1d3e20` → `bc650fd22d3cbb558cc38b1b0e6781a7`; canal `0b86e3113c756785e2e976245c3101e1` → `a1740c422bfc2d4166e4ebc6fa92cb4e`. Alpha/Beta UUID íntegros.
+
+**P3D pendiente**: inspección HTSP nueva `channelId` numérica, sincronización Kodi aislado, confirmación de 3 canales sin duplicados, cliente/grupos y ausencia del `iUniqueId=300123659` original de Gamma, salvo reutilización demostrada. No declarar `G3AT_P3_FINAL=PASS` aún. Playlist actual `add-gamma`.
