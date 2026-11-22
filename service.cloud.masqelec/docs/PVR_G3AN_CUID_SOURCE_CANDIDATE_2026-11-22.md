@@ -205,3 +205,12 @@ Operador reinició exclusivamente servicio Tvheadend del Docker Compose G3-AN (`
     G3AN_RESTART_IDENTITY=PASS
     G3AN_URL_CHANGE=READY_TO_TEST
     G3AN_KODI_IDENTITY=PENDING
+
+## G3-AN URL change: PENDING_REFRESH, no identity drift yet (22/11/2026)
+
+Operador ejecutó gate preflight `G3AN_URL_PREFLIGHT=PASS`, seguido de `g3an/prepare.py url`, que devolvió `G3AN_PLAYLIST_STAGE=URL`, `G3AN_PLAYLIST_PRIVATE_ONLY=YES`, `G3AN_PLAYLIST_URL=http://g3an-playlist/playlist.m3u`. Tras ~120s de consultas API: `G3AN_URL_APPLIED=False`, pero `G3AN_MUXES_UUID_STABLE=True` (2), `G3AN_SERVICES_UUID_STABLE=True` (3), `G3AN_CHANNELS_UUID_STABLE=True` (2), `G3AN_CUID_g3an-001_PRESERVED=True`, `G3AN_CUID_g3an-002_PRESERVED=True`, `G3AN_BETA_URL_UNCHANGED=True`; `G3AN_URL_IDENTITY=PENDING_REFRESH`. **No declarar PASS ni FAIL del parche**, porque Alpha todavía conserva URL antigua en API. No repetir `prepare.py url`, no restaurar baseline ni reiniciar; comprobar playlist HTTP desde el contenedor TVH, configuración de red IPTV (URL/refetch period), y logs de actualización periódica, luego activar el refresco desde UI solamente si está verificado, o esperar el intervalo configurado. Repetir comparación de UUID solamente después de observar URL nueva. G3-AM/G3-AB siguen fuera del alcance.
+
+    G3AN_CUID_RESTART_IDENTITY=PASS
+    G3AN_URL_PLAYLIST_WRITTEN=YES
+    G3AN_URL_APPLIED_TO_MUX=NO_OBSERVED
+    G3AN_URL_IDENTITY=PENDING_REFRESH
