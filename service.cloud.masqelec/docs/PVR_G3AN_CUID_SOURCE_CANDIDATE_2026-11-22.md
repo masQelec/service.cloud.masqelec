@@ -309,3 +309,12 @@ Próximo gate: mantener un cliente y contar bytes/actividad antes y después de 
     G3AO_PLAYBACK_SUBSCRIPTION=PASS
     G3AO_PLAYBACK_BYTES=NOT_MEASURED
     G3AO_LIVE_URL_SWITCH_CONTINUITY=PENDING
+
+## G3-AO live-stream continuity blocked at preflight: zero bytes (22/11/2026)
+
+Operator ran live update test against Alpha HTTP `/stream/channel/e4852534cdb2fd64f54fd861d4d00767`. Gate output `G3AO_LIVE_PREFLIGHT=PASS`, then `G3AO_BYTES_BEFORE=0` after 8 seconds, `G3AO_LIVE_GATE=BLOCKED_NO_ACTIVE_DATA`. Crucially the test **did not run `prepare.py baseline`**, so playlist remains at `url` stage and no URL-change-during-playback result exists. Earlier `/api/status/subscriptions` `HTTP Testing` merely proved a subscription opened, not that transport bytes were delivered. Consumer script used blocking `stream.read(188*20)`, so 0 may reflect absent TS data or buffered reads without a completed block. Diagnose independently via bounded `curl` to actual G3-AN channel stream, response headers/status and bytes, JSON `/api/status/subscriptions`, TVH and stream generator logs; check upstream synthetic stream health and possible URL encoded query effects. Keep G3-AM/G3-AB untouched, do not modify/restart or rerun prepare while diagnosing. If stream source healthy, replace consumer with small reads or `read1` and read timeouts; do not claim continuity PASS without actual byte growth before and after URL transition.
+
+    G3AO_LIVE_PREFLIGHT=PASS
+    G3AO_BYTES_BEFORE=0
+    G3AO_LIVE_GATE=BLOCKED_NO_ACTIVE_DATA
+    G3AO_URL_CHANGE_DURING_ACTIVE_STREAM=NOT_EXECUTED
