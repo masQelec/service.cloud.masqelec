@@ -165,9 +165,13 @@ g3an_preflight(iptv_network_t *in, htsmsg_t *items)
         '  iptv_mux_t *by_cuid = NULL;\n',
         "AUTO_DECL")
     data[auto] = replace_one(data[auto],
-        '  url = htsmsg_get_str(item, "m3u-url");\n',
         '  url = htsmsg_get_str(item, "m3u-url");\n'
-        '  cuid = htsmsg_get_str(item, "CUID");\n',
+        '\n'
+        '  if (url == NULL ||',
+        '  url = htsmsg_get_str(item, "m3u-url");\n'
+        '  cuid = htsmsg_get_str(item, "CUID");\n'
+        '\n'
+        '  if (url == NULL ||',
         "AUTO_CUID")
     data[auto] = replace_one(data[auto],
         '  LIST_FOREACH(mm, &in->mn_muxes, mm_network_link) {\n'
