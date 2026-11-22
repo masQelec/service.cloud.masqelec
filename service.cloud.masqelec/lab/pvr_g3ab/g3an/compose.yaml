@@ -1,0 +1,40 @@
+# G3-AN isolated Tvheadend runtime. Never reuse G3-AB/G3-AM config or playlist.
+name: masqelec-pvr-g3an
+services:
+  playlist:
+    image: nginx:alpine
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    volumes:
+      - ../runtime/g3an/playlist:/usr/share/nginx/html:ro
+    networks:
+      pvr_g3ab:
+        aliases: [g3an-playlist]
+    restart: "no"
+
+  tvh:
+    image: masqelec/tvh-g3am-runtime:noble
+    # Synthetic localhost-only lab. --noacl MUST NOT appear in production.
+    command: ["--config", "/config", "--bindaddr", "0.0.0.0", "--http_port", "9981", "--htsp_port", "9982", "--nosyslog", "--noacl"]
+    user: "1000:1000"
+    init: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:39991:9981"
+      - "127.0.0.1:39992:9982"
+    volumes:
+      - /home/ubuntu/tvheadend-g3an-upstream/build.linux/tvheadend:/opt/g3an/tvheadend:ro
+      - /home/ubuntu/tvheadend-g3an-upstream/data/conf:/opt/data/conf:ro
+      - /home/ubuntu/tvheadend-g3an-upstream/src/webui/static:/opt/src/webui/static:ro
+      - ../runtime/g3an/tvh_config:/config
+    networks: [pvr_g3ab]
+    depends_on: [playlist]
+    restart: "no"
+
+networks:
+  pvr_g3ab:
+    external: true
+    name: masqelec-pvr-g3ab_pvr_g3ab
