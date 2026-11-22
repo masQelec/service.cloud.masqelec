@@ -515,3 +515,11 @@ DB `clients`: one record `idClient=1`, `sAddonID=pvr.hts`, `iInstanceID=1`. DB `
     G3AR_KODI_CHANNEL_ROWS=2
     G3AR_KODI_CLIENTS=1
     G3AR_KODI_POST_UPDATE_RETENTION=PENDING
+
+## G3-AS Kodi-open playlist change: Tvheadend URL/CUID gate PASS (22/11/2026)
+
+Operator executed second-terminal G3-AS preflight (`G3AS_PREFLIGHT=PASS` required Kodi process running and playlist still at `live-url` query stage), then `g3an/prepare.py live` wrote only G3-AN private playlist (`G3AN_PLAYLIST_STAGE=LIVE`, `G3AN_PLAYLIST_PRIVATE_ONLY=YES`). After 80-second TVH refresh delay, observed API mux records: Alpha mux UUID `afa32f8f8223bdff59057f7790448c92`, CUID `g3an-001`, URL `http://g3ap-live:8080/ch1.ts`; Beta mux UUID `c96721109b182b2d53fbba80bdc5820c`, CUID `g3an-002`, URL `http://streams/ch2.ts`. `G3AS_PLAYLIST_UPDATE=COMPLETED`. This confirms G3-AN TVH adopted URL change and preserved both mux UUID/CUID while isolated Kodi process was running at preflight. No post-change SQLite comparison, client-side iUniqueId, or actual live Kodi display yet; `G3AS_KODI_RETENTION=PENDING`. Next ask operator to close isolated Kodi normally and compare lab-only `/tmp/g3ar-kodi-A3FZBaXx/data/userdata/Database/TV46.db` against saved `/tmp/g3ar-kodi-A3FZBaXx/g3as-before.json`, with both files guarded, process-not-running check, duplicate check, PVR client identity, and exact channel record stability. Do not claim final Kodi retention until operator returns result.
+
+    G3AS_TVH_UPDATE=PASS
+    G3AS_ALPHA_URL=http://g3ap-live:8080/ch1.ts
+    G3AS_KODI_RETENTION=PENDING
