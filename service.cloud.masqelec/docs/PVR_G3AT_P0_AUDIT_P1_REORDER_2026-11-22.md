@@ -222,3 +222,19 @@ Para muxes, servicios y canales: `UNEXPECTED_NEW=[]` y `UNEXPECTED_LOST=[]`. Alp
 2026-11-22 11:32:44.790 iptv: removed 1 mux(es) from network 'IPTV LOCAL'
 ```
 Respaldo evidencias P3A `/home/ubuntu/g3at-evidence/G3AT-P3A/`, 7 ficheros con SHA256 verificados. **No concluir limpieza Kodi**: el Kodi aislado aún no ha sincronizado la baja. **No iniciar reaparición Gamma** hasta snapshot SQLite post-baja y revisión de grupos sin huérfanos. El estado actual de la playlist privada es `reorder`; Gamma ausente TVH.
+
+
+## G3-AT-P3B — Sincronización baja Kodi y limpieza SQLite, PASS (22/11/2026)
+
+Tras retirar Gamma de G3-AN/HTSP en P3A, el operador abrió el Kodi aislado, sincronizó la baja y cerró normalmente. Comparación SQLite read-only con `/home/ubuntu/g3at-evidence/G3AT-P1-before/TV46.db`:
+```text
+G3AT_P3B_CHANNELS_RESTORED=True
+G3AT_P3B_CLIENTS_RESTORED=True
+G3AT_P3B_CHANNELGROUPS_RESTORED=True
+G3AT_P3B_MAP_CHANNELGROUPS_CHANNELS_RESTORED=True
+G3AT_P3B_CHANNELS=[(1, 1, 874874340), (2, 1, 1137851149)]
+G3AT_P3B_GAMMA_REMOVED=True
+G3AT_P3B_SQLITE=PASS
+G3AT_P3B_BACKUP=PASS
+```
+Respaldo de evidencia postbaja en `/home/ubuntu/g3at-evidence/G3AT-P3B/TV46-after-removal.db`, SQLite íntegra. Con el alcance de estas cuatro tablas, Kodi no dejó filas ni relaciones de Gamma tras su baja. **G3AT_P3B=PASS**; aún no hay evidencia de otras tablas no examinadas. Playlist activa `reorder`; TVH 2 mux / 3 servicios / 2 canales y HTSP 2 identidades originales. Siguiente P3C: reintroducir `add-gamma`, auditar nuevos UUID, mapeo bidireccional, HTSP y comprobar la ausencia de cambios en Alpha/Beta; reaparición Kodi como subgate posterior P3D. Prohibido asumir que los UUID de Gamma se conservan tras eliminación destructiva.
