@@ -270,3 +270,33 @@ TVH log 11:36:44 nuevo mux y mapeo bouquet; 11:36:59 fin de escaneo; 11:37:00 su
 Hallazgo: conservar el CUID no recupera UUID de mux/servicio/canal tras borrado destructivo. UUID original Gamma mux `aae864752fce1c09379c630a048f8f25` → nuevo `d74624c6a724a31e957e892acd2fb03e`; servicio `095c73b01bb2a1c1f331f88aee1d3e20` → `bc650fd22d3cbb558cc38b1b0e6781a7`; canal `0b86e3113c756785e2e976245c3101e1` → `a1740c422bfc2d4166e4ebc6fa92cb4e`. Alpha/Beta UUID íntegros.
 
 **P3D pendiente**: inspección HTSP nueva `channelId` numérica, sincronización Kodi aislado, confirmación de 3 canales sin duplicados, cliente/grupos y ausencia del `iUniqueId=300123659` original de Gamma, salvo reutilización demostrada. No declarar `G3AT_P3_FINAL=PASS` aún. Playlist actual `add-gamma`.
+
+
+## G3-AT-P3D / P3 FINAL — Reaparición Gamma en Kodi, PASS (22/11/2026)
+
+Operador ejecutó el gate de reaparición tras P3C, obtuvo y usó identidad HTSP nueva de Gamma para contrastarla con la SQLite del Kodi aislado tras sincronización y cierre. Salida exacta entregada:
+```text
+G3AT_P3D_CHANNELS_COUNT=2->3
+G3AT_P3D_CLIENTS_COUNT=1->1
+G3AT_P3D_CHANNELGROUPS_COUNT=4->4
+G3AT_P3D_MAP_CHANNELGROUPS_CHANNELS_COUNT=6->9
+G3AT_P3D_THREE_CHANNELS=True
+G3AT_P3D_ALPHA_BETA_STABLE=True
+G3AT_P3D_GAMMA_RECREATED=True
+G3AT_P3D_PVR_CLIENT_STABLE=True
+G3AT_P3D_CHANNELS_OLD_PRESERVED=True
+G3AT_P3D_CLIENTS_OLD_PRESERVED=True
+G3AT_P3D_CHANNELGROUPS_OLD_PRESERVED=True
+G3AT_P3D_MAP_CHANNELGROUPS_CHANNELS_OLD_PRESERVED=True
+G3AT_P3D_CHANNELS= [(1, 1, 874874340), (2, 1, 1137851149), (3, 1, 1108112545)]
+G3AT_P3D_GAMMA_OLD_ID_ABSENT= True
+G3AT_P3D_FINAL=PASS
+G3AT_P3D_BACKUP=PASS
+```
+Gamma anterior HTSP/Kodi `300123659`, nuevo `1108112545`: la reaparición produce identidad numérica diferente. Alpha `874874340` y Beta `1137851149` sin cambio. Nuevos UUID TVH P3C: mux `d74624c6a724a31e957e892acd2fb03e`, servicio `bc650fd22d3cbb558cc38b1b0e6781a7`, canal `a1740c422bfc2d4166e4ebc6fa92cb4e`. Cliente PVR único y grupos antiguos preservados, 3 nuevas relaciones tras reaparición. SQLite comprobada íntegra y copia en `/home/ubuntu/g3at-evidence/G3AT-P3D/TV46-after-reappearance.db`.
+
+**G3AT_P3_FINAL=PASS** para ciclo controlado alta–baja–reaparición, incluyendo TVH/HTSP/Kodi y comparación de cuatro tablas SQLite. El CUID protege continuidad de mux si la entrada permanece, pero no obliga a reutilizar UUID después de borrado destructivo. Una playlist temporalmente incompleta podría destruir identidades. **No extrapolar a playlists grandes, actualización interrumpida, reinicios ni reproducción activa**. G3-AB/G3-AM, Kodi habitual, sistema producción y CoreELEC no se han tocado. Estado activo de G3-AN: playlist `add-gamma`, 3 canales.
+
+### Próximo diseño recomendado (pendiente de implementación y pruebas)
+
+Antes de modificar el código del addon, especificar política de reconciliación con M3U autoritativa y transacción de cambios: distinguir actualizaciones por CUID de bajas auténticas; validar lista completa y evitar aplicar listas parciales/vacías; definir tratamiento de canales retirados y casos de error; realizar pruebas de estrés y cortes de sincronización sin alterar directamente la SQLite de Kodi. El escenario actual demuestra la semántica de TVH y Kodi, no la política del addon.
