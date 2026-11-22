@@ -383,3 +383,7 @@ Updated `lab/pvr_g3ab/g3ap/compose.yaml` to run **directly** with existing cache
     G3AP_LOCAL_FFMPEG=PASS
     G3AP_OFFLINE_COMPOSE=COMMITTED_NOT_EXECUTED
     G3AP_SUSTAINED_STREAM=PENDING
+
+## G3-AP first offline container start: HTTP 8080 refused (22/11/2026)
+
+Operator ran revised `g3ap/compose.yaml`: `G3AP_CONFIG_EXIT=0`, `docker compose up -d --no-deps --pull never live` returned `G3AP_START_EXIT=0`, Docker showed `masqelec-pvr-g3ap-live-1 Started` in 0.2s. Immediate GET `/healthz` from G3-AN playlist network resolved `g3ap-live` to `172.20.0.8` but failed `Connection refused` (`G3AP_HEALTH_EXIT=1`); immediate `docker logs --tail 25 masqelec-pvr-g3ap-live-1` output empty; `docker ps` showed G3-AP `Up Less than a second`. G3-AN `Up 9 minutes`, G3-AM `Up 11 hours`. **Docker container startup is not proof HTTP service is ready**; empty immediate logs may be startup race, early process exit, or inability to bind/read sources. Do not modify Dockerfile/image/Compose yet. Next read-only diagnostic after process settles: `docker inspect` State (Status, Running, ExitCode, Error, StartedAt/FinishedAt), `docker ps -a`, `docker logs --timestamps`, Python process listening via `/proc/net/tcp` or health retry loop with bounded attempts and no container restart, and inspect volume/source paths only if needed. Keep URL playlist unchanged. `G3AP_HEALTH=FAIL_OBSERVED_IMMEDIATE`, `G3AP_CONTINUOUS_STREAM=PENDING`.
