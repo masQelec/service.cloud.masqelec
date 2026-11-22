@@ -242,3 +242,13 @@ Operator ran `pvr_g3ao_allow_active_url_refresh_lab.py` against only `/home/ubun
     G3AO_SOURCE_GATE=PASS
     G3AO_BUILD=PENDING
     G3AO_RUNTIME_URL_REFRESH=PENDING
+
+## G3-AO compiled/restarted (22/11/2026): build PASS, URL identity not yet measured
+
+Operator stopped only G3-AN `tvh`, rebuilt patched G3-AO executable: `G3AO_MAKE_EXIT=0`, `G3AO_BUILD=PASS`; `docker compose ... up -d --no-deps tvh`: `G3AO_START_EXIT=0`; API `/api/serverinfo` HTTP 200; logs `config: loaded`, `iptv: m3u parse: 0 new mux(es) in network 'IPTV LOCAL' (total 2)`. G3-AM remains `Up 11 hours`. **Do not infer URL adoption from '0 new mux(es)':** must query current Alpha `iptv_url` expecting `http://streams/ch1.ts?g3an_url_test=1`, both CUIDs and exact original mux/service/channel UUID sets from `/tmp/g3an-baseline-identity.json`, active EPG subscribers status, and any log errors. Note `--noacl` lab-only warning as expected, not production compatible. `G3AO_RUNTIME_IDENTITY=PENDING_VERIFICATION`; after successful identity gate, test existing stream uninterrupted across a subsequent URL mutation (not yet done) and Kodi HTSP.
+
+    G3AO_MAKE=PASS
+    G3AO_START=PASS
+    G3AO_HTTP=200
+    G3AO_URL_APPLIED=UNVERIFIED
+    G3AO_UUID_IDENTITY=UNVERIFIED
