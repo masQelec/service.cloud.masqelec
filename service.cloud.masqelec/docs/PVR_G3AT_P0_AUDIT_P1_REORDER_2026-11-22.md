@@ -84,3 +84,10 @@ G3AT_P1_SQLITE_COMPARISON=PASS
 Sumado a P1B/P1C/P1D, `G3AT_P1_FINAL=PASS` para **reordenación meramente posicional con números explícitos constantes**. No se ha demostrado renumeración ni política de bajas. Estado de playlist en lab: `reorder`. G3-AB/G3-AM y producción protegidos; CoreELEC NO.
 
 **Siguiente fase P2:** alta Gamma controlada con `CUID=g3an-003`, número propio 3, emisor existente y verificado (no asumir `/ch3.ts`). Auditar primero la política de auto-mapeo y la configuración G3-AN para evitar un alta de mux sin canal Kodi.
+
+
+## G3-AT-P2A — Inventario previo al alta Gamma (22/11/2026)
+
+Salida del operador, sin mutaciones: árbol local en `develop`, HEAD `193099a` (anterior a los commits documentales remotos); Kodi aislado `CLOSED`. Red IPTV LOCAL UUID `d1642fb49f8bf0d2c583ce1b2deae146`. API TVH: 2 muxes (Alpha CUID `g3an-001`, URL `http://g3ap-live:8080/ch1.ts`; Beta CUID `g3an-002`, URL `http://streams/ch2.ts`), 3 servicios, 2 canales. Servicio Beta histórico no vinculado: UUID `923fc082cf4b92edf42d4b5a87da125e`, `enabled=false`; otros dos servicios mantienen sus canales originales. G3-AP `server.py` permite únicamente rutas `/ch1.ts` y `/ch2.ts`, ninguna `/ch3.ts` todavía. No asumir fuente Gamma ni automapeo funcional.
+
+**Gate P2A:** `INVENTORY=COLLECTED`, **no** `GAMMA_ADD=PASS`. Inspeccionar configuración API de mapeo de red y rutas de `service_mapper_process` antes de tocar el generador. Evitar una baja destructiva o crear duplicados en Gamma hasta contar con evidencia real de creación y asociación. G3-AB/G3-AM, producción y CoreELEC protegidos.
