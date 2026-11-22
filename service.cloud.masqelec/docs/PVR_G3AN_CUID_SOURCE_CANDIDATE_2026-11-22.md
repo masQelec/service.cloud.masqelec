@@ -372,3 +372,14 @@ Operator ran G3-AP compose config and image build: `G3AP_COMPOSE_EXIT=0`; Docker
 ## G3-AP offline image inventory (22/11/2026)
 
 Operator listed local Docker images. Base `python:3.12-slim-bookworm` absent; `masqelec/tvh-g3am-runtime:noble` is present but `docker run --rm --network none --pull never ... sh -c 'command -v python3; command -v ffmpeg'` found neither executable; `/usr/bin/sh` exists. Other present image `lscr.io/linuxserver/tvheadend:latest` (703 MB) has not been checked for ffmpeg/python3 yet. Host `getent hosts registry-1.docker.io` returned multiple IPv6 records, whereas BuildKit lookup to configured DNS `212.230.135.1` timed out earlier. Host lookup success alone does not prove registry connectivity or rule out intermittent BuildKit DNS issue. Do not modify Docker daemon DNS or restart labs. Next limited read-only offline check `docker run --rm --network none --pull never --entrypoint /bin/sh lscr.io/linuxserver/tvheadend:latest -c 'command -v ffmpeg; command -v python3; ...'`; only if suitable can adapt isolated G3-AP image without registry; otherwise investigate transient resolver and choose a strictly isolated local-source alternative. G3-AP build/boot/stream continuity remain pending.
+
+## G3-AP offline runtime candidate: cached TVH image provides Python+FFmpeg (22/11/2026)
+
+Operator checked `docker run --rm --network none --pull never --entrypoint /bin/sh lscr.io/linuxserver/tvheadend:latest` without affecting running labs. Confirmed `/usr/bin/ffmpeg`, `/usr/bin/ffprobe`, `/usr/bin/python3` (symlink Python 3.12), `/usr/bin/python`, `/bin/busybox`; Alpine 3.20.10. Thus no need to fetch `python:3.12-slim-bookworm` or run apt installs, avoiding unavailable Docker Hub DNS.
+
+Updated `lab/pvr_g3ab/g3ap/compose.yaml` to run **directly** with existing cached `lscr.io/linuxserver/tvheadend:latest`, `pull_policy: never`, overridden `entrypoint: ['/usr/bin/python3','-u','/opt/g3ap/server.py']` and `command: []` to bypass linuxserver TVH startup, keep `user 65534`, `read_only: true`, no capabilities, external shared lab network with `g3ap-live` DNS alias and NO exposed host ports. `Dockerfile` remains historical unused candidate; **do not run docker compose build** for revised Compose. Next operator gates: `git pull --ff-only origin develop`, `docker compose -f .../g3ap/compose.yaml config --quiet`, `docker compose -f .../g3ap/compose.yaml up -d --no-deps --pull never live`, `docker ps`, `docker logs`, and `/healthz` through existing G3-AN playlist container. If this works, verify sustained >30 sec HTTP bytes using separate client **without buffering** and only then transition G3-AN playlist URLs. G3-AB streams container and G3-AM tvh unchanged, no release permission. No running test has yet been conducted after Compose edit.
+
+    G3AP_LOCAL_PYTHON=PASS
+    G3AP_LOCAL_FFMPEG=PASS
+    G3AP_OFFLINE_COMPOSE=COMMITTED_NOT_EXECUTED
+    G3AP_SUSTAINED_STREAM=PENDING
