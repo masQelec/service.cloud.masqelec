@@ -264,3 +264,15 @@ Nueva hipótesis por lectura de upstream exacto `src/input/mpegts/iptv/iptv_auto
     G3AO_UUID_PRESERVED_WHILE_URL_UNCHANGED=PASS_OBSERVED
     G3AO_URL_UPDATE=FAIL_OR_PENDING
     G3AO_CAUSE=NEEDS_INPUT_DIAGNOSTICS
+
+## G3-AO URL update actually succeeded; literal URL check was false negative (22/11/2026)
+
+Operator checked exact playlist on host and inside G3-AN nginx: Alpha playlist `http://streams/ch1.ts?g3an_url_test=1`, Beta `http://streams/ch2.ts`. TVH API after G3-AO candidate shows Alpha mux UUID `afa32f8f8223bdff59057f7790448c92`, CUID `g3an-001`, `iptv_url=http://streams/ch1.ts?g3an%5Furl%5Ftest=1`, `iptv_url_cmpid` same encoded value; Beta UUID `c96721109b182b2d53fbba80bdc5820c`, CUID `g3an-002`, URL unmodified. `%5F` is percent-encoding of `_` in query key, so earlier direct string comparison `G3AO_ALPHA_URL_UPDATED=False` was **FALSE NEGATIVE**, not actual update failure. M3U network grid UUID `d1642fb49f8bf0d2c583ce1b2deae146`, `url=http://g3an-playlist/playlist.m3u`, `refetch_period=1`, `remove_args=ticket`, `ignore_path=0`. IPTV refetch logs regular and no new `deferred` after replacement. Docker G3-AN tvh bind-mount points to source `/home/ubuntu/tvheadend-g3an-upstream/build.linux/tvheadend`; start 10:15:57. HTTP 404 `/api/iptv/network/grid` is just non-existing endpoint; `mpegts/network/grid` returns the network.
+
+G3-AO now has source/build/start PASS and **actual Alpha URL transition observed**, with same mux UUID and CUID; previous full UUID-set checks confirmed muxes 2, services 3, channels 2 stable, but those checks occurred before correct percent-aware URL acceptance. Next run one consolidated read-only gate using `urllib.parse.urlsplit`/`parse_qsl` to compare semantic query and verify exact baseline UUID sets, CUIDs, Beta URL and EPG subscriptions at same observation time. Also read compressed mux file again to confirm changed URL/CUID persisted, then controlled G3-AN-only restart, future true simultaneous live playback test and Kodi iUniqueId gate. No CoreELEC integration or production changes yet.
+
+    G3AO_URL_APPLIED_API=PASS_NORMALIZED
+    G3AO_ALPHA_UUID_PRESERVED=PASS_OBSERVED
+    G3AO_CUID_PRESERVED=PASS_OBSERVED
+    G3AO_FULL_ATOMIC_GATE=PENDING_CONSOLIDATION
+    G3AO_LIVE_STREAM_TEST=PENDING
