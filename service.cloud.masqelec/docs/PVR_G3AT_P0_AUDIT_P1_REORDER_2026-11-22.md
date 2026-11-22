@@ -59,3 +59,28 @@ CHANNELS= [(1, 1, 874874340), (2, 1, 1137851149)]
 ```
 
 Por tanto `G3AT_P1D_KODI_IDENTITY=PASS` para los registros `idChannel,iClientId,iUniqueId`. **Aún pendiente:** comparación estructural de clientes y asignaciones de grupos con `/home/ubuntu/g3at-evidence/G3AT-P1-before/TV46.db`. No proclamar `G3AT_P1_FINAL=PASS` hasta ese control. No se ha alterado directamente SQLite.
+
+
+## G3-AT-P1E — Comparación SQLite final, PASS (operador, 22/11/2026)
+
+La comparación read-only entre `G3AT-P1-before/TV46.db` y la base SQLite del Kodi aislado, tras reordenar Beta/Alpha y cerrar Kodi correctamente, devolvió:
+
+```text
+G3AT_P1E_CHANNELS_SCHEMA_STABLE=True
+G3AT_P1E_CHANNELS_ROWS_STABLE=True
+G3AT_P1E_CHANNELS_COUNT=2->2
+G3AT_P1E_CLIENTS_SCHEMA_STABLE=True
+G3AT_P1E_CLIENTS_ROWS_STABLE=True
+G3AT_P1E_CLIENTS_COUNT=1->1
+G3AT_P1E_CHANNELGROUPS_SCHEMA_STABLE=True
+G3AT_P1E_CHANNELGROUPS_ROWS_STABLE=True
+G3AT_P1E_CHANNELGROUPS_COUNT=4->4
+G3AT_P1E_MAP_CHANNELGROUPS_CHANNELS_SCHEMA_STABLE=True
+G3AT_P1E_MAP_CHANNELGROUPS_CHANNELS_ROWS_STABLE=True
+G3AT_P1E_MAP_CHANNELGROUPS_CHANNELS_COUNT=6->6
+G3AT_P1_SQLITE_COMPARISON=PASS
+```
+
+Sumado a P1B/P1C/P1D, `G3AT_P1_FINAL=PASS` para **reordenación meramente posicional con números explícitos constantes**. No se ha demostrado renumeración ni política de bajas. Estado de playlist en lab: `reorder`. G3-AB/G3-AM y producción protegidos; CoreELEC NO.
+
+**Siguiente fase P2:** alta Gamma controlada con `CUID=g3an-003`, número propio 3, emisor existente y verificado (no asumir `/ch3.ts`). Auditar primero la política de auto-mapeo y la configuración G3-AN para evitar un alta de mux sin canal Kodi.
