@@ -503,3 +503,15 @@ Operator inspected canonical `/usr/share/kodi/addons/pvr.hts/resources/settings.
     G3AR_WAYLAND_ENV=AVAILABLE
     G3AR_KODI_ISOLATED_BOOT=PENDING
     G3AR_PVR_SYNC=PENDING
+
+## G3-AR actual Kodi 21.3 TV46.db initial identity: PASS (22/11/2026)
+
+Operator closed lab Kodi and audited only `/tmp/g3ar-kodi-A3FZBaXx/data/userdata/Database/TV46.db`; output `G3AR_REAL_PROFILE_ACCESSED=NO`. Real pvr.hts addon connected after initial startup attempt to default 127.0.0.1:9982 failed at 11:51:45; reconfigured instance 1 was recreated at 11:51:47, received HTSP permissions, async updates initialized, `PVR Manager: Started` at 11:51:49. Initial `9982` error precedes successful TVH handshake and was not terminal. Some thumbnail errors occurred, not established as PVR failures.
+
+DB `clients`: one record `idClient=1`, `sAddonID=pvr.hts`, `iInstanceID=1`. DB `channels`: exactly two rows. Alpha `idChannel=1`, `iUniqueId=874874340`, `sChannelName=G3AN Alpha`, `iClientId=1`, `idEpg=1`; Beta `idChannel=2`, `iUniqueId=1137851149`, `sChannelName=G3AN Beta`, `iClientId=1`, `idEpg=2`. Both `iUniqueId` **exactly match** HTSP `channelId` observed twice and across G3-AN restart. `channelgroups` has 4 rows including IPTV LOCAL and G3AN SYNTHETIC and two all-channels groups; `map_channelgroups_channels` 6 rows (each channel mapped to 3 groups) — not six channel duplicates. `G3AR_KODI_INITIAL_IDENTITY=PASS`, no duplicates on first import. **Not yet tested after playlist refresh/restart**; do not claim long-term Kodi retention. Current G3-AN playlist `live-url` (Alpha `?g3ap_url_test=1`), same CUID, Beta unchanged. Next gate snapshot via SQLite `.backup` or Python `sqlite3.Connection.backup` under lab-only /tmp path, record `idChannel`, `iUniqueId`, `iClientId`, `idEpg`, `sChannelName`, and mappings; start same lab Kodi with KODI_DATA and HOME/XDG isolation; while active switch G3-AN-only playlist `live-url` to `live` with `g3an/prepare.py live` (after gate and record), wait for TVH refetch, close Kodi gracefully, compare sqlite read-only. If Kodi does not receive channel updates for a pure URL change, this might be normal since HTSP channel identity and metadata unchanged: important to prove no duplicates and stable DB, but **not evidence of forced Kodi refresh**. No source changes or production deployment.
+
+    G3AR_KODI_INITIAL_IDENTITY=PASS
+    G3AR_KODI_TV_DB=TV46.db
+    G3AR_KODI_CHANNEL_ROWS=2
+    G3AR_KODI_CLIENTS=1
+    G3AR_KODI_POST_UPDATE_RETENTION=PENDING
