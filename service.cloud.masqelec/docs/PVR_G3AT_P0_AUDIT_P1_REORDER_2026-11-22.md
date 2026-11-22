@@ -34,3 +34,16 @@
 - `G3AT_GAMMA_ADD_DELETE_READD=PENDING`.
 
 No compilar, desplegar ni tocar el binario de TVH hasta nuevos gates.
+
+
+## P1 — Evidencia real posterior (operador, 22/11/2026)
+
+- Pruebas offline del generador: `Ran 3 tests ... OK`, `G3AT_P1_STATIC=PASS`, playlist `live` sin cambiar antes de la mutación.
+- Baseline previo `G3AT_P1B_BASELINE=PASS`: muxes 2, servicios 3, canales 2; API TVH, HTSP v44 y copia íntegra de SQLite Kodi de laboratorio. Referencia `/home/ubuntu/g3at-evidence/G3AT-P1-before`.
+- P1C ejecutado explícitamente en G3-AN: `prepare.py reorder` imprimió `G3AN_PLAYLIST_STAGE=REORDER`, `G3AN_PLAYLIST_PRIVATE_ONLY=YES`, `G3AT_P1C_PLAYLIST_ORDER=PASS`, `G3AT_P1C_CUID_AND_URL=PASS`.
+- Tras 80 s, comparaciones API: `G3AT_P1C_MUXES_UUID_STABLE=True`, `G3AT_P1C_MUXES_COUNT_STABLE=True`, `G3AT_P1C_CUID_STABLE=True`, `G3AT_P1C_SERVICES_UUID_STABLE=True`, `G3AT_P1C_SERVICES_COUNT_STABLE=True`, `G3AT_P1C_CHANNELS_UUID_STABLE=True`, `G3AT_P1C_CHANNELS_COUNT_STABLE=True`, `G3AT_P1C_TVH_IDENTITY=PASS`.
+- HTSP v44, `G3AQ_INITIAL_SYNC=PASS`, `G3AQ_HTSP_IDENTITY=PASS`; Alpha channelId `874874340`, UUID `e4852534cdb2fd64f54fd861d4d00767`, número 1; Beta channelId `1137851149`, UUID `0d3bd243f67184e9adb9ceadf4a51c50`, número 2.
+- Log TVH tras mutación: `2026-11-22 11:17:44.788 [INFO] iptv: m3u parse: 0 new mux(es) in network 'IPTV LOCAL' (total 2)`. Evidencia de sincronización real, sin muxes nuevos.
+- `G3AT_P1C_COMPARISON=PASS`, `G3AT_P1C_TVH_HTSP=PASS`. Evidencias bajo `/home/ubuntu/g3at-evidence/G3AT-P1-after`.
+- **P1 no cerrado:** Kodi de laboratorio todavía no ha sido arrancado/re-sincronizado tras la reordenación y no se ha comparado la SQLite post-refresh. No declarar `G3AT_P1_KODI=PASS` ni `G3AT_P1_FINAL=PASS`.
+- No se han tocado G3-AB, G3-AM, producción ni CoreELEC. Playlist actual: `reorder` (Beta primero, Alpha después); conservar hasta cerrar comparación Kodi o rollback explícito respaldado.
