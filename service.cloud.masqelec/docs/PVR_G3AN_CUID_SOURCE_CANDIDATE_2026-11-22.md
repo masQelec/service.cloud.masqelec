@@ -234,3 +234,11 @@ New standalone one-time G3-AO patch helper in repo `service.cloud.masqelec/tools
     G3AN_URL_ACTIVE_FENCE_ROOT_CAUSE=CONFIRMED
     G3AO_PATCH_HELPER=COMMITTED_NOT_EXECUTED
     G3AO_RUNTIME_GATE=PENDING
+
+## G3-AO source applied: static gate PASS (22/11/2026)
+
+Operator ran `pvr_g3ao_allow_active_url_refresh_lab.py` against only `/home/ubuntu/tvheadend-g3an-upstream`. Output `G3AO_ANCHORS=PASS`, dry run `G3AO_APPLY=DRY_RUN`, then `G3AO_ANCHORS=PASS` / `G3AO_APPLY=PASS`; `git diff --check` passed with `G3AO_SOURCE_GATE=0`. Git diff stat (accumulated G3-AN + G3-AO modifications): `iptv_auto.c 216 lines changed`, `iptv_mux.c +8`, `iptv_private.h +1`; total **221 insertions, 4 deletions**. G3-AM original `Up 11 hours`. The new candidate has NOT been compiled or runtime tested. Next step: verify baseline file and clean Docker target, stop only G3-AN tvh before make, compile `make -j2 PYTHON=python3` and preserve full result; start only G3-AN tvh if build PASS. Since playlist is currently at `url` stage, on successful restart TVH should pick new configured URL at next IPTV refresh; compare mux/service/channel UUIDs and CUIDs to baseline. Do not conflate host source static gate with runtime success, nor prematurely deploy to CoreELEC.
+
+    G3AO_SOURCE_GATE=PASS
+    G3AO_BUILD=PENDING
+    G3AO_RUNTIME_URL_REFRESH=PENDING
