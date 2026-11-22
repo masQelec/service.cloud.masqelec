@@ -473,3 +473,14 @@ Operator executed a guarded HTSP identity comparison before and after `docker re
     G3AQ_HTSP_RESTART_PERSISTENCE=PASS
     G3AQ_KODI_IUNIQUEID=PENDING
     G3AQ_KODI_DB_RETENTION=PENDING
+
+## G3-AR Kodi/PVR addon preflight (22/11/2026)
+
+Operator reports Kodi installed `/usr/bin/kodi`, `/usr/bin/kodi-standalone`, version Debian Media Center **21.3**, Debian package `2:21.3+dfsg-1ubuntu1`. PVR plugin metadata from `/usr/share/kodi/addons/pvr.hts/addon.xml`: ID `pvr.hts`, version **21.2.6**, name `Tvheadend HTSP Client`. Kodi `--help` supports `-p`/`--portable` but explicitly says it writes configuration in its *installation folder* (not an isolated testing HOME), `--windowing` x11/wayland/gbm, `--debug`; no explicit custom `--profile` option in help. `pgrep -af 'kodi|pvr.hts'` reported no processes. Graphical context `DISPLAY=:0`, `WAYLAND_DISPLAY=wayland-0`, `XDG_SESSION_TYPE=wayland`. These are environment facts only, not successful Kodi PVR connection or DB identity.
+
+**Safety plan:** Do not invoke `kodi -p`, which could put configs in install folder. Do not use real HOME `~/.kodi`; avoid running Kodi until verified wrapper and addon settings keys and tested clean isolated HOME/XDG directories. First nonmutating inspect `/usr/bin/kodi` launcher, actual `/usr/lib/x86_64-linux-gnu/kodi/kodi.bin`, `/usr/share/kodi/addons/pvr.hts/resources/settings.xml`, profile-existing status without opening it, PVR plugin settings keys (`host`, `htsp_port`, username/password, etc). Then implement controlled isolated runtime with `HOME=/tmp/g3ar.../home`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and preserve existing host user display/Wayland variables; never touch ~/.kodi. Snapshot `TV*.db` using `sqlite3` only after Kodi exits, verify `iUniqueId` and retention against exact HTSP ids; distinguish Kodi internal client ID and DB keys. Do not launch Kodi until runtime profile plan validated. G3-AN isolated network still localhost 39992, lab noacl, not suitable for production.
+
+    G3AR_KODI_VERSION=21.3
+    G3AR_PVR_HTS_VERSION=21.2.6
+    G3AR_KODI_PROCESS_COUNT=0
+    G3AR_KODI_DB_RETENTION=PENDING
