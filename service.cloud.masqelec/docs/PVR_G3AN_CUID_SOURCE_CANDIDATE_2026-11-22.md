@@ -454,3 +454,14 @@ New read-only `tools/pvr_g3aq_htsp_identity_probe.py` candidate committed on dev
     G3AQ_HTSP_TCP=PASS
     G3AQ_HTSP_IDENTITY=PENDING
     G3AQ_KODI_IUNIQUEID=PENDING
+
+## G3-AQ HTSP read-only double handshake: PASS (22/11/2026)
+
+Operator executed `tools/pvr_g3aq_htsp_identity_probe.py` twice independently against `127.0.0.1:39992`: both handshakes negotiated HTSP version **44**, `G3AQ_INITIAL_SYNC=PASS`, exactly 2 channels, `G3AQ_HTSP_IDENTITY=PASS` exit 0; `G3AQ_DOUBLE_HTSP_READ=PASS`. Exact identical identities in both snapshots: G3AN Alpha `channelId=874874340`, `channelIdStr=e4852534cdb2fd64f54fd861d4d00767`, `channelNumber=1`; G3AN Beta `channelId=1137851149`, `channelIdStr=0d3bd243f67184e9adb9ceadf4a51c50`, `channelNumber=2`. G3-AM remained Up 12h. This proves in-session HTSP identity stability over two independent connections, **not** across TVH restart and **not** Kodi `iUniqueId` mapping/retention.
+
+Next gate: save bounded, parseable baseline of HTSP `G3AQ_CHANNELS_JSON` to `/tmp` via the same probe; restart **only** G3-AN lab TVH container (no Docker daemon restart, no G3-AM/G3-AB, no playlist changes) with bounded readiness retries; probe again and compare exact numeric IDs, UUIDs, channel order/numbers. Compare mux/service/channel API uuid sets against `/tmp/g3an-baseline-identity.json` if available, and verify persisted `iptv_cuid` and Alpha `live-url` source. Run Kodi addon identity integration in a fresh isolated Kodi profile only after restart gate passes; never touch real Kodi profile or DB. Version 44 observed, no HTSP authentication issues.
+
+    G3AQ_HTSP_VERSION=44
+    G3AQ_DOUBLE_HTSP_READ=PASS
+    G3AQ_HTSP_RESTART_PERSISTENCE=PENDING
+    G3AQ_KODI_IUNIQUEID=PENDING
