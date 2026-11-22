@@ -140,3 +140,17 @@ Después de `G3AT_P2F_BASELINE=PASS` y snapshot previo `G3AT_P2F_SNAPSHOT_BEFORE
 Comprobación API G3-AN de lectura, sobre UUID de P2F: mux `aae864752fce1c09379c630a048f8f25`, servicio `095c73b01bb2a1c1f331f88aee1d3e20`, canal `0b86e3113c756785e2e976245c3101e1`. Los 7 booleanos salieron `True`: `MUX_EXISTS`, `SERVICE_EXISTS`, `CHANNEL_EXISTS`, `CUID_CORRECT`, `SERVICE_LINKED_TO_CHANNEL`, `CHANNEL_LINKED_TO_SERVICE`, `CHANNEL_ENABLED`. `G3AT_P2G_MAPPING=PASS`.
 
 La creación y asociación TVH está probada en G3-AN, pero **el cierre final de P2 requiere Kodi aislado**: confirmar 3 canales reales en SQLite, Alpha/Beta con filas y IDs conservados, Gamma nuevo `iUniqueId=300123659`, `iClientId=1`, sin duplicados, cliente y grupos sin degradación inesperada. No cambiar `add-gamma` ni quitar Gamma mientras se realiza esa prueba. No se han realizado bajas ni reapariciones.
+
+
+## G3-AT-P2H — Gamma sincronizado en Kodi aislado, PASS (22/11/2026)
+
+Tras ejecutar Kodi aislado y cerrarlo, el operador inspeccionó `TV46.db` en modo `ro`. Evidencia exacta:
+```text
+G3AT_P2H_SQLITE_INTEGRITY= ok
+G3AT_P2H_CHANNELS= [(1, 1, 874874340), (2, 1, 1137851149), (3, 1, 300123659)]
+G3AT_P2H_CLIENTS= [(1, 'pvr.hts')]
+G3AT_P2H_GAMMA_IMPORTED= True
+G3AT_P2H_EXISTING_IDS_STABLE= True
+G3AT_P2H_SQLITE_GATE= PASS
+```
+Kodi retiene Alpha/Beta, añade Gamma con nueva identidad y conserva un único cliente. **Pendiente**: comparación de conjuntos de grupos, relaciones de grupos/canales y filas antiguas con P1-before; no exigir igualdad total de tablas porque el alta Gamma debe agregar filas. Aún no declarar `G3AT_P2_FINAL=PASS`. La playlist privada permanece `add-gamma` y no se ha realizado ninguna baja.
