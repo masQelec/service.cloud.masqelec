@@ -318,3 +318,12 @@ Operator ran live update test against Alpha HTTP `/stream/channel/e4852534cdb2fd
     G3AO_BYTES_BEFORE=0
     G3AO_LIVE_GATE=BLOCKED_NO_ACTIVE_DATA
     G3AO_URL_CHANGE_DURING_ACTIVE_STREAM=NOT_EXECUTED
+
+## G3-AO: Zero-byte stream confirmed; live-switch blocked (22/11/2026)
+
+Operator executed bounded curl GET on G3-AN `http://127.0.0.1:39991/stream/channel/e4852534cdb2fd64f54fd861d4d00767`: `HTTP=000`, `BYTES=0`, `SPEED_BPS=0`, empty Content-Type, `CURL_EXIT=28` after 8002ms. `/api/status/inputs`: Alpha 2 subscriptions, Beta 1; both report `bps=0`, `signal=0`, `te=0`, `cc=0`. `/api/status/subscriptions`: Alpha HTTP subscription title `HTTP`, state `Testing`, `in=0`, `out=0`, alongside two running EPG grabbers also `in=0/out=0`. Logs confirm HTTP client subscriptions start and end, and auto M3U refetch every minute; no evidence of successful MPEG-TS delivery. This invalidates earlier assumption that the HTTP Testing subscription proves working playback; active subscription alone is not usable streaming. Both mux bps zero raises suspicion about synthetic upstream source or network reachability, but exact cause is UNVERIFIED. Do not change playlist or restart any lab. Next gate: read-only inspection of synthetic source container (`streams` service name from G3-AB compose), HTTP GET limited bytes of Alpha URL both with and without `?g3an_url_test=1`, Beta URL, from G3-AN network namespace via `docker exec` if curl/wget available, plus status/logs. Critical note: running curl inside TVH image may not be available; use temporary diagnostic container only if needed and no production mutation. No progress on active-stream continuity or Kodi identity.
+
+    G3AO_STREAM_HTTP_CODE=000
+    G3AO_STREAM_BYTES=0
+    G3AO_SOURCE_HEALTH=UNVERIFIED
+    G3AO_LIVE_URL_SWITCH=BLOCKED_NO_MEDIA
