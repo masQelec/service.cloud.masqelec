@@ -30,6 +30,8 @@ services:
       - /home/ubuntu/tvheadend-g3an-upstream/build.linux/tvheadend:/opt/g3an/tvheadend:ro
       - /home/ubuntu/tvheadend-g3an-upstream/data/conf:/opt/data/conf:ro
       - /home/ubuntu/tvheadend-g3an-upstream/src/webui/static:/opt/src/webui/static:ro
+      # Vue UI: required by G3-AN /gui/ to avoid HTTP 500.
+      - /home/ubuntu/tvheadend-g3an-upstream/src/webui/static-vue/dist:/opt/src/webui/static-vue/dist:ro
       - ../runtime/g3an/tvh_config:/config
     networks: [pvr_g3ab]
     depends_on: [playlist]
