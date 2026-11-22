@@ -154,3 +154,36 @@ G3AT_P2H_EXISTING_IDS_STABLE= True
 G3AT_P2H_SQLITE_GATE= PASS
 ```
 Kodi retiene Alpha/Beta, añade Gamma con nueva identidad y conserva un único cliente. **Pendiente**: comparación de conjuntos de grupos, relaciones de grupos/canales y filas antiguas con P1-before; no exigir igualdad total de tablas porque el alta Gamma debe agregar filas. Aún no declarar `G3AT_P2_FINAL=PASS`. La playlist privada permanece `add-gamma` y no se ha realizado ninguna baja.
+
+
+## G3-AT-P2I — Persistencia y cierre P2, PASS (22/11/2026)
+
+El operador comparó por esquema y multiconjunto de filas SQLite en modo solo lectura el respaldo `/home/ubuntu/g3at-evidence/G3AT-P1-before/TV46.db` con el perfil Kodi aislado tras el alta Gamma. Evidencia:
+
+```text
+G3AT_P2I_CHANNELS_SCHEMA_STABLE=True
+G3AT_P2I_CHANNELS_OLD_ROWS_PRESERVED=True
+G3AT_P2I_CHANNELS_COUNT=2->3
+G3AT_P2I_CHANNELS_ADDED=1
+G3AT_P2I_CHANNELS_REMOVED_OR_CHANGED=0
+G3AT_P2I_CLIENTS_SCHEMA_STABLE=True
+G3AT_P2I_CLIENTS_OLD_ROWS_PRESERVED=True
+G3AT_P2I_CLIENTS_COUNT=1->1
+G3AT_P2I_CLIENTS_ADDED=0
+G3AT_P2I_CLIENTS_REMOVED_OR_CHANGED=0
+G3AT_P2I_CHANNELGROUPS_SCHEMA_STABLE=True
+G3AT_P2I_CHANNELGROUPS_OLD_ROWS_PRESERVED=True
+G3AT_P2I_CHANNELGROUPS_COUNT=4->4
+G3AT_P2I_CHANNELGROUPS_ADDED=0
+G3AT_P2I_CHANNELGROUPS_REMOVED_OR_CHANGED=0
+G3AT_P2I_MAP_CHANNELGROUPS_CHANNELS_SCHEMA_STABLE=True
+G3AT_P2I_MAP_CHANNELGROUPS_CHANNELS_OLD_ROWS_PRESERVED=True
+G3AT_P2I_MAP_CHANNELGROUPS_CHANNELS_COUNT=6->9
+G3AT_P2I_MAP_CHANNELGROUPS_CHANNELS_ADDED=3
+G3AT_P2I_MAP_CHANNELGROUPS_CHANNELS_REMOVED_OR_CHANGED=0
+G3AT_P2I_PERSISTENCE=PASS
+```
+
+**G3AT_P2_FINAL=PASS**: alta Gamma validada de M3U → TVH mux/servicio/canal → HTSP → Kodi SQLite, con retención de las filas antiguas y tres nuevas relaciones de grupos. Identidad Gamma: CUID `g3an-003`, mux `aae864752fce1c09379c630a048f8f25`, servicio `095c73b01bb2a1c1f331f88aee1d3e20`, canal `0b86e3113c756785e2e976245c3101e1`, HTSP/Kodi id `300123659`, Kodi idChannel `3`.
+
+**Inicio P3 (eliminación y reaparición Gamma) NO AUTORIZADO aún**: eliminar CUID de playlist puede causar borrado de mux y canal vía bouquet; la reaparición quizá genere UUID/iUniqueId nuevos. No aplicar `prepare.py reorder`, no iniciar Kodi ni sincronizar borrado hasta obtener snapshot previo de TVH y copia SQLite verificada y examinar secuencia en dos fases. Proteger referencias G3-AB/G3-AM, Kodi habitual y CoreELEC. Estado activo `add-gamma`.
