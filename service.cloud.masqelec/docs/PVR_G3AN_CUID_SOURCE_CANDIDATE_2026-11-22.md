@@ -368,3 +368,7 @@ Operator ran G3-AP compose config and image build: `G3AP_COMPOSE_EXIT=0`; Docker
     G3AP_BUILD=BLOCKED_DOCKER_HUB_DNS
     G3AP_CONTAINER_STARTED=NO
     G3AO_LIVE_STREAM_CONTINUITY=PENDING
+
+## G3-AP offline image inventory (22/11/2026)
+
+Operator listed local Docker images. Base `python:3.12-slim-bookworm` absent; `masqelec/tvh-g3am-runtime:noble` is present but `docker run --rm --network none --pull never ... sh -c 'command -v python3; command -v ffmpeg'` found neither executable; `/usr/bin/sh` exists. Other present image `lscr.io/linuxserver/tvheadend:latest` (703 MB) has not been checked for ffmpeg/python3 yet. Host `getent hosts registry-1.docker.io` returned multiple IPv6 records, whereas BuildKit lookup to configured DNS `212.230.135.1` timed out earlier. Host lookup success alone does not prove registry connectivity or rule out intermittent BuildKit DNS issue. Do not modify Docker daemon DNS or restart labs. Next limited read-only offline check `docker run --rm --network none --pull never --entrypoint /bin/sh lscr.io/linuxserver/tvheadend:latest -c 'command -v ffmpeg; command -v python3; ...'`; only if suitable can adapt isolated G3-AP image without registry; otherwise investigate transient resolver and choose a strictly isolated local-source alternative. G3-AP build/boot/stream continuity remain pending.
