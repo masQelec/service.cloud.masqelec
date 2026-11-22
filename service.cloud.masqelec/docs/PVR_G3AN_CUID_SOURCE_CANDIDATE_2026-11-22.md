@@ -276,3 +276,14 @@ G3-AO now has source/build/start PASS and **actual Alpha URL transition observed
     G3AO_CUID_PRESERVED=PASS_OBSERVED
     G3AO_FULL_ATOMIC_GATE=PENDING_CONSOLIDATION
     G3AO_LIVE_STREAM_TEST=PENDING
+
+## G3-AO FINAL_GATE PASS — URL CUID y UUID estables (22/11/2026)
+
+Operador ejecutó gate consolidado tras G3-AO: `G3AO_MUXES_UUID_STABLE=True` (2), `G3AO_SERVICES_UUID_STABLE=True` (3), `G3AO_CHANNELS_UUID_STABLE=True` (2), `G3AO_ALPHA_URL=True`, `G3AO_ALPHA_CMPID=True` usando comparación semántica de URL, `G3AO_ALPHA_CUID=True`, `G3AO_BETA_CUID=True`, `G3AO_BETA_URL=True` y lectura read-only de HTSMSG2/GZIP de mux Alpha `G3AO_ALPHA_URL_DISK=True`; `G3AO_FINAL_GATE=PASS`. La URL Alpha queda `http://streams/ch1.ts?g3an%5Furl%5Ftest=1`, equivalente semánticamente a la de la playlist `http://streams/ch1.ts?g3an_url_test=1`. Se han conservado UUID de muxes/servicios/canales al actualizar la URL y se ha confirmado persistencia del nuevo URL y CUID en disco. El tercer servicio no asociado persiste (3→3), sin incremento.
+
+No confundir con el siguiente gate: todavía falta recuperación tras reinicio **con URL ya cambiada**, continuidad de reproducción en curso al cambiar la URL de nuevo, verificación de la sesión HTSP y estabilidad `iUniqueId` de Kodi. Mantener G3-AM/G3-AB intactos y `CORE ELEC RELEASE=NO`.
+
+    G3AO_FINAL_GATE=PASS
+    G3AO_POST_URL_RESTART=PENDING
+    G3AO_LIVE_STREAM_CONTINUITY=PENDING
+    G3AO_KODI_IUNIQUEID=PENDING
