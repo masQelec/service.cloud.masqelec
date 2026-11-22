@@ -287,3 +287,15 @@ No confundir con el siguiente gate: todavía falta recuperación tras reinicio *
     G3AO_POST_URL_RESTART=PENDING
     G3AO_LIVE_STREAM_CONTINUITY=PENDING
     G3AO_KODI_IUNIQUEID=PENDING
+
+## G3-AO post-URL restart: PASS (22/11/2026)
+
+Operador ejecutó `docker compose .../g3an/compose.yaml restart tvh` **únicamente G3-AN** después de confirmar el cambio de URL y persistencia en disco. Comparación contra `/tmp/g3an-baseline-identity.json` devolvió `G3AO_RESTART_MUXES_STABLE=True`, `G3AO_RESTART_SERVICES_STABLE=True`, `G3AO_RESTART_CHANNELS_STABLE=True`, `G3AO_RESTART_ALPHA_URL=True` con normalización porcentual, `G3AO_RESTART_ALPHA_CUID=True`, `G3AO_RESTART_BETA_CUID=True`, `G3AO_RESTART_BETA_URL=True`, total `G3AO_RESTART_URL=PASS`. G3-AM continuó `Up 11 hours`, sin intervención. **Persistencia y recarga del cambio de URL demostradas**, pero no se han probado las suscripciones de reproducción activas a través de otro cambio de URL ni el comportamiento de Kodi `pvr.hts`/`iUniqueId`.
+
+    G3AO_BUILD=PASS
+    G3AO_URL_IDENTITY=PASS
+    G3AO_URL_PERSISTENCE=PASS
+    G3AO_POST_URL_RESTART=PASS
+    G3AO_LIVE_PLAYBACK_CONTINUITY=PENDING
+    G3AO_KODI_IUNIQUEID=PENDING
+    G3AO_CORELEC_RELEASE_AUTHORIZED=NO
