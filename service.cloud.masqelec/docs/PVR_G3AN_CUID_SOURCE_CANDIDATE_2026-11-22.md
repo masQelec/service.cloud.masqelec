@@ -422,3 +422,14 @@ Operator ran guarded `g3an/prepare.py live` only after checking baseline snapsho
     G3AP_TVH_PLAYBACK_BYTES=PENDING
     G3AO_LIVE_URL_CONTINUITY=PENDING
     G3AO_KODI_IDENTITY=PENDING
+
+## G3-AP continuous source through TVH: HTTP playback PASS (22/11/2026)
+
+Operator exercised G3-AN TVH `http://127.0.0.1:39991/stream/channel/e4852534cdb2fd64f54fd861d4d00767` with bounded 20s curl. Result: HTTP 200, Content-Type `video/mp2t`, 1,791,076 bytes, ~89,549 bytes/s, `curl exit=28` timeout by test design **after bytes were received**. `/api/status/subscriptions` showed active `HTTP` client `Running`, `errors=0`, in/out 87796; `/api/status/inputs` showed IPTV #1 Alpha with 1 sub and `bps=0` (post-test point observation, not proof absence of earlier traffic). G3-AP logs confirm TVH-IP `172.20.0.7` GET `/ch1.ts` 200; prior self-test ended with expected client ConnectionResetError (consumer closed). TVH log Alpha `tuning on IPTV #1` and HTTP subscription, with name `G3AB Signal 1` while subscription output later `Service01`; do not infer identity drift from display name alone. This proves TS delivery through TVH for a finite 20s session, not yet survival of an active session through a URL change.
+
+Next controlled `live`→`live-url` playlist step while existing HTTP client streams, with preflight against `/tmp/g3an-baseline-identity.json`, status and byte increases before writing playlist, watch M3U change normalized query, compare exact mux/service/channel UUID sets and CUIDs, measure continuing bytes after update, and avoid unnecessary G3-AN TVH restarts. Record client failures separately and diagnose source reconnection. G3-AM/G3-AB remain untouched.
+
+    G3AP_TVH_HTTP=200
+    G3AP_TVH_BYTES_20S=1791076
+    G3AP_TVH_STREAMING=PASS
+    G3AO_ACTIVE_URL_CHANGE_CONTINUITY=PENDING
