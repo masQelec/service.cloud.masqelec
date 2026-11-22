@@ -47,3 +47,15 @@ No compilar, desplegar ni tocar el binario de TVH hasta nuevos gates.
 - `G3AT_P1C_COMPARISON=PASS`, `G3AT_P1C_TVH_HTSP=PASS`. Evidencias bajo `/home/ubuntu/g3at-evidence/G3AT-P1-after`.
 - **P1 no cerrado:** Kodi de laboratorio todavía no ha sido arrancado/re-sincronizado tras la reordenación y no se ha comparado la SQLite post-refresh. No declarar `G3AT_P1_KODI=PASS` ni `G3AT_P1_FINAL=PASS`.
 - No se han tocado G3-AB, G3-AM, producción ni CoreELEC. Playlist actual: `reorder` (Beta primero, Alpha después); conservar hasta cerrar comparación Kodi o rollback explícito respaldado.
+
+## P1D — Kodi aislado tras reordenación: identidad confirmada (22/11/2026)
+
+El operador arrancó el Kodi aislado existente tras P1C y observó ambos canales. Cerró Kodi normalmente y ejecutó lectura SQLite en modo read-only. Evidencia:
+
+```text
+G3AT_P1D_KODI=CLOSED
+SQLITE_INTEGRITY= ok
+CHANNELS= [(1, 1, 874874340), (2, 1, 1137851149)]
+```
+
+Por tanto `G3AT_P1D_KODI_IDENTITY=PASS` para los registros `idChannel,iClientId,iUniqueId`. **Aún pendiente:** comparación estructural de clientes y asignaciones de grupos con `/home/ubuntu/g3at-evidence/G3AT-P1-before/TV46.db`. No proclamar `G3AT_P1_FINAL=PASS` hasta ese control. No se ha alterado directamente SQLite.
