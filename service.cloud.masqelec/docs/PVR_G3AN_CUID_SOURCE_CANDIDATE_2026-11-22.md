@@ -433,3 +433,12 @@ Next controlled `live`→`live-url` playlist step while existing HTTP client str
     G3AP_TVH_BYTES_20S=1791076
     G3AP_TVH_STREAMING=PASS
     G3AO_ACTIVE_URL_CHANGE_CONTINUITY=PENDING
+
+## G3-AO active HTTP playback URL refresh: PASS (22/11/2026)
+
+Operator executed guarded G3-AN-only `live`→`live-url` update while Python urllib continuously read `/stream/channel/e4852534cdb2fd64f54fd861d4d00767`. `G3AO_LIVE_PREFLIGHT=PASS`, HTTP 200, 905972 bytes before mutation. `g3an/prepare.py live-url` reported private playlist written, and TVH auto-refetch detected normalized new Alpha URL `http://g3ap-live:8080/ch1.ts?g3ap_url_test=1`. Byte counts: at URL observation 5646956; 15s later 6917836, i.e. **+1,270,880 bytes after detected update**. `G3AO_CLIENT_ALIVE=True`, `G3AO_CLIENT_ERROR=None`, all checks `G3AO_LIVE_URL_UPDATED=True`, `G3AO_LIVE_MUXES_UUID_STABLE=True`, `G3AO_LIVE_SERVICES_UUID_STABLE=True`, `G3AO_LIVE_CHANNELS_UUID_STABLE=True`, `G3AO_LIVE_ALPHA_CUID=True`, `G3AO_LIVE_BETA_CUID=True`, `G3AO_LIVE_BETA_URL=True`, `G3AO_LIVE_BYTES_PROGRESS_AFTER=True`, `G3AO_LIVE_CLIENT_ALIVE=True`, `G3AO_LIVE_NO_CLIENT_ERROR=True`; final `G3AO_LIVE_URL_CONTINUITY=PASS`. Logs show playlist M3U parse 0 new muxes, HTTP subscription 0007, and no visible URL-change-caused unsubscribe; original G3-AM TVH Up 12h. This proves HTTP client stays alive and bytes advance through **configuration** URL change with a query parameter on the same stream source, not physical active-source handoff. No evidence yet on HTSP `channelId` or Kodi `iUniqueId` retention. Source at `live-url` stage; do not reset without an explicit new gated operation. No CoreELEC build or deployment authorization.
+
+    G3AO_ACTIVE_HTTP_URL_CONFIG_CONTINUITY=PASS
+    G3AO_ACTIVE_PHYSICAL_SOURCE_SWITCH=UNTESTED
+    G3AO_HTSP_CHANNEL_ID=PENDING
+    G3AO_KODI_IUNIQUEID=PENDING
