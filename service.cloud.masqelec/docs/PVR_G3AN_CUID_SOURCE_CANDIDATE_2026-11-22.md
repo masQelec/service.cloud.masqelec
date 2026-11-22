@@ -494,3 +494,12 @@ Operator checked `/usr/bin/kodi` POSIX launcher (real binary `/usr/lib/x86_64-li
     G3AR_PVR_SETTINGS_KEYS=INSPECTED
     G3AR_ISOLATED_KODI_START=PENDING
     G3AR_KODI_IUNIQUEID=PENDING
+
+## G3-AR addon setting defaults and Wayland runtime preflight (22/11/2026)
+
+Operator inspected canonical `/usr/share/kodi/addons/pvr.hts/resources/settings.xml`, confirming `host` default `127.0.0.1`, `https=false`, `http_port=9981`, `htsp_port=9982`, empty `user`/`pass`, `connect_timeout=10`, `response_timeout=5`, `streaming_profile` empty, `streaming_http=false`. These are addon settings **definitions**, not proof that a profile-specific instance has saved or applied G3-AN settings. TVH laboratory target settings will be `host=127.0.0.1`, `http_port=39991`, `htsp_port=39992`, `https=false`, `streaming_http=false`. Installer addon manifest identifies `pvr.hts` 21.2.6, extension `kodi.pvrclient` Linux binary `pvr.hts.so.21.2.6`, binary instance PVR API dependencies. Host display `DISPLAY=:0`, `WAYLAND_DISPLAY=wayland-0`, `XDG_RUNTIME_DIR=/run/user/1000`, session Wayland. The usual user profile exists and is out of scope. Next gate: launch and inspect a strictly fresh Kodi runtime with `KODI_DATA` and sandbox HOME pointing to `/tmp` and XDG dirs, never copy or edit actual profile; prove generated paths/log before enabling PVR plugin or editing settings. Be alert to Wayland session access and never terminate unrelated Kodi process.
+
+    G3AR_ADDON_SETTINGS_SCHEMA=INSPECTED
+    G3AR_WAYLAND_ENV=AVAILABLE
+    G3AR_KODI_ISOLATED_BOOT=PENDING
+    G3AR_PVR_SYNC=PENDING
