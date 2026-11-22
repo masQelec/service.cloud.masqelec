@@ -299,3 +299,13 @@ Operador ejecutó `docker compose .../g3an/compose.yaml restart tvh` **únicamen
     G3AO_LIVE_PLAYBACK_CONTINUITY=PENDING
     G3AO_KODI_IUNIQUEID=PENDING
     G3AO_CORELEC_RELEASE_AUTHORIZED=NO
+
+## G3-AO HTTP playback preflight: PASS (22/11/2026)
+
+Operador lanzó `curl` sobre `/stream/channel/e4852534cdb2fd64f54fd861d4d00767` (Alpha, sólo G3-AN 39991) y comprobó tras 3 s `HTTP_CLIENT_RUNNING=True`. `/api/status/subscriptions` reportó una suscripción de cliente `HTTP Testing IPTV #1/IPTV LOCAL/playlist.m3u - G3AN Alpha/G3AB Signal 1` junto a dos suscripciones internas `epggrab Running` para Alpha y Beta. El script terminaba deliberadamente `curl`, cuya salida fue `CURL_EXIT=-15` (SIGTERM previsto), no error de servidor. `G3AO_PLAYBACK_PREFLIGHT=PASS` significa que la suscripción real se puede abrir mientras corre EPG; NO se midieron bytes ni continuidad a través de una actualización de URL.
+
+Próximo gate: mantener un cliente y contar bytes/actividad antes y después de un cambio de URL mientras se ejecuta, cambiar únicamente playlist G3-AN de fase `url` a `baseline` con `prepare.py baseline` (Alpha vuelve a `http://streams/ch1.ts`), esperar refresco automático 1 min, comprobar identidad UUIDs respecto snapshot, CUID, URL semántica, actividad de suscripción y bytes, confirmación HTTP cliente y EPG. Sin stop de TVH, sin cambios en G3-AM/G3-AB. No declarar continuidad hasta medir progreso de bytes pre/post y evitar falso positivo si el stream queda abierto sin entregar datos. Tras ello Kodi pvr.hts iUniqueId.
+
+    G3AO_PLAYBACK_SUBSCRIPTION=PASS
+    G3AO_PLAYBACK_BYTES=NOT_MEASURED
+    G3AO_LIVE_URL_SWITCH_CONTINUITY=PENDING
