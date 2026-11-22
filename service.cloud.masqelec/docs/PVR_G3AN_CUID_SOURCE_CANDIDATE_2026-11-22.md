@@ -79,3 +79,7 @@ Salida real comunicada por el operador tras corrección de ancla AUTO_CUID:
     G3AN_GIT_DIFF_CHECK=PASS
     G3AN_BUILD_UBUNTU=PENDING
     G3AN_RUNTIME_TEST=PENDING
+
+## G3-AN primer configure fallido por dependencia dvbcsa (22/11/2026)
+
+Operador informó `G3AN_BUILD_EXIT=1`, `G3AN_BUILD=FAIL` antes de make; configure marcó `checking for cc dvbcsa/dvbcsa.h ... fail`, `ERROR: Failed to find dvbcsa library`. No es evidencia de error en fuentes G3-AN. Inspección de `tvheadend/tvheadend@8837853a6/configure` líneas ~812-827 confirma que el chequeo dvbcsa se ejecuta dentro de `if enabled_or_auto tvhcsa`; la opción soportada `--disable-tvhcsa` evita ese requisito, sin instalar biblioteca extra para laboratorio IPTV sintético. Repetir configure + make exclusivamente en checkout G3-AN, flags `--disable-ffmpeg_static --disable-libav --disable-doc --disable-tvhcsa`, registrar /tmp/g3an-build.log y códigos por separado sin `set -e` en shell interactiva. Estado: `G3AN_SOURCE_APPLY=PASS`, `G3AN_FIRST_CONFIGURE=BLOCKED_MISSING_DVBCSA`, `G3AN_BUILD=PENDING_RETRY`; G3-AM no se reemplaza ni reinicia.
