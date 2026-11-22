@@ -465,3 +465,11 @@ Next gate: save bounded, parseable baseline of HTSP `G3AQ_CHANNELS_JSON` to `/tm
     G3AQ_DOUBLE_HTSP_READ=PASS
     G3AQ_HTSP_RESTART_PERSISTENCE=PENDING
     G3AQ_KODI_IUNIQUEID=PENDING
+
+## G3-AQ HTSP identity across G3-AN restart: PASS (22/11/2026)
+
+Operator executed a guarded HTSP identity comparison before and after `docker restart --time 10 masqelec-pvr-g3an-tvh-1`, without restarting G3-AM or G3-AB. Preflight expected values matched exactly, restart exit code 0, HTSP reconnected successfully. Before and after map identical: `e4852534cdb2fd64f54fd861d4d00767 -> 874874340` (Alpha), `0d3bd243f67184e9adb9ceadf4a51c50 -> 1137851149` (Beta). `G3AQ_CHANNEL_IDS_STABLE=True`, `G3AQ_HTSP_RESTART_PERSISTENCE=PASS`. Post-start TVH log showed `iptv: m3u parse: 0 new mux(es)` total 2. 'mpegts ... deleting' messages logged during clean shutdown are not by themselves data loss. Lab-only `access: Access control checking disabled` warning due to --noacl, **not production-safe**, and `scanfile: no predefined muxes found` warning, not causal failures for IPTV gate. G3-AM original Up 12h. No actual Kodi DB/readback or `iUniqueId` verified yet.
+
+    G3AQ_HTSP_RESTART_PERSISTENCE=PASS
+    G3AQ_KODI_IUNIQUEID=PENDING
+    G3AQ_KODI_DB_RETENTION=PENDING
