@@ -11,7 +11,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
 
 SOURCE = Path("/source")
-ALLOWED = {"/ch1.ts": SOURCE / "ch1.ts", "/ch2.ts": SOURCE / "ch2.ts"}
+ALLOWED = {"/ch1.ts": SOURCE / "ch1.ts", "/ch2.ts": SOURCE / "ch2.ts",
+           "/ch3.ts": SOURCE / "ch1.ts"}  # G3-AT: independent URL, read-only existing fixture
 CHUNK = 188 * 32
 MAX_CLIENTS = threading.BoundedSemaphore(6)
 
