@@ -136,3 +136,14 @@ El operador ejecutó preparación sintética `g3an/prepare.py init`: `G3AN_PLAYL
     G3AN_NETWORK_CREATED=PENDING
     G3AN_CUID_BASELINE_PERSISTENCE=PENDING
     G3AN_URL_CHANGE=PENDING
+
+## HTTP 500 diagnosticado — Vue dist no montado (22/11/2026)
+
+Runtime G3-AN `tvh` y `playlist` Up 2min, API `/api/serverinfo` 200, `/gui/` 500. Logs G3-AN: `[ERROR] webui: failed to open src/webui/static-vue/dist/index.html`. Sólo se había montado el directorio ExtJS `src/webui/static` y recursos `data/conf`; no la salida Vue. Se corrigió `g3an/compose.yaml` añadiendo bind mount de `/home/ubuntu/tvheadend-g3an-upstream/src/webui/static-vue/dist` a `/opt/src/webui/static-vue/dist` `:ro`. Antes de recrear exclusivamente servicio TVH G3-AN, exigir `test -f /home/ubuntu/tvheadend-g3an-upstream/src/webui/static-vue/dist/index.html`; si no existe, bloquear y diagnosticar Vue build, NO permitir creación implícita de directorio vacío por Compose. `docker compose -f ... up -d --no-deps tvh` recreará sólo G3-AN TVH, conservando volumen bind `runtime/g3an/tvh_config`, sin tocar G3-AM o G3-AB. Verificar `/gui/` y API tras arranque. Este HTTP 500 no apunta al código CUID, pero el runtime funcional CUID permanece pendiente.
+
+    G3AN_RUNTIME_PROCESS=PASS
+    G3AN_API_SERVERINFO=200
+    G3AN_WEBUI_GUI=500_MISSING_VUE_DIST
+    G3AN_VUE_MOUNT_CODE=COMMITTED
+    G3AN_VUE_DIST_EXISTS_ON_HOST=UNVERIFIED
+    G3AN_WEBUI_RETEST=PENDING
