@@ -172,3 +172,7 @@ Operador ejecutó captura API pre-mutación: `/tmp/g3an-baseline-identity.json`,
     G3AN_BASELINE_SNAPSHOT=PASS
     G3AN_CUID_ON_DISK=UNKNOWN
     G3AN_RESTART_TEST=BLOCKED_PENDING_DISK
+
+## G3-AN ausencia CUID en la persistencia (22/11/2026) — BLOQUEO
+
+Segundo diagnóstico operador: directorio G3-AN `runtime/g3an/tvh_config` existe (33 archivos), `/input/iptv/networks/<uuid>/muxes` existe; Docker inspect confirma montaje exacto a `/config`. Búsqueda Python bytewise recursiva en **todos** los archivos sin seguir symlinks: `CUID_MATCHING_FILES=0`, `G3AN_DISK_CUID_1=False`, `G3AN_DISK_CUID_2=False`. Aunque la API contiene `g3an-001/002`, **no hay evidencia de persistencia en disco y se debe bloquear reinicio/URL mutación**. Source upstream `iptv_mux_config_save` llama a `mpegts_mux_save(mm,c,0)`, que envuelve datos en mapa `config`; `mpegts_mux_save` llama `idnode_save(&mm->mm_id,root)`; `idnode_changed` encola escritura asíncrona. Inspeccionar de forma read-only archivos mux exactos y claves de `config`, su fecha/hora, existencia/UUID y datos de clase, evitando imprimir URLs/credenciales. No se puede atribuir todavía a PO_NOUI, ni a retraso, ni a un bug exacto sin esta inspección. `G3AN_CUID_API_PRESENT=PASS`, `G3AN_CUID_ON_DISK=FAIL_OBSERVED`, `G3AN_RESTART_BLOCKED=YES`.
