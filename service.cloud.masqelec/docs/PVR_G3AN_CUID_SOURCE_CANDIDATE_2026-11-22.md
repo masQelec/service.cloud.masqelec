@@ -347,3 +347,15 @@ Operator confirmed `/usr/bin/ffmpeg` and `/usr/bin/ffprobe` installed on Ubuntu 
     G3AP_SOURCE_DURATION_SEC=12.010023
     G3AP_LOOP_REMUX=NOT_YET_TESTED
     G3AO_LIVE_CONTINUITY=PENDING
+
+## G3-AP isolated continuous HTTP source candidate committed (22/11/2026)
+
+Operator ran host FFmpeg finite-loop/remux sanity test on G3-AB fixture `ch1.ts`: `G3AP_FFMPEG_EXIT=0`, ffprobe showed `duration=36.106756`, `size=3123808`, `bit_rate=692127`, video MPEG-2, audio MP2; grep for non-monotonic/invalid/corrupt/error/failed had **no output**. `G3AP_LOOP_PREFLIGHT=PASS` for 36-second offline remux, **not** indefinite HTTP playback.
+
+Added standalone G3-AP service in repo: `lab/pvr_g3ab/g3ap/{Dockerfile,compose.yaml,server.py}`. Separate Compose project `masqelec-pvr-g3ap`, network alias `g3ap-live` on **preexisting** `masqelec-pvr-g3ab_pvr_g3ab`, port 8080 Docker-internal only (no host ports). Dockerfile `python:3.12-slim-bookworm` + apt-install `ffmpeg` during build (requires pulling/build network), UID 65534, no capabilities, readonly container. Runtime only mounts existing G3-AB fixture directory `../runtime/streams:/source:ro` (no modification), and `server.py` read-only. Simple ThreadingHTTPServer streams `/ch1.ts` and `/ch2.ts` continuously by spawning per-client `ffmpeg -re -stream_loop -1 -i <fixed-source> -map video -map audio -c copy -f mpegts pipe:1`, fixed path allowlist and query stripped so `?g3ap_url_test=...` works, maximum 6 clients, `/healthz`. This is a **candidate** needing Docker image build, container boot, network GET, and sustained byte-gain validation; do not assume successful yet. Existing G3-AB streams and G3-AM forensic lab untouched. **Do not change G3-AN playlist URL yet**. Once sustained source passes, G3-AN URL may be updated to `http://g3ap-live:8080/ch1.ts` by a new separately guarded G3-AN-only playlist stage, then reproduce continuous-playback change; ensure capture baseline UUID/CUID gate.
+
+    G3AP_FFMPEG_REMUX_PREFLIGHT=PASS
+    G3AP_SOURCE_COMPOSE=COMMITTED_ONLY
+    G3AP_DOCKER_BUILD=PENDING
+    G3AP_HTTP_SUSTAINED_BYTES=PENDING
+    G3AO_LIVE_CONTINUITY=PENDING
