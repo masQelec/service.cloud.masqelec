@@ -123,3 +123,16 @@ Archivos añadidos en el repo: `lab/pvr_g3ab/g3an/compose.yaml` (proyecto Docker
 Comandos próximos de arranque, con usuario Ubuntu propietario de directorios y Docker funcionando, sin `set -e` en shell interactiva: `git pull --ff-only origin develop`, `python3 service.cloud.masqelec/lab/pvr_g3ab/g3an/prepare.py init`, `docker compose -f service.cloud.masqelec/lab/pvr_g3ab/g3an/compose.yaml config -q`, `docker compose -f ... up -d`, `docker compose -f ... ps`; inspeccionar logs del contenedor específico G3-AN. No ejecutar Docker volume prune/down -v, no tocar puertos G3-AM. Tras boot configurar propia red con URL e inventario, al haber conectado IPTV streams `http://streams/ch*.ts` usando red sintética externa.
 
 GATES: `G3AN_BINARY_LDD_DOCKER=PASS`, `G3AN_COMPOSE_VERSIONED=YES`, `G3AN_RUNTIME_STARTED=NOT_TESTED`, `G3AN_CUID_PERSISTENCE=NOT_TESTED`, `G3AN_KODI_IDENTITY=NOT_TESTED`. El binario G3-AN es experimental y no autorizado para producción.
+
+## G3-AN: arranque runtime Docker comprobado en Ubuntu (22/11/2026)
+
+El operador ejecutó preparación sintética `g3an/prepare.py init`: `G3AN_PLAYLIST_STAGE=BASELINE`, `G3AN_PREPARE_EXIT=0`. `docker compose -f .../g3an/compose.yaml config -q` pasó, y `up -d` arrancó `masqelec-pvr-g3an-playlist-1` y `masqelec-pvr-g3an-tvh-1` con `G3AN_START_EXIT=0`. Mapeo de puertos de contenedor TVH: HTTP `127.0.0.1:39991->9981/tcp`, HTSP `127.0.0.1:39992->9982/tcp`. `curl http://127.0.0.1:39991/` respondió `G3AN_HTTP_CODE=302`. Paralelamente `masqelec-pvr-g3am-tvh-1 Up 11 hours`. Esto acredita **arranque inicial y disponibilidad HTTP**, pero no prueba que HTSP contenga canales ni estabilidad de servicio a largo plazo, ni importación IPTV.
+
+**Siguiente procedimiento:** abrir UI local `http://127.0.0.1:39991/`, crear red de tipo IPTV Automatic Network *solo G3-AN*, URL `http://g3an-playlist/playlist.m3u`, refetch 1 minuto y opciones de scan/mapping según configuración sintética previa; confirmar 2 muxes y sus CUID `g3an-001/g3an-002` en campos de grid o configuración propia. Mapear servicios a canales G3-AN con id autogenerados y capturar UUID pre-URL. Evitar tocar G3-AM/G3-AB, hacer reset de configuración o jugar con Kodi todavía. No ejecutar `g3an/prepare.py url` antes de la captura base y persistencia comprobada.
+
+    G3AN_DOCKER_LDD=PASS
+    G3AN_RUNTIME_START=PASS
+    G3AN_HTTP_RESPONDS=YES_302
+    G3AN_NETWORK_CREATED=PENDING
+    G3AN_CUID_BASELINE_PERSISTENCE=PENDING
+    G3AN_URL_CHANGE=PENDING
