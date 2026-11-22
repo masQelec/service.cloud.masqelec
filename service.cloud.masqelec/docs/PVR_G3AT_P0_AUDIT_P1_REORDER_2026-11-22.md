@@ -133,3 +133,10 @@ Después de `G3AT_P2F_BASELINE=PASS` y snapshot previo `G3AT_P2F_SNAPSHOT_BEFORE
 - El comprobador histórico G3-AQ devolvió `G3AQ_HTSP_IDENTITY=FAIL` **porque exige `len==2`**. No representa una regresión demostrada. Se necesita sonda específica G3-AT.
 - Log TVH `2026-11-22 11:26:44.789 iptv: m3u parse: 1 new mux(es) ... total 3`; `11:26:44.790 bouquet: ... G3AN Gamma/{PMT:0}: mapped service`; `11:27:44.789 0 new mux(es) ... total 3`.
 - Evidencias `/home/ubuntu/g3at-evidence/G3AT-P2F`; `G3AT_P2F_EVIDENCE=COLLECTED`. **Pendientes**: comprobar explícitamente enlace servicio Gamma↔canal por API y nueva SQLite Kodi. No declarar `G3AT_P2_FINAL=PASS` todavía. No retirar ni reañadir Gamma, pues la baja puede ser destructiva.
+
+
+## G3-AT-P2G — Enlace real Gamma servicio/canal, PASS (operador, 22/11/2026)
+
+Comprobación API G3-AN de lectura, sobre UUID de P2F: mux `aae864752fce1c09379c630a048f8f25`, servicio `095c73b01bb2a1c1f331f88aee1d3e20`, canal `0b86e3113c756785e2e976245c3101e1`. Los 7 booleanos salieron `True`: `MUX_EXISTS`, `SERVICE_EXISTS`, `CHANNEL_EXISTS`, `CUID_CORRECT`, `SERVICE_LINKED_TO_CHANNEL`, `CHANNEL_LINKED_TO_SERVICE`, `CHANNEL_ENABLED`. `G3AT_P2G_MAPPING=PASS`.
+
+La creación y asociación TVH está probada en G3-AN, pero **el cierre final de P2 requiere Kodi aislado**: confirmar 3 canales reales en SQLite, Alpha/Beta con filas y IDs conservados, Gamma nuevo `iUniqueId=300123659`, `iClientId=1`, sin duplicados, cliente y grupos sin degradación inesperada. No cambiar `add-gamma` ni quitar Gamma mientras se realiza esa prueba. No se han realizado bajas ni reapariciones.
