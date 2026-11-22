@@ -484,3 +484,13 @@ Operator reports Kodi installed `/usr/bin/kodi`, `/usr/bin/kodi-standalone`, ver
     G3AR_PVR_HTS_VERSION=21.2.6
     G3AR_KODI_PROCESS_COUNT=0
     G3AR_KODI_DB_RETENTION=PENDING
+
+## G3-AR Kodi launcher/profile-path and pvr.hts settings inspected (22/11/2026)
+
+Operator checked `/usr/bin/kodi` POSIX launcher (real binary `/usr/lib/x86_64-linux-gnu/kodi/kodi.bin`). **Launcher line 30 explicitly honors `KODI_DATA=${KODI_DATA:-"${HOME}/.${bin_name}"}` mapped to `special://home/`**, allowing isolated data path without `--portable`. `KODI_HOME` also referenced at lines 120-121 but should not override application resource location in this gate. Confirmed normal `$HOME/.kodi` **EXISTS_DO_NOT_TOUCH**, and sqlite3 binary `/usr/bin/sqlite3` available. PVR addon setting IDs from `/usr/share/kodi/addons/pvr.hts/resources/settings.xml`: `host`, `https`, `http_port`, `htsp_port`, `user`, `pass`, `connect_timeout`, `response_timeout`, `streaming_profile`, `streaming_http`, `epg_async`, etc. Need validate Kodi 21 settings serialization, addon activation, profile isolation and server host:port before launch. Do **not** copy real user Kodi profile or handedit DB. Candidate isolation: separate KODI_DATA + HOME + XDG vars in private `/tmp/g3ar-kodi-...` directory and use unprivileged user; only G3-AN lab HTSP `127.0.0.1:39992`. Existing original Kodi profile must never be accessed or modified. No Kodi process currently running (prior check).
+
+    G3AR_LAUNCHER_KODI_DATA=SUPPORTED
+    G3AR_REAL_PROFILE=EXISTS_UNTOUCHED
+    G3AR_PVR_SETTINGS_KEYS=INSPECTED
+    G3AR_ISOLATED_KODI_START=PENDING
+    G3AR_KODI_IUNIQUEID=PENDING
