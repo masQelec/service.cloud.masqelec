@@ -113,3 +113,13 @@ Siguiente gate REQUERIDO: desplegar binario G3-AN en **otro** contenedor aislado
     G3AN_BUILD_UBUNTU=PASS
     G3AN_CUID_RUNTIME=NOT_TESTED
     G3AN_CORELEC_BUILD=NOT_AUTHORIZED
+
+## Runtime separado G3-AN preparado tras compatibilidad Docker PASS
+
+Usuario comprobó mediante `docker run --rm --entrypoint /usr/bin/ldd ... masqelec/tvh-g3am-runtime:noble` que el binario G3-AN enlaza `libssl.so.3`, `libcrypto.so.3`, `libz.so.1`, `libm.so.6`, `libc.so.6`, todas resueltas; `G3AN_DOCKER_LDD_EXIT=0`. GLIBC máxima requerida 2.38 y Ubuntu 24.04 aporta 2.39. El contenedor G3-AM existente seguía `Up 11 hours`. `ldd` PASS comprueba enlace dinámico, NO startup funcional ni compatibilidad de toda la aplicación.
+
+Archivos añadidos en el repo: `lab/pvr_g3ab/g3an/compose.yaml` (proyecto Docker `masqelec-pvr-g3an`, imagen runtime noble ya disponible con **entrypoint G3-AN explícito**, bind mount read-only binario de `/home/ubuntu/tvheadend-g3an-upstream/build.linux/tvheadend`, docs/config assets sólo lectura, config exclusiva `runtime/g3an/tvh_config`, playlist exclusiva `runtime/g3an/playlist`, host HTTP `127.0.0.1:39991`, HTSP `127.0.0.1:39992`, red externa lab existente con alias `g3an-playlist`). `g3an/prepare.py` prepara M3U sintética con `CUID=g3an-001/g3an-002`, etapas `init`, `baseline`, `url`; exige marcador sintético, rechaza symlinks y propietario ajeno, publica atómicamente. La opción `init` NO pisa una playlist ya existente. G3-AB/G3-AM originales no se alteran. No se copian configuraciones o identidades del lab anterior; la configuración TVH arranca vacía y tendrá que crearse su propia red IPTV automática con URL `http://g3an-playlist/playlist.m3u` desde interfaz de laboratorio (sin ACL solo lab). No ejecutar cambio de URL hasta obtener `G3AN_BASELINE_CUID_PERSISTED=PASS` y registro de UUID de mux/servicio/canal; no confiar solo en nombre visible.
+
+Comandos próximos de arranque, con usuario Ubuntu propietario de directorios y Docker funcionando, sin `set -e` en shell interactiva: `git pull --ff-only origin develop`, `python3 service.cloud.masqelec/lab/pvr_g3ab/g3an/prepare.py init`, `docker compose -f service.cloud.masqelec/lab/pvr_g3ab/g3an/compose.yaml config -q`, `docker compose -f ... up -d`, `docker compose -f ... ps`; inspeccionar logs del contenedor específico G3-AN. No ejecutar Docker volume prune/down -v, no tocar puertos G3-AM. Tras boot configurar propia red con URL e inventario, al haber conectado IPTV streams `http://streams/ch*.ts` usando red sintética externa.
+
+GATES: `G3AN_BINARY_LDD_DOCKER=PASS`, `G3AN_COMPOSE_VERSIONED=YES`, `G3AN_RUNTIME_STARTED=NOT_TESTED`, `G3AN_CUID_PERSISTENCE=NOT_TESTED`, `G3AN_KODI_IDENTITY=NOT_TESTED`. El binario G3-AN es experimental y no autorizado para producción.
