@@ -214,3 +214,12 @@ Operador ejecutó gate preflight `G3AN_URL_PREFLIGHT=PASS`, seguido de `g3an/pre
     G3AN_URL_PLAYLIST_WRITTEN=YES
     G3AN_URL_APPLIED_TO_MUX=NO_OBSERVED
     G3AN_URL_IDENTITY=PENDING_REFRESH
+
+## G3-AN URL bloqueada por mm_active; falso error de formato (22/11/2026)
+
+Los logs muestran refrescos automáticos `iptv: m3u parse: 0 new mux(es)` cada minuto desde 09:58 hasta 10:05, y desde 10:06 hasta 10:11 `iptv: G3-AN URL change deferred for active stream` seguido de `iptv: unknown playlist format for network 'IPTV LOCAL'`. La API sigue mostrando la URL antigua en Alpha, pero sin cambios de UUIDs. En la fuente parcheada `g3an_preflight()` retorna `-1` cuando CUID coincide y `im->mm_active` con URL distinta. En upstream `iptv_auto_network_process_m3u()` el retorno `-1` se propaga a `iptv_auto_network_process()`; su rama `else` restaura `im_delete_flag=0` y registra mensaje genérico `unknown playlist format`, aunque el M3U era válido. No es problema de periodo de refresco; la lógica de protección G3-AN es responsable del aplazamiento. El log de EPG `subscription: ... epggrab subscribing` sugiere actividad interna pero aún falta comprobar estado actual y tipo de suscripciones; no afirmar causa exacta de `mm_active`. No quitar a ciegas fence activo: observar `/api/status/subscriptions` y `status/inputs` para distinguir EPG de reproducción. Después diseñar manejo de actualización URL que no interrumpa sesiones activas y no bloquee sincronización indefinidamente, y mejorar error de preflight para que no se confunda con formato inválido. No reejecutar aplicador no idempotente, no tocar G3-AM, no tocar producción ni Kodi.
+
+    G3AN_M3U_REFETCH=PASS_EVERY_MINUTE
+    G3AN_URL_UPDATE=BLOCKED_BY_G3AN_ACTIVE_FENCE
+    G3AN_UNKNOWN_FORMAT=FALSE_GENERIC_ERROR
+    G3AN_ACTIVE_SUBSCRIPTION_KIND=UNVERIFIED
