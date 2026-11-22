@@ -359,3 +359,12 @@ Added standalone G3-AP service in repo: `lab/pvr_g3ab/g3ap/{Dockerfile,compose.y
     G3AP_DOCKER_BUILD=PENDING
     G3AP_HTTP_SUSTAINED_BYTES=PENDING
     G3AO_LIVE_CONTINUITY=PENDING
+
+## G3-AP Docker build blocked by Docker Hub DNS timeout (22/11/2026)
+
+Operator ran G3-AP compose config and image build: `G3AP_COMPOSE_EXIT=0`; Docker BuildKit failed at **base-image metadata fetch**, before any build step: `FROM python:3.12-slim-bookworm` failed HEAD `https://registry-1.docker.io/v2/library/python/manifests/3.12-slim-bookworm`, resolver `212.230.135.1:53` UDP timed out. `G3AP_BUILD_EXIT=1`. No G3-AP service started; G3-AN remains Up 7 minutes; original G3-AM remains Up 11 hours. This is network/DNS dependency of Docker build, not evidence of invalid application code. Do **not** edit global Docker DNS, restart Docker daemon, or modify other labs. Next run *read-only* `docker image ls` for locally available Python/FFmpeg images; inspect Python & ffmpeg availability in existing image with `docker image inspect` or `docker run --rm --network none --entrypoint /bin/sh` only if locally available, without impacting existing containers. If no suitable local combination, diagnose network/DNS narrowly or create alternative isolated host process with secure local binding (requires deliberate network setup). Keep source and streaming continuity gate pending.
+
+    G3AP_COMPOSE_CONFIG=PASS
+    G3AP_BUILD=BLOCKED_DOCKER_HUB_DNS
+    G3AP_CONTAINER_STARTED=NO
+    G3AO_LIVE_STREAM_CONTINUITY=PENDING
