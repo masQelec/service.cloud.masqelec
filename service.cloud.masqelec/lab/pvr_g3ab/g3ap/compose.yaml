@@ -1,11 +1,13 @@
-# Separate lab-only, continuously paced MPEG-TS source; does not replace G3-AB streams.
+# G3-AP: isolated continuous synthetic MPEG-TS HTTP source, OFFLINE only.
+# Reuse preinstalled local linuxserver/tvheadend image with Python and FFmpeg.
+# No build or pull; bypass its normal TVH init/entrypoint and serve only G3-AP.
 name: masqelec-pvr-g3ap
 services:
   live:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: masqelec/g3ap-live:lab
+    image: lscr.io/linuxserver/tvheadend:latest
+    pull_policy: never
+    entrypoint: ["/usr/bin/python3", "-u", "/opt/g3ap/server.py"]
+    command: []
     read_only: true
     init: true
     user: "65534:65534"
