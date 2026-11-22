@@ -442,3 +442,15 @@ Operator executed guarded G3-AN-only `live`→`live-url` update while Python url
     G3AO_ACTIVE_PHYSICAL_SOURCE_SWITCH=UNTESTED
     G3AO_HTSP_CHANNEL_ID=PENDING
     G3AO_KODI_IUNIQUEID=PENDING
+
+## G3-AQ HTSP/Kodi preflight: installed, TCP accessible (22/11/2026)
+
+Operator reports `/usr/bin/kodi` and `/usr/bin/kodi-standalone` available; pvr.hts installed at `/usr/lib/x86_64-linux-gnu/kodi/addons/pvr.hts/pvr.hts.so`, data directory `/usr/share/kodi/addons/pvr.hts`. TCP connection to isolated G3-AN `127.0.0.1:39992` PASS; G3-AN TVH Up 19m. **Only file existence and port reachability verified**; no HTSP negotiation, channel identifiers, Kodi profiles, or playback measured. No Kodi process started.
+
+New read-only `tools/pvr_g3aq_htsp_identity_probe.py` candidate committed on develop. Implements bounded HTSMSG binary framing, `hello` and `enableAsyncMetadata` only, collects `channelAdd` notifications up to `initialSyncCompleted`, prints numeric HTSP `channelId`, string `channelIdStr`, channelName and number. Checks expected fixed channel UUIDs e4852534cdb2fd64f54fd861d4d00767 and 0d3bd243f67184e9adb9ceadf4a51c50. This probe has **not** been run by the operator and is not proof of Kodi `iUniqueId`; compare numeric channelId across separate sessions, source changes and restart later. Protocol basis: Tvheadend HTSMSG wire format and HTSP official hello/enableAsyncMetadata/channelAdd docs. No added daemon, no writes to TVH or Kodi. G3-AN playlist currently `live-url`.
+
+    G3AQ_KODI_BINARIES=FOUND
+    G3AQ_PVR_HTS_PLUGIN=FOUND
+    G3AQ_HTSP_TCP=PASS
+    G3AQ_HTSP_IDENTITY=PENDING
+    G3AQ_KODI_IUNIQUEID=PENDING
