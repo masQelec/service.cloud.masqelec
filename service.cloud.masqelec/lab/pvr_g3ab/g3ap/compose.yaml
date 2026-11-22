@@ -1,0 +1,25 @@
+# Separate lab-only, continuously paced MPEG-TS source; does not replace G3-AB streams.
+name: masqelec-pvr-g3ap
+services:
+  live:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: masqelec/g3ap-live:lab
+    read_only: true
+    init: true
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    volumes:
+      - ./server.py:/opt/g3ap/server.py:ro
+      - ../runtime/streams:/source:ro
+    networks:
+      pvr_g3ab:
+        aliases: [g3ap-live]
+    restart: "no"
+networks:
+  pvr_g3ab:
+    external: true
+    name: masqelec-pvr-g3ab_pvr_g3ab
