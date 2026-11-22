@@ -391,3 +391,14 @@ Operator ran revised `g3ap/compose.yaml`: `G3AP_CONFIG_EXIT=0`, `docker compose 
 ## G3-AP HTTP startup HEALTH PASS, first refusal was startup race (22/11/2026)
 
 Operator inspected live G3-AP container after initial `Connection refused`: `STATUS=running RUNNING=true EXIT=0 OOM=false ERROR=`; expected `ENTRYPOINT=["/usr/bin/python3","-u","/opt/g3ap/server.py"] CMD=[]`; log `2026-11-22T10:32:09.157861495Z G3AP_LISTEN=0.0.0.0:8080`. First retried GET `/healthz` from G3-AN playlist container returned `OK` and `G3AP_HEALTH_RESULT=0`. G3-AP Up 36s, G3-AN Up 10m, original G3-AM Up 11h. Thus initial refused connection was consistent with (not rigorously proven caused by) early startup, **not** a permanent server fault. Next gate: bounded ~36-40 second HTTP GET of `/ch1.ts` using Python `urllib.response.read1` or small reads to count actual incremental byte totals and inspect `content-type`, `HTTP=200`; source duration 12s, require received data after 30s and no exceptions, then repeat through shared Docker DNS. This must not modify any playlist, TVH, config, or G3-AB/G3-AM container. `G3AP_HEALTH=PASS`, `G3AP_CONTINUOUS_STREAM=PENDING`.
+
+## G3-AP continuous MPEG-TS proved and G3-AN playlist stages prepared (22/11/2026)
+
+Operator ran GET `http://g3ap-live:8080/ch1.ts` within isolated G3-AP lab, HTTP=200, Content-Type `video/mp2t`, cumulative bytes increased: 10s=899204, 20s=1805176, 30s=2673360, 40s=3557148; `G3AP_CONTINUOUS_STREAM=PASS`. G3-AM remained running `Up 12 hours`. This validates **G3-AP source** sustained HTTP transport, NOT yet that G3-AN TVH receives, remuxes, or serves it to HTTP/HTSP clients.
+
+Extended `lab/pvr_g3ab/g3an/prepare.py` with two *opt-in* guarded stages: `live` sets Alpha CUID g3an-001 stream URL `http://g3ap-live:8080/ch1.ts`; `live-url` changes that URL to `http://g3ap-live:8080/ch1.ts?g3ap_url_test=1` without changing CUID. Beta unchanged (`http://streams/ch2.ts`), all existing stages (`init`, `baseline`, `url`) preserved. **No runtime playlist change or TVH restart applied by this GitHub commit**. First next gate: `git pull`, confirm G3-AP health, baseline UUIDs and existing Alpha URL stage; execute `prepare.py live`, await 1min IPTV auto refresh; assert new Alpha URL percent-aware, CUID and all mux/service/channel UUIDs identical against baseline. Existing `epggrab` mux may still use **old** URL snapshot; do not interpret new config URL as proven streaming. Only after source config gate PASS, controlled **G3-AN-only** restart to re-open mux with G3-AP continuous source. Then prove HTTP bytes and active subscription, next execute `prepare.py live-url` during active playback, compare identity and received bytes before/after; confirm session never stopped. G3-AM/G3-AB never modified, CoreELEC release prohibited.
+
+    G3AP_CONTINUOUS_STREAM=PASS
+    G3AN_LIVE_STAGES=COMMITTED_NOT_EXECUTED
+    G3AN_LIVE_SOURCE_CONFIG=NOT_YET_TESTED
+    G3AO_LIVE_URL_CHANGE_CONTINUITY=PENDING
