@@ -157,3 +157,9 @@ Salida real del operador tras `g3an/compose.yaml` actualizado: `G3AN_VUE_DIST=PA
     G3AN_API_HTTP=200
     G3AN_G3AM_UNTOUCHED=YES
     G3AN_CUID_BASELINE_PERSISTENCE=PENDING
+
+## G3-AN baseline de identidades reales por API (22/11/2026)
+
+Operador proporcionó API G3-AN con 2 muxes, ambos con campo modificado `iptv_cuid` visible: Alpha `g3an-001` UUID mux `afa32f8f8223bdff59057f7790448c92`, URL `http://streams/ch1.ts`; Beta `g3an-002` UUID mux `c96721109b182b2d53fbba80bdc5820c`, URL `http://streams/ch2.ts`. Dos canales: Alpha UUID `e4852534cdb2fd64f54fd861d4d00767`, número 1; Beta UUID `0d3bd243f67184e9adb9ceadf4a51c50`, número 2. Servicios vinculados: Alpha `4bfccf27c63505a1b6b81aec861174ed` (svcname `G3AB Signal 1` sid 1), Beta `0588b5c02d512b7045c254cf95ed46ab` (svcname `G3AB Signal 2` sid 2). **Tercer servicio** no vinculado `923fc082cf4b92edf42d4b5a87da125e`, svcname `G3AN Beta`, sid 1; posible provisional, no borrar ni ignorar en invariantes. `G3AN_BASELINE_INVENTORY=COMPLETED`, `G3AN_CUID_API_PRESENT=PASS`. Persistencia CUID tras reinicio, total de servicios después de refetch, preservación de UUID de mux/service/channel y Kodi HTSP iUniqueId siguen PENDIENTES.
+
+**Próximo gate:** comprobación directa read-only de ficheros `/config/input/iptv/muxes` o equivalente y snapshot API en fichero fuera de G3-AM, sin cambiar URL. Si el CUID persistió, probar reload/restart limitado a G3-AN y comparar UUID/cuid. Después ejecutar `prepare.py url`, forzar refresco o esperar periodicidad y comparar identidades/total de servicios. En las primeras pruebas observar la condición de seguridad `mm_active` e interrumpir ante cualquier cambio de UUID. No declarar plenamente funcional hasta medir todos los gates, especialmente Kodi.
