@@ -523,3 +523,15 @@ Operator executed second-terminal G3-AS preflight (`G3AS_PREFLIGHT=PASS` require
     G3AS_TVH_UPDATE=PASS
     G3AS_ALPHA_URL=http://g3ap-live:8080/ch1.ts
     G3AS_KODI_RETENTION=PENDING
+
+## G3-AS Kodi PVR SQLite retention after live URL update: PASS (22/11/2026)
+
+Operator ran read-only comparison of the isolated Kodi profile `/tmp/g3ar-kodi-A3FZBaXx/data/userdata/Database/TV46.db` against the previously captured `g3as-before.json`, after G3-AN playlist was changed `live-url` → `live` while isolated Kodi was running and Kodi was subsequently shut down. Reported `G3AS_CLIENTS=[(1, 'pvr.hts', 1)]`, `G3AS_TWO_CHANNELS=True`, `G3AS_NO_DUPLICATES=True`, `G3AS_EXPECTED_IDS=True`, `G3AS_RECORDS_STABLE=True`, `G3AS_PVR_CLIENT_STABLE=True`, `G3AS_KODI_RETENTION=PASS`. Original baseline from earlier audit: Alpha `idChannel=1`, `iUniqueId=874874340`, `iClientId=1`, `idEpg=1`, name `G3AN Alpha`; Beta `idChannel=2`, `iUniqueId=1137851149`, `iClientId=1`, `idEpg=2`, name `G3AN Beta`. Entire compared channel record list was unchanged. No access to normal `~/.kodi` profile.
+
+**Evidence scope:** confirms TVH source URL refresh preserving CUID/mux UUID and Kodi PVR channel record identity after re-sync for **unchanged two-channel playlist**. It does not establish add/delete/reorder behavior, unknown channel retention mechanisms, service identifier changes, Kodi channel cleanup latency, power-failure handling, or CoreELEC runtime compatibility. Continue only with G3-AN synthetic playlist, isolate Kodi profile, snapshots/rollback before any new mutations. No new G3-AB/G3-AM changes.
+
+    G3AS_TVH_UPDATE=PASS
+    G3AS_KODI_RETENTION=PASS
+    G3AT_ADD_DELETE_REORDER=PENDING
+    G3AT_KODI_CLEANUP=PENDING
+    CORE_ELEC_NATIVE_BUILD=NOT_AUTHORIZED
