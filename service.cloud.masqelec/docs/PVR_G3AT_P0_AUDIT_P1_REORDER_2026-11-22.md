@@ -91,3 +91,15 @@ Sumado a P1B/P1C/P1D, `G3AT_P1_FINAL=PASS` para **reordenación meramente posici
 Salida del operador, sin mutaciones: árbol local en `develop`, HEAD `193099a` (anterior a los commits documentales remotos); Kodi aislado `CLOSED`. Red IPTV LOCAL UUID `d1642fb49f8bf0d2c583ce1b2deae146`. API TVH: 2 muxes (Alpha CUID `g3an-001`, URL `http://g3ap-live:8080/ch1.ts`; Beta CUID `g3an-002`, URL `http://streams/ch2.ts`), 3 servicios, 2 canales. Servicio Beta histórico no vinculado: UUID `923fc082cf4b92edf42d4b5a87da125e`, `enabled=false`; otros dos servicios mantienen sus canales originales. G3-AP `server.py` permite únicamente rutas `/ch1.ts` y `/ch2.ts`, ninguna `/ch3.ts` todavía. No asumir fuente Gamma ni automapeo funcional.
 
 **Gate P2A:** `INVENTORY=COLLECTED`, **no** `GAMMA_ADD=PASS`. Inspeccionar configuración API de mapeo de red y rutas de `service_mapper_process` antes de tocar el generador. Evitar una baja destructiva o crear duplicados en Gamma hasta contar con evidencia real de creación y asociación. G3-AB/G3-AM, producción y CoreELEC protegidos.
+
+
+## G3-AT-P2B/P2C — Auditoría y candidato estático Gamma (22/11/2026)
+
+Evidencia operador P2B: red G3-AN `autodiscovery=0`, `bouquet=True`, `scan_create=True`, `service_sid=1`, `channel_number=0`. En `service_mapper_process`, si no existe canal adecuado llama a `channel_create` y enlaza servicio/canal; sin embargo el alta efectiva sigue sin comprobarse. `bouquet_unmap_channel` elimina el canal mediante `channel_delete(ch,1)` cuando no hay otro servicio del mismo bouquet que lo mantenga. `bouquet_remove_service` llama a esa función con `delconf` activo. Por tanto la baja destructiva podría emitir HTSP `channelDelete` y borrar identidad persistida; la ejecución real en G3-AN/Kodi está PENDIENTE. No declarar recuperación de identidad tras reaparición.
+
+Candidato P2C **solo código GitHub, no aplicado aún al runtime**:
+- G3-AP `server.py` permite la URL sintética distinta `/ch3.ts` utilizando el archivo de prueba YA EXISTENTE `/source/ch1.ts` en modo solo lectura. No crear ni modificar fixtures G3-AB. La nueva ruta no estará activa hasta reinicio **solo del emisor G3-AP**, lo que interrumpe sus clientes; programarlo con preflight y sin reproducción activa.
+- Generador privado G3-AN `prepare.py add-gamma` conserva exactamente las dos entradas completas del estado `reorder` y añade Gamma al final con `CUID=g3an-003`, `tvg-chno=3`, `tvh-chnum=3`, URL `http://g3ap-live:8080/ch3.ts`. No cambia etapas anteriores.
+- Test offline `tests/test_pvr_g3at_gamma.py` comprueba invariantes, cantidad, URL única, CUID y línea original Alpha/Beta. **NO ejecutado** a fecha de escritura.
+- P2C no autoriza todavía `prepare.py add-gamma`: primero `git pull --ff-only` con árbol limpio, pruebas estáticas PASS, preflight contenedor + HTTP de nueva ruta y comprobar estado de suscripciones de G3-AP/G3-AN. Sólo después, alta acotada G3-AN y observación de API/HTSP/Kodi.
+- Mantener playlist activa en estado `reorder` hasta nuevo gate. No forzar `service_mapper` ni cambiar bouquets globalmente. No usar automáticamente etapa `reorder` como borrado seguro de Gamma tras su alta: podría ser DESTRUCTIVA.
