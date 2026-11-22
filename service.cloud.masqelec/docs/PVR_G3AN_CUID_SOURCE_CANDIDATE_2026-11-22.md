@@ -252,3 +252,15 @@ Operator stopped only G3-AN `tvh`, rebuilt patched G3-AO executable: `G3AO_MAKE_
     G3AO_HTTP=200
     G3AO_URL_APPLIED=UNVERIFIED
     G3AO_UUID_IDENTITY=UNVERIFIED
+
+## G3-AO build PASS, pero URL aún antigua tras refetch (22/11/2026)
+
+Operador ejecutó comparación con baseline tras compilar/arrancar G3-AO: `G3AO_MUXES_UUID_STABLE=True` (2), `G3AO_SERVICES_UUID_STABLE=True` (3), `G3AO_CHANNELS_UUID_STABLE=True` (2); `G3AO_ALPHA_URL_UPDATED=False`, `G3AO_ALPHA_CUID=True`, `G3AO_BETA_CUID=True`, `G3AO_BETA_URL_UNCHANGED=True`. EPG subscriptions 2 Running (`epggrab`, una por canal). Logs del nuevo arranque `10:15:57`, refrescos M3U regulares 10:15, 10:16, 10:17, 10:18, cada uno `0 new mux(es) ... (total 2)` sin nuevo mensaje `URL change deferred`. Mensaje `deferred` a 10:14 pertenece a binario **anterior**. Resultado `G3AO_URL_IDENTITY=FAIL_OR_PENDING`: NO dar por superado el gate.
+
+Nueva hipótesis por lectura de upstream exacto `src/input/mpegts/iptv/iptv_auto.c` (líneas aprox. 169–210): URL de comparación `url2` puede normalizarse mediante ajustes de red `in_ignore_args` / `in_ignore_path`, distintos del `iptv_url` real. La rama actual G3-AN actualiza URL con guard `if (by_cuid && strcmp(im->mm_iptv_url_cmpid ?: "", url2) != 0)`; si url2 no cambia pero URL efectiva sí, no entra. Otra hipótesis: Nginx no sirve la playlist nueva o contenedor no ha actualizado bind-mount del binario. Próximo diagnóstico SOLO lectura: comparar playlist del host y desde Nginx, inspeccionar API mux `iptv_url` + `iptv_url_cmpid`, red IPTV `iptv/network/grid` con campos `remove_args`, `ignore_args`, `ignore_path`, `refetch_period`, y bind mount ejecutable/container. No editar ni reiniciar ni forzar nuevos cambios de playlist hasta localizar causa. Si cmpid no cambia por diseño, reparar G3-AN comparando URL efectiva independientemente de cmpid (requiere regresiones específicas y no usar de forma insegura URL sin codificar); si HTTP aún entrega baseline, corregir publicación de playlist sin tocar el motor.
+
+    G3AO_BUILD=PASS
+    G3AO_M3U_REFETCH=PASS
+    G3AO_UUID_PRESERVED_WHILE_URL_UNCHANGED=PASS_OBSERVED
+    G3AO_URL_UPDATE=FAIL_OR_PENDING
+    G3AO_CAUSE=NEEDS_INPUT_DIAGNOSTICS
