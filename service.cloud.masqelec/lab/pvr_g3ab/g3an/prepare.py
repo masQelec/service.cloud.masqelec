@@ -33,7 +33,7 @@ def playlist(stage):
     alpha_url = "http://streams/ch1.ts"
     if stage == "url":
         alpha_url = "http://streams/ch1.ts?g3an_url_test=1"
-    if stage in ("live", "live-url"):
+    if stage in ("live", "live-url", "reorder"):
         alpha_url = "http://g3ap-live:8080/ch1.ts"
         if stage == "live-url":
             alpha_url += "?g3ap_url_test=1"
