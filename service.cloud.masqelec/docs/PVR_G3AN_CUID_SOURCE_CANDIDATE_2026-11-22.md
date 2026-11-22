@@ -402,3 +402,13 @@ Extended `lab/pvr_g3ab/g3an/prepare.py` with two *opt-in* guarded stages: `live`
     G3AN_LIVE_STAGES=COMMITTED_NOT_EXECUTED
     G3AN_LIVE_SOURCE_CONFIG=NOT_YET_TESTED
     G3AO_LIVE_URL_CHANGE_CONTINUITY=PENDING
+
+## G3-AP continuous stream gate PASS — 40 seconds (22/11/2026)
+
+Operator executed bounded Python `urllib` stream read inside running G3-AP container at `http://g3ap-live:8080/ch1.ts`; server answered HTTP 200 `Content-Type: video/mp2t`. Observed monotonically increasing byte counts: 10s `899204`, 20s `1805176`, 30s `2673360`, 40s `3557148`, total `3557148`; `G3AP_CONTINUOUS_STREAM=PASS`. G3-AP logs confirmed GET 200. G3-AM original remained Up 12h. This establishes sustained synthetic HTTP MPEG-TS delivery beyond the 12-second finite file, but **does not yet establish TVH/PVR live playback or URL-change continuity**.
+
+During follow-up inspection, existing `g3an/prepare.py` on `develop` already has guarded `live` and `live-url` choices: Alpha URL `http://g3ap-live:8080/ch1.ts` and subsequent `?g3ap_url_test=1`, respectively; Beta remains `http://streams/ch2.ts`. No new generator modification was made in this turn. Next gate: baseline UUID snapshot + CUID and G3-AN API preflight; `prepare.py live` only if preconditions pass; observe per-minute refresh to Alpha URL semantically using parse_qsl (encoded underscores); preserve exact 2 muxes/3 services/2 channels UUID sets, both CUID, Beta URL. Note epggrab may keep old finite URL stream open; after confirming identity and URL, perform controlled G3-AN-only restart to reinitialize connection to G3-AP, then measure >0 actual HTTP video bytes. Do not claim mid-playback continuity until a **separate** `live` to `live-url` test with client already receiving TS bytes. G3-AB/G3-AM remain immutable, no CoreELEC release.
+
+    G3AP_CONTINUOUS_STREAM=PASS
+    G3AN_CONTINUOUS_SOURCE_CUTOVER=PENDING
+    G3AO_LIVE_URL_CONTINUITY=PENDING
