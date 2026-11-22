@@ -147,3 +147,13 @@ Runtime G3-AN `tvh` y `playlist` Up 2min, API `/api/serverinfo` 200, `/gui/` 500
     G3AN_VUE_MOUNT_CODE=COMMITTED
     G3AN_VUE_DIST_EXISTS_ON_HOST=UNVERIFIED
     G3AN_WEBUI_RETEST=PENDING
+
+## Vue GUI corregida y verificada (22/11/2026)
+
+Salida real del operador tras `g3an/compose.yaml` actualizado: `G3AN_VUE_DIST=PASS`; `docker compose up -d --no-deps tvh` recreó exclusivamente `masqelec-pvr-g3an-tvh-1`; `G3AN_GUI_HTTP=200`, `G3AN_API_HTTP=200`; G3-AM original permanecía `Up 11 hours`. Se cierra el bloqueo HTTP 500 por falta de montaje `/opt/src/webui/static-vue/dist`. La UI Vue está disponible. En un HTML SingleFile suministrado por operador se observa vista `Channels: 2`, pero no sustituye inventario de UUID/CUID persistente por API o en la configuración. No ejecutar mutación URL hasta captura basal de muxes, servicios y canales y comprobación `iptv_cuid` de los dos muxes.
+
+    G3AN_VUE_DIST=PASS
+    G3AN_GUI_HTTP=200
+    G3AN_API_HTTP=200
+    G3AN_G3AM_UNTOUCHED=YES
+    G3AN_CUID_BASELINE_PERSISTENCE=PENDING
