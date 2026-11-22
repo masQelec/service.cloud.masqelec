@@ -37,17 +37,22 @@ def playlist(stage):
         alpha_url = "http://g3ap-live:8080/ch1.ts"
         if stage == "live-url":
             alpha_url += "?g3ap_url_test=1"
-    return (
-        "#EXTM3U\n"
+    alpha = (
         '#EXTINF:-1 CUID="g3an-001" tvg-chno="1" tvh-chnum="1" tvg-name="G3AN Alpha" group-title="G3AN SYNTHETIC",G3AN Alpha\n'
         + alpha_url + "\n"
-        + '#EXTINF:-1 CUID="g3an-002" tvg-chno="2" tvh-chnum="2" tvg-name="G3AN Beta" group-title="G3AN SYNTHETIC",G3AN Beta\n'
+    )
+    beta = (
+        '#EXTINF:-1 CUID="g3an-002" tvg-chno="2" tvh-chnum="2" tvg-name="G3AN Beta" group-title="G3AN SYNTHETIC",G3AN Beta\n'
         + "http://streams/ch2.ts\n"
     )
+    # Reordering is purely positional. It must not change CUID, LCN or URL.
+    if stage == "reorder":
+        return "#EXTM3U\n" + beta + alpha
+    return "#EXTM3U\n" + alpha + beta
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("stage", choices=("init", "baseline", "url", "live", "live-url"))
+    parser.add_argument("stage", choices=("init", "baseline", "url", "live", "live-url", "reorder"))
     args = parser.parse_args()
     target = guard()
     if args.stage == "init" and target.exists():
