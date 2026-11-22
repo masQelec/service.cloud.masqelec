@@ -412,3 +412,13 @@ During follow-up inspection, existing `g3an/prepare.py` on `develop` already has
     G3AP_CONTINUOUS_STREAM=PASS
     G3AN_CONTINUOUS_SOURCE_CUTOVER=PENDING
     G3AO_LIVE_URL_CONTINUITY=PENDING
+
+## G3-AP source cutover into G3-AN: identity PASS (22/11/2026)
+
+Operator ran guarded `g3an/prepare.py live` only after checking baseline snapshot and old Alpha URL; output `G3AP_INPUTS_BEFORE=0`, `G3AP_CUTOVER_PREFLIGHT=PASS`, `G3AN_PLAYLIST_STAGE=LIVE`, `G3AN_PLAYLIST_PRIVATE_ONLY=YES`, URL `http://g3an-playlist/playlist.m3u`. API comparison after automatic M3U refetch: `G3AP_ALPHA_URL=True` (`http://g3ap-live:8080/ch1.ts` normalized), `G3AP_MUXES_UUID=True`, `G3AP_SERVICES_UUID=True`, `G3AP_CHANNELS_UUID=True`, `G3AP_ALPHA_CUID=True`, `G3AP_BETA_CUID=True`, `G3AP_BETA_URL=True`, final `G3AP_CUTOVER_IDENTITY=PASS`. G3-AM remains Up 12h. `G3AP_INPUTS_BEFORE=0` is merely a point-in-time input count, not proof of failure. **Do not yet run `prepare.py live-url`**. Next gate: verify actual streaming via G3-AN TVH `/stream/channel/e4852534cdb2fd64f54fd861d4d00767` using bounded curl and bytes in 12-20s, input `bps`, subscriptions, G3-AP logs. Confirm 0-byte issue resolved before live URL continuity test. If no bytes, analyze exact service/PAT/PMT vs TS source without changing identities or restarting unrelated labs.
+
+    G3AP_CONTINUOUS_SOURCE=PASS
+    G3AP_CUTOVER_IDENTITY=PASS
+    G3AP_TVH_PLAYBACK_BYTES=PENDING
+    G3AO_LIVE_URL_CONTINUITY=PENDING
+    G3AO_KODI_IDENTITY=PENDING
