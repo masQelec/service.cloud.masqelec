@@ -103,3 +103,20 @@ Candidato P2C **solo código GitHub, no aplicado aún al runtime**:
 - Test offline `tests/test_pvr_g3at_gamma.py` comprueba invariantes, cantidad, URL única, CUID y línea original Alpha/Beta. **NO ejecutado** a fecha de escritura.
 - P2C no autoriza todavía `prepare.py add-gamma`: primero `git pull --ff-only` con árbol limpio, pruebas estáticas PASS, preflight contenedor + HTTP de nueva ruta y comprobar estado de suscripciones de G3-AP/G3-AN. Sólo después, alta acotada G3-AN y observación de API/HTSP/Kodi.
 - Mantener playlist activa en estado `reorder` hasta nuevo gate. No forzar `service_mapper` ni cambiar bouquets globalmente. No usar automáticamente etapa `reorder` como borrado seguro de Gamma tras su alta: podría ser DESTRUCTIVA.
+
+
+## G3-AT-P2E — Emisor Gamma real, PASS (operador, 22/11/2026)
+
+Tras preflight `G3AT_P2E_SUBSCRIPTIONS=0` y `G3AT_P2E_PREFLIGHT=PASS`, se recreó exclusivamente el contenedor `masqelec-pvr-g3ap-live-1` con `docker compose ... up -d --no-deps --force-recreate --pull never live`, necesaria por el bind mount de archivo único de server.py. El comando devolvió Started. HTTP local desde el propio contenedor:
+```text
+G3AT_P2E_CH1_HTTP=200
+G3AT_P2E_CH1_BYTES=564
+G3AT_P2E_CH1_TS_VALID=True
+G3AT_P2E_CH3_HTTP=200
+G3AT_P2E_CH3_BYTES=564
+G3AT_P2E_CH3_TS_VALID=True
+G3AT_P2E_MEDIA=PASS
+G3AT_P2E_PROTECTED_CONTAINERS=PASS
+G3AT_P2E_FINAL=PASS
+```
+Se compararon los ID de contenedores protegidos G3-AN/G3-AM/G3-AB antes y después sin diferencias. El ensayo de 3 paquetes TS en cada URL no equivale a prueba integral de reproducción. Gamma **aún no existe** en la playlist ni en TVH/Kodi. La playlist activa continúa `reorder`. Próximo gate `G3AT_P2F`: alta explícita Gamma con snapshot previo, comparación por UUID/CUID y revisión de mapeo; si solo se crea mux no declarar alta PVR PASS. No eliminar ni reañadir Gamma todavía.
