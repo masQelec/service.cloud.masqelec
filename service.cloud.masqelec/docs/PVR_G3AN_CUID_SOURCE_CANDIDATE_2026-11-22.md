@@ -223,3 +223,14 @@ Los logs muestran refrescos automáticos `iptv: m3u parse: 0 new mux(es)` cada m
     G3AN_URL_UPDATE=BLOCKED_BY_G3AN_ACTIVE_FENCE
     G3AN_UNKNOWN_FORMAT=FALSE_GENERIC_ERROR
     G3AN_ACTIVE_SUBSCRIPTION_KIND=UNVERIFIED
+
+## G3-AO candidate — active EPG subscribers and safe configured URL refresh (22/11/2026)
+
+Live `status/subscriptions` in G3-AN: **exactly 2**, both title `epggrab`, state `Running`: input IPTV #1 Alpha and IPTV #2 Beta. `status/inputs`: 1 subscriber per stream, weight 4. No user playback subscription in snapshot. Thus G3-AN's `mm_active` guard is triggered by permanent OTA EPG subscriptions. Source upstream `src/input/mpegts/iptv/iptv.c`, `iptv_input_start_mux`: line ~335 reads config URL, line ~403 captures `im->mm_iptv_url_raw = raw ? strdup(raw) : NULL` before `ih->start(...)`. Current active connection uses copied URL, permitting *candidate* config URL update without forcing disconnection; must validate streaming compatibility at runtime before accepting. No distinction by subscription class needed for the minimal candidate: updating configured `mm_iptv_url` and comparison ID leaves current instance alone, next start sees new URL. Behavior not yet proven, especially reconnection/handler lifecycle.
+
+New standalone one-time G3-AO patch helper in repo `service.cloud.masqelec/tools/pvr_g3ao_allow_active_url_refresh_lab.py`. Only targets `/home/ubuntu/tvheadend-g3an-upstream`; dry run by default. Anchors require **existing G3-AN** source, replaces guard in `g3an_preflight` and skips `if (im->mm_active) goto end` in CUID-match update; no adjustment of mux UUID, services, channel links or EPG data. No forced stop and no runtime deployment. G3-AL and G3-AM never touched. To apply: first dry-run `python3 .../tools/pvr_g3ao_allow_active_url_refresh_lab.py /home/ubuntu/tvheadend-g3an-upstream` and review `git diff --check`; only then `--apply`, stop **only G3-AN tvh** before linking executable (prevent text-file-busy), compile via `make -j2 PYTHON=python3` in source checkout, start **only G3-AN tvh**, observe automatic M3U refresh. Keep baseline snapshot and playlist URL stage unchanged during rebuild. Acceptance: Alpha URL changes to `?g3an_url_test=1`, CUID and UUID of both muxes and all 3 services/2 channels stable, no unexpected stream shutdown; afterward test real playback, OTA EPG, HTSP/Kodi identity. Do not claim PASS until observed.
+
+    G3AN_EPG_INTERNAL_SUBS=2_RUNNING
+    G3AN_URL_ACTIVE_FENCE_ROOT_CAUSE=CONFIRMED
+    G3AO_PATCH_HELPER=COMMITTED_NOT_EXECUTED
+    G3AO_RUNTIME_GATE=PENDING
