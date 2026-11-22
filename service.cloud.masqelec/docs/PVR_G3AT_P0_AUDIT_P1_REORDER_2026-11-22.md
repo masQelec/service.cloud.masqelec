@@ -120,3 +120,16 @@ G3AT_P2E_PROTECTED_CONTAINERS=PASS
 G3AT_P2E_FINAL=PASS
 ```
 Se compararon los ID de contenedores protegidos G3-AN/G3-AM/G3-AB antes y después sin diferencias. El ensayo de 3 paquetes TS en cada URL no equivale a prueba integral de reproducción. Gamma **aún no existe** en la playlist ni en TVH/Kodi. La playlist activa continúa `reorder`. Próximo gate `G3AT_P2F`: alta explícita Gamma con snapshot previo, comparación por UUID/CUID y revisión de mapeo; si solo se crea mux no declarar alta PVR PASS. No eliminar ni reañadir Gamma todavía.
+
+
+## G3-AT-P2F — Alta real Gamma (operador, 22/11/2026)
+
+Después de `G3AT_P2F_BASELINE=PASS` y snapshot previo `G3AT_P2F_SNAPSHOT_BEFORE=PASS`, se ejecutó una única mutación privada `prepare.py add-gamma` (`G3AN_PLAYLIST_STAGE=ADD-GAMMA`, `PRIVATE_ONLY=YES`). Tras 80 segundos:
+- Entidades TVH `before={'muxes':2,'services':3,'channels':2}` → `after={'muxes':3,'services':4,'channels':3}`.
+- `G3AT_P2F_MUXES_OLD_IDS_PRESERVED=True`, `G3AT_P2F_SERVICES_OLD_IDS_PRESERVED=True`, `G3AT_P2F_CHANNELS_OLD_IDS_PRESERVED=True`; ningún ID eliminado.
+- Mux Gamma nuevo `aae864752fce1c09379c630a048f8f25`, CUID `g3an-003`, URL `http://g3ap-live:8080/ch3.ts`; servicio nuevo `095c73b01bb2a1c1f331f88aee1d3e20`; canal nuevo `0b86e3113c756785e2e976245c3101e1`.
+- `G3AT_P2F_GAMMA_MUX=True`, `G3AT_P2F_EXISTING_IDENTITY=True`, `G3AT_P2F_MUX_GATE=PASS`.
+- HTSP v44 `INITIAL_SYNC=PASS`, 3 canales: Gamma channelId `300123659`, UUID `0b86e3113c756785e2e976245c3101e1`, número 3; Alpha `874874340`, Beta `1137851149` estables.
+- El comprobador histórico G3-AQ devolvió `G3AQ_HTSP_IDENTITY=FAIL` **porque exige `len==2`**. No representa una regresión demostrada. Se necesita sonda específica G3-AT.
+- Log TVH `2026-11-22 11:26:44.789 iptv: m3u parse: 1 new mux(es) ... total 3`; `11:26:44.790 bouquet: ... G3AN Gamma/{PMT:0}: mapped service`; `11:27:44.789 0 new mux(es) ... total 3`.
+- Evidencias `/home/ubuntu/g3at-evidence/G3AT-P2F`; `G3AT_P2F_EVIDENCE=COLLECTED`. **Pendientes**: comprobar explícitamente enlace servicio Gamma↔canal por API y nueva SQLite Kodi. No declarar `G3AT_P2_FINAL=PASS` todavía. No retirar ni reañadir Gamma, pues la baja puede ser destructiva.
