@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "addon_id": "service.tvheadend43",
+  "kodi_major": 21,
+  "packages": [
+    {
+      "target": "Amlogic-ng.arm",
+      "version": "21.2.8",
+      "path": "pvr/tvheadend/Amlogic-ng.arm/service.tvheadend43-21.2.8.zip",
+      "size": 32654890,
+      "sha256": "282e8169c51c8bb30a1ca0e1b47ec4dde5ecd91cc122092d6617bb6efbde45e3",
+      "validated_builds": []
+    },
+    {
+      "target": "Amlogic-ne.aarch64",
+      "version": "21.2.8",
+      "path": "pvr/tvheadend/Amlogic-ne.aarch64/service.tvheadend43-21.2.8.zip",
+      "size": 34641758,
+      "sha256": "ecabb995f8ce3f6f33da940045367f120aadcd97df717a73655dd46ed1d0170d",
+      "validated_builds": []
+    }
+  ]
+}
