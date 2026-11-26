@@ -72,6 +72,21 @@ def _module():
 class RcloneTokenSyncTests(unittest.TestCase):
     def setUp(self):
         self.sync = _module()
+
+        route_patches = (
+            mock.patch.object(
+                self.sync.constants, "CLOUD_BRANCH", "21"
+            ),
+            mock.patch.object(
+                self.sync.constants, "CLOUD_RAW_BASE",
+                "https://raw.githubusercontent.com/"
+                "masQelec/cloud.masqelec/21"
+            ),
+        )
+
+        for patch in route_patches:
+            patch.start()
+            self.addCleanup(patch.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.path = os.path.join(self.tmp.name, "rclone.conf")

@@ -10,6 +10,7 @@ import tempfile
 import time
 
 from lib import constants
+from lib import cloud_version_routes as cloud_routes
 from lib import rclone_two_mount_client_role as client_role
 from lib import rclone_two_mount_client_apply as apply
 from lib import rclone_two_mount_master_runtime as master
@@ -90,7 +91,7 @@ def tick(rpc_call, *, authorized=False, now=None,
     if (getattr(constants, "RCLONE_TWO_MOUNT_CLIENT_RECOVERY_ENABLED", False)
             is not True or
             getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED", False)
-            is not True or constants.CLOUD_BRANCH != "develop"):
+            is not True or not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH)):
         return "BLOCKED_RELEASE_GATES"
     if not client_role.allowed(role if role is not None else apply._get_role()):
         return "BLOCKED_NOT_CLIENT"

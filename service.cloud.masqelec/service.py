@@ -23,6 +23,22 @@ import xbmcgui
 import urllib.request
 import urllib.parse
 
+# Resolver cloud antes de importar consumidores.
+from lib import constants
+from lib import cloud_version_routes as cloud_routes
+
+try:
+    cloud_routes.initialize_runtime_route(
+        constants,
+        getattr(xbmc, "executeJSONRPC", None),
+    )
+except cloud_routes.CloudVersionError as exc:
+    xbmc.log(
+        "[masQelec][cloud] Inicio bloqueado: " + str(exc),
+        xbmc.LOGERROR,
+    )
+    raise SystemExit(1)
+
 from lib import log_utils
 from lib import jsonrpc_utils
 from lib import rclone_utils
@@ -36,7 +52,6 @@ from lib import utils
 from lib import device_utils
 from lib import core_catalog
 from lib import rclone_token_sync
-from lib import constants
 from lib import rclone_two_mount_rollout
 from lib import rclone_two_mount_health
 from lib import rclone_two_mount_startup_stage
@@ -565,7 +580,7 @@ def _phase1_cloud_storage_blocking(monitor: xbmc.Monitor):
     except Exception:
         log(f"Fallo en cloud_storage:\n{traceback.format_exc()}", "ERROR")
     # Staging local de 2 FUSE + 4 bind: sólo cuando la bandera específica
-    # esté autorizada. La rama develop la mantiene False.
+    # esté autorizada. La habilitacion depende de los flags de release.
     if getattr(constants, "RCLONE_TWO_MOUNT_STAGING_ENABLED", False) is True:
         try:
             stage_result = rclone_two_mount_startup_stage.stage_on_startup(

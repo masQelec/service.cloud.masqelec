@@ -13,6 +13,14 @@ SPEC.loader.exec_module(pilot)
 
 
 class GroupedPilotTests(unittest.TestCase):
+    def setUp(self):
+        route_patch = mock.patch.object(
+            pilot.constants, "CLOUD_BRANCH", "develop"
+        )
+
+        route_patch.start()
+        self.addCleanup(route_patch.stop)
+
     def _base(self):
         stack = []
         def patch(obj, name, value):

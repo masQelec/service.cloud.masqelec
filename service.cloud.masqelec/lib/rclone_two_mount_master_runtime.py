@@ -11,6 +11,7 @@ import tempfile
 import urllib.parse
 
 from lib import constants
+from lib import cloud_version_routes as cloud_routes
 from lib import rclone_two_mount_config_routes as routes
 from lib import rclone_two_mount_master_sync as master
 from lib import rclone_two_mount_plan as plan
@@ -18,15 +19,18 @@ from lib import rclone_two_mount_rollout as rollout
 from lib import rclone_two_mount_startup_stage as stage
 
 API = "https://api.github.com/repos/masQelec/cloud.masqelec"
-BRANCH = "develop"
 MAX_HTTP_BODY = 8 * 1024 * 1024
 
 
 class GitHubV2Transport:
-    """Solo la rama develop del cloud repo; path remoto fijo, nunca fallback."""
+    """Rama cloud validada, fijada al crear el transporte."""
     def __init__(self, token, request=None):
         if not isinstance(token, str) or not token:
             raise ValueError("GitHub token required")
+        branch = constants.CLOUD_BRANCH
+        if not cloud_routes.rclone_transport_branch_allowed(branch):
+            raise ValueError("Invalid GitHub branch")
+        self.branch = branch
         self._token = token
         if request is None:
             from lib import catalog_utils
@@ -46,7 +50,7 @@ class GitHubV2Transport:
 
     def head(self):
         status, body = self._call(
-            "GET", API + "/branches/" + BRANCH)
+            "GET", API + "/branches/" + self.branch)
         if status != 200:
             return None
         try:
@@ -61,13 +65,13 @@ class GitHubV2Transport:
             raise ValueError("GitHub path outside v2 allowlist")
         return self._call(
             "GET", API + "/contents/" +
-            urllib.parse.quote(path, safe="/") + "?ref=" + BRANCH)
+            urllib.parse.quote(path, safe="/") + "?ref=" + self.branch)
 
     def put(self, path, payload):
         if path != routes.V2_REMOTE_PATH:
             raise ValueError("GitHub path outside v2 allowlist")
         if (not isinstance(payload, dict) or
-                payload.get("branch") != BRANCH):
+                payload.get("branch") != self.branch):
             raise ValueError("Invalid GitHub branch")
         return self._call(
             "PUT", API + "/contents/" +
@@ -157,7 +161,7 @@ def run_once(*, release_authorized=False, request=None,
             is not True or
             getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED", False)
             is not True or
-            constants.CLOUD_BRANCH != BRANCH or
+            not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH) or
             _get_role() != "MASTER" or
             rollout.mode(True) != "active"):
         return "blocked_master_not_ready"
@@ -174,7 +178,7 @@ def run_once(*, release_authorized=False, request=None,
             gh.head, gh.get, gh.put,
             probe if probe is not None else _probe_candidate,
             secret_key, gh_token, release_authorized=True,
-            master_attested=True)
+            master_attested=True, branch=gh.branch)
     except (OSError, ValueError, KeyError, TypeError, RuntimeError):
         return "blocked_master_runtime"
 
@@ -188,7 +192,7 @@ def publish_from_legacy_before_cutover(*, authorized=False, request=None,
     """
     if authorized is not True:
         return "blocked_not_authorized"
-    if (constants.CLOUD_BRANCH != BRANCH
+    if (not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH)
             or getattr(constants, "RCLONE_TWO_MOUNT_FEATURE_ALLOWED",
                        False) is not True
             or getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED",
@@ -217,6 +221,6 @@ def publish_from_legacy_before_cutover(*, authorized=False, request=None,
             local_sources, gh.head, gh.get, gh.put,
             probe if probe is not None else _probe_candidate,
             secret, github_token, release_authorized=True,
-            master_attested=True)
+            master_attested=True, branch=gh.branch)
     except (OSError, ValueError, TypeError, KeyError, RuntimeError):
         return "blocked_master_runtime"

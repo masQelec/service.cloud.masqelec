@@ -11,6 +11,7 @@ import json
 import re
 
 from lib import rclone_conf_merge as merge
+from lib import cloud_version_routes as cloud_routes
 from lib import rclone_token_policy as policy
 from lib import rclone_two_mount_oauth as oauth
 from lib import rclone_two_mount_publish_guard as crypt
@@ -119,10 +120,11 @@ def _parse_put(status, response, expected_blob, creating):
 
 
 def sync_once(read_sources, head, get, put, health_gate, key, token, *,
-              release_authorized=False, master_attested=False):
+              release_authorized=False, master_attested=False,
+              branch):
     """Master-v2 workflow inyectado. No crea sockets por sí solo.
 
-    head(): SHA de refs/heads/develop autenticado.
+    head(): SHA autenticado de la rama seleccionada.
     get(path): (status, contents_body) autenticado GitHub.
     put(path, payload): (status, response_body), sin reintentos.
     health_gate(candidate, names): {remote: 'ok'} por fuente REAL comprobada.
@@ -132,6 +134,8 @@ def sync_once(read_sources, head, get, put, health_gate, key, token, *,
     debe asegurar rol MASTER y no exponer claves/tokens en logs.
     """
     if release_authorized is not True or master_attested is not True:
+        return "blocked_not_authorized"
+    if not cloud_routes.rclone_transport_branch_allowed(branch):
         return "blocked_not_authorized"
     if (not all(callable(x) for x in (
             read_sources, head, get, put, health_gate)) or
@@ -170,7 +174,7 @@ def sync_once(read_sources, head, get, put, health_gate, key, token, *,
         expected_blob = crypt.git_blob_sha(payload_bytes)
         payload = {
             "message": "Verified master v2 MQC2 snapshot",
-            "branch": "develop",
+            "branch": branch,
             "content": base64.b64encode(payload_bytes).decode("ascii"),
         }
         creating = operation == "create_requires_health"

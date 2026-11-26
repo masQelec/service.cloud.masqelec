@@ -32,7 +32,10 @@ from lib import constants
 OWNER = constants.CLOUD_OWNER
 REPO = constants.CLOUD_REPO
 BRANCH = constants.CLOUD_BRANCH
-API_BASE = f"https://api.github.com/repos/{OWNER}/{REPO}/contents"
+API_BASE = (
+    f"https://api.github.com/repos/{OWNER}/{REPO}/contents"
+    if BRANCH else ""
+)
 
 GITHUB_TOKEN_B64 = constants.GITHUB_TOKEN_B64
 SRC_DIR = getattr(constants, "SRC_DIR", "/storage/.catalog")

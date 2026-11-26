@@ -16,6 +16,21 @@ from lib import constants
 
 class MasterV2RuntimeTests(unittest.TestCase):
     def setUp(self):
+        route_patches = (
+            mock.patch.object(
+                constants, "CLOUD_BRANCH", "21"
+            ),
+            mock.patch.object(
+                constants, "CLOUD_RAW_BASE",
+                "https://raw.githubusercontent.com/"
+                "masQelec/cloud.masqelec/21"
+            ),
+        )
+
+        for patch in route_patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+
         self.calls = []
 
     def request(self, method, url, token, payload=None):
@@ -34,10 +49,10 @@ class MasterV2RuntimeTests(unittest.TestCase):
         status, _ = t.get(routes.V2_REMOTE_PATH)
         self.assertEqual(status, 404)
         status, _ = t.put(routes.V2_REMOTE_PATH, {
-            "branch": "develop", "content": "fake", "message": "test"})
+            "branch": "21", "content": "fake", "message": "test"})
         self.assertEqual(status, 409)
         self.assertEqual(self.calls[0][1],
-                         "https://api.github.com/repos/masQelec/cloud.masqelec/branches/develop")
+                         "https://api.github.com/repos/masQelec/cloud.masqelec/branches/21")
         for op, url, _ in self.calls[1:]:
             self.assertTrue(url.startswith(
                 "https://api.github.com/repos/masQelec/cloud.masqelec/contents/rclone/rclone-v2.conf.crypt"))
@@ -47,7 +62,7 @@ class MasterV2RuntimeTests(unittest.TestCase):
         t = runtime.GitHubV2Transport("TEST", self.request)
         for method in (lambda: t.get(routes.LEGACY_REMOTE_PATH),
                        lambda: t.put(routes.LEGACY_REMOTE_PATH,
-                                     {"branch": "develop"})):
+                                     {"branch": "21"})):
             with self.assertRaises(ValueError):
                 method()
         self.assertFalse(self.calls)

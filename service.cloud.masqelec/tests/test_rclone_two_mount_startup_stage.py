@@ -127,6 +127,7 @@ class StartupStageTests(unittest.TestCase):
 
     def test_parent_public_permissions_block(self):
         self.parent.mkdir(mode=0o755)
+        self.parent.chmod(0o755)
         self.assertEqual(self.stage(), "blocked_private_parent")
 
     def test_stage_in_wrong_state_does_not_write(self):

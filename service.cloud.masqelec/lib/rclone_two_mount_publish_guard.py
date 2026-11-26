@@ -12,6 +12,7 @@ import json
 import re
 
 from lib import chacha_pure
+from lib import cloud_version_routes as cloud_routes
 from lib import rclone_token_policy as policy
 
 REMOTE_PATH = "rclone/rclone.conf.crypt"
@@ -76,7 +77,7 @@ def encode_candidate(candidate, key):
 
 def strict_put(token, encrypted, expected_sha, request, *,
                release_authorized=False, sources_revalidated=False,
-               remote_authenticated=False):
+               remote_authenticated=False, branch):
     """Una sola petición PUT GitHub, con SHA previo, NUNCA retry 409/422.
 
     Los tres permisos deben proceder de comprobaciones independientes:
@@ -87,6 +88,8 @@ def strict_put(token, encrypted, expected_sha, request, *,
     if not (release_authorized is True and
             sources_revalidated is True and
             remote_authenticated is True):
+        return "blocked"
+    if not cloud_routes.rclone_transport_branch_allowed(branch):
         return "blocked"
     if not isinstance(token, str) or not token:
         return "no_token"
@@ -100,7 +103,7 @@ def strict_put(token, encrypted, expected_sha, request, *,
     new_sha = git_blob_sha(encrypted)
     payload = {
         "message": "OAuth v2 snapshot verification",
-        "branch": "develop",
+        "branch": branch,
         "sha": expected_sha,
         "content": base64.b64encode(encrypted).decode("ascii"),
     }

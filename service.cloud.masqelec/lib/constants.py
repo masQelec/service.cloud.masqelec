@@ -7,18 +7,20 @@ ADDON_NAME = "service.cloud.masqelec"
 # Nube experimental. En la rama estable se mantiene la configuración anterior.
 CLOUD_OWNER = "masQelec"
 CLOUD_REPO = "cloud.masqelec"
-CLOUD_BRANCH = "develop"
-CLOUD_RAW_BASE = (
-    f"https://raw.githubusercontent.com/{CLOUD_OWNER}/{CLOUD_REPO}/{CLOUD_BRANCH}"
-)
+# Enrutamiento obligatorio por version de Kodi.
+CLOUD_VERSION_ROUTING_ENABLED = True
 
-# Valores MQC2 autenticados (ChaCha20-Poly1305), solo rama develop.
+# Resueltas exclusivamente desde la version de Kodi.
+CLOUD_BRANCH = None
+CLOUD_RAW_BASE = None
+
+# Valores MQC2 autenticados (ChaCha20-Poly1305), solo ramas de distribucion autorizadas.
 # Mantener estos datos fuera de logs; no son tokens en claro.
 GITHUB_TOKEN_B64 = "MQC2:AwG1YFgnxM1JAzAqgP/+okWCLqJcylA/P8mO6GNNLwNlpD48Fc9lCNygWWnByUHczB0BsSvE1xXKDqj2CHPrwuAHpOE="
 TG_TOKEN_B64 = "MQC2:Sc32WIFmcAFNH3TO5aiAo9w0yOC5WB3tVCvZ+/l5HOtAtgOPC2GyRFBTP7a6AjexcWulmpSJw5A12FrcyLRJcR4JmmUBuGsG11c="
 TG_CHATID = "952051424"
 
-# Recuperación OAuth: preparado en develop, inicialmente inactivo hasta validación real.
+# Recuperación OAuth: controlado mediante los gates independientes de release.
 RCLONE_TOKEN_SYNC_ENABLED = False
 
 # Release de reemplazo directo en la siguiente actualización del addon:

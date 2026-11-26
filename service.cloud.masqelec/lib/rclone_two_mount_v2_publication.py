@@ -9,15 +9,19 @@ import urllib.error
 import urllib.request
 
 from lib import constants
+from lib import cloud_version_routes as cloud_routes
 from lib import rclone_two_mount_config_routes as routes
 
 MAX_BODY = 8 * 1024 * 1024
 
 
 def available(open_url=None):
-    if constants.CLOUD_BRANCH != "develop":
+    if not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH):
         return False
     base = constants.CLOUD_RAW_BASE
+    if not cloud_routes.rclone_transport_base_matches(
+            constants.CLOUD_BRANCH, base):
+        return False
     try:
         url = routes.remote_url_for_mount_mode(base, "active")
         if open_url is None:

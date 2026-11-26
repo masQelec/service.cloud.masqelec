@@ -122,6 +122,7 @@ class JournalTests(unittest.TestCase):
 
     def test_unsafe_parent_permissions_block(self):
         os.makedirs(self.parent, mode=0o755)
+        os.chmod(self.parent, 0o755)
         with self.assertRaisesRegex(ValueError,"Unsafe journal directory"):
             with journal.locked(self.parent):
                 pass

@@ -8,6 +8,21 @@ from lib import rclone_two_mount_client_worker as worker
 
 class WorkerTests(unittest.TestCase):
     def setUp(self):
+        route_patches = (
+            mock.patch.object(
+                worker.constants, "CLOUD_BRANCH", "21"
+            ),
+            mock.patch.object(
+                worker.constants, "CLOUD_RAW_BASE",
+                "https://raw.githubusercontent.com/"
+                "masQelec/cloud.masqelec/21"
+            ),
+        )
+
+        for patch in route_patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+
         worker._last_attempt = None
         self.addCleanup(setattr, worker, "_last_attempt", None)
         self.calls = []

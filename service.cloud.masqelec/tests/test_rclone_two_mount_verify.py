@@ -178,7 +178,7 @@ class OAuthV2StrictPublicationTests(unittest.TestCase):
             {"release_authorized": True, "remote_authenticated": True},
         ):
             self.assertEqual(publisher.strict_put(
-                "fake", self.cipher, self.sha, request, **perms), "blocked")
+                "fake", self.cipher, self.sha, request, branch="21", **perms), "blocked")
         self.assertEqual(calls, [])
 
     def test_put_includes_expected_sha_and_no_secrets_in_commit_message(self):
@@ -189,7 +189,7 @@ class OAuthV2StrictPublicationTests(unittest.TestCase):
                 self.cipher)}}
         status = publisher.strict_put(
             "fake", self.cipher, self.sha, request,
-            release_authorized=True,
+            branch="21", release_authorized=True,
             sources_revalidated=True,
             remote_authenticated=True,
         )
@@ -198,7 +198,7 @@ class OAuthV2StrictPublicationTests(unittest.TestCase):
         token, path, data = calls[0]
         self.assertEqual(token, "fake")
         self.assertEqual(path, "rclone/rclone.conf.crypt")
-        self.assertEqual(data["branch"], "develop")
+        self.assertEqual(data["branch"], "21")
         self.assertEqual(data["sha"], self.sha)
         self.assertNotIn("refresh", data["message"])
         self.assertEqual(base64.b64decode(data["content"]), self.cipher)
@@ -210,7 +210,7 @@ class OAuthV2StrictPublicationTests(unittest.TestCase):
             return 409, "conflict"
         self.assertEqual(publisher.strict_put(
             "fake", self.cipher, self.sha, request,
-            release_authorized=True, sources_revalidated=True,
+            branch="21", release_authorized=True, sources_revalidated=True,
             remote_authenticated=True), "remote_conflict_no_retry")
         self.assertEqual(len(calls), 1)
 
@@ -221,7 +221,7 @@ class OAuthV2StrictPublicationTests(unittest.TestCase):
             return 422, "conflict"
         self.assertEqual(publisher.strict_put(
             "fake", self.cipher, self.sha, request,
-            release_authorized=True, sources_revalidated=True,
+            branch="21", release_authorized=True, sources_revalidated=True,
             remote_authenticated=True), "remote_rejected_no_retry")
         self.assertEqual(len(calls), 1)
 
@@ -230,7 +230,7 @@ class OAuthV2StrictPublicationTests(unittest.TestCase):
             publisher.strict_put(
                 "fake", self.cipher, None,
                 lambda *args: (200, {}),
-                release_authorized=True, sources_revalidated=True,
+                branch="21", release_authorized=True, sources_revalidated=True,
                 remote_authenticated=True,
             )
 
@@ -248,6 +248,6 @@ class OAuthV2StrictPublicationTests(unittest.TestCase):
             seen.append(payload["sha"])
             return 409, None
         publisher.strict_put("fake", self.cipher, expected, request,
-            release_authorized=True, sources_revalidated=True,
+            branch="21", release_authorized=True, sources_revalidated=True,
             remote_authenticated=True)
         self.assertEqual(seen, [expected])

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Distribución OAuth de Google Drive + OneDrive (MASTER -> GitHub -> CLIENT).
 
-Solo develop puede publicar. No registra secretos ni contenido de rclone.conf.
+Solo una rama de distribucion autorizada puede publicar. No registra secretos ni contenido de rclone.conf.
 Un cambio de token se comprueba antes de publicar o instalar.
 Los montajes ya iniciados no se reinician aquí (requieren gestión aparte).
 """
@@ -17,6 +17,7 @@ import urllib.request
 from lib import catalog_utils
 from lib import chacha_pure
 from lib import constants
+from lib import cloud_version_routes as cloud_routes
 from lib import device_utils
 from lib import log_utils
 from lib import rclone_token_policy as policy
@@ -207,7 +208,7 @@ def _legacy_sync_permitted():
 def _publish_master():
     if not _legacy_sync_permitted():
         return "two_mount_mode"
-    if constants.CLOUD_BRANCH != "develop" or not device_utils.is_master_device():
+    if not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH) or not device_utils.is_master_device():
         return "blocked"
     key = device_utils.get_key_from_authorized_keys()
     if not key:
@@ -319,7 +320,7 @@ def _master_recover(mode, original=None, broken_names=()):
     """
     if not _legacy_sync_permitted():
         return "two_mount_mode"
-    if constants.CLOUD_BRANCH != "develop" or not device_utils.is_master_device():
+    if not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH) or not device_utils.is_master_device():
         return "blocked"
     if mode not in ("corrupt", "auth"):
         raise ValueError("Modo de recuperación no admitido")
@@ -618,7 +619,7 @@ def _v2_master_tick():
             getattr(constants, "RCLONE_TWO_MOUNT_MASTER_SYNC_ENABLED", False)
             is not True or
             device_utils.get_device_role() != "MASTER" or
-            constants.CLOUD_BRANCH != "develop"):
+            not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH)):
         return
     now = time.monotonic()
     if _last_tick is not None and now - _last_tick < MASTER_INTERVAL:
@@ -693,7 +694,7 @@ def tick():
         return
     if not _legacy_sync_permitted():
         return
-    if constants.CLOUD_BRANCH != "develop":
+    if not cloud_routes.rclone_transport_branch_allowed(constants.CLOUD_BRANCH):
         return
     role = device_utils.get_device_role()
     interval = MASTER_INTERVAL if role == "MASTER" else CLIENT_INTERVAL

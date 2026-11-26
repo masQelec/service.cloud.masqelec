@@ -45,7 +45,7 @@ class FakeGH:
     def put(self, path, payload):
         self.calls.append("PUT:" + path)
         assert path == routes.V2_REMOTE_PATH
-        assert payload["branch"] == "develop"
+        assert payload["branch"] == "21"
         assert bool(payload.get("sha")) != self.missing
         plaintext = crypt.decode_remote_contents({
             "encoding": "base64",
@@ -120,7 +120,8 @@ class MasterV2PublishTests(unittest.TestCase):
         self.health = lambda candidate, names: {x: "ok" for x in names}
 
     def run_sync(self, gh, **options):
-        opts = dict(release_authorized=True, master_attested=True)
+        opts = dict(release_authorized=True,
+                    master_attested=True, branch="21")
         opts.update(options)
         return master.sync_once(self.source, gh.head, gh.get, gh.put,
                                 self.health, self.key, "TEST_GH_TOKEN", **opts)

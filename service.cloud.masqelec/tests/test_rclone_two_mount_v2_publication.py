@@ -29,8 +29,19 @@ class FakeResponse:
 
 
 class PublicationTests(unittest.TestCase):
+    def setUp(self):
+        route_patch = mock.patch.object(
+            published.constants,
+            "CLOUD_RAW_BASE",
+            "https://raw.githubusercontent.com/"
+            "masQelec/cloud.masqelec/21"
+        )
+
+        route_patch.start()
+        self.addCleanup(route_patch.stop)
+
     def test_published_bytes_available(self):
-        with mock.patch.object(published.constants, "CLOUD_BRANCH", "develop"):
+        with mock.patch.object(published.constants, "CLOUD_BRANCH", "21"):
             def opener(req, timeout):
                 self.assertEqual(timeout, 8)
                 self.assertTrue(req.full_url.endswith(
@@ -39,7 +50,7 @@ class PublicationTests(unittest.TestCase):
             self.assertTrue(published.available(opener))
 
     def test_missing_config_and_network_fault_block(self):
-        with mock.patch.object(published.constants, "CLOUD_BRANCH", "develop"):
+        with mock.patch.object(published.constants, "CLOUD_BRANCH", "21"):
             self.assertFalse(published.available(
                 lambda req, timeout: FakeResponse(
                     code=404, url=req.full_url)))
@@ -54,7 +65,7 @@ class PublicationTests(unittest.TestCase):
             self.assertFalse(published.available(failure))
 
     def test_redirect_rejected(self):
-        with mock.patch.object(published.constants, "CLOUD_BRANCH", "develop"):
+        with mock.patch.object(published.constants, "CLOUD_BRANCH", "21"):
             self.assertFalse(published.available(
                 lambda req, timeout: FakeResponse(
                     url="https://example.com/redirect", payload=b"whatever")))
@@ -65,7 +76,7 @@ class PublicationTests(unittest.TestCase):
                 lambda *args, **kwargs: self.fail("must not connect")))
 
     def test_invalid_route_rejected(self):
-        with mock.patch.object(published.constants, "CLOUD_BRANCH", "develop"), \
+        with mock.patch.object(published.constants, "CLOUD_BRANCH", "21"), \
              mock.patch.object(
                  published.constants, "CLOUD_RAW_BASE", "http://bad/"):
             self.assertFalse(published.available(

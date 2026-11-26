@@ -115,7 +115,7 @@ def startup_decision(device_mode, *, feature_allowed=False,
 
     DEVOLVER 'activate...' NO ejecuta systemctl/mount ni otorga permisos
     operativos: estos booleanos todavía no están conectados a validadores
-    reales. Este módulo permanece en develop con feature=False.
+    reales. La activacion depende de los gates de release.
     """
     if device_mode not in ("legacy", "prepared", "active", "unsafe"):
         return "blocked_invalid_mode"
