@@ -38,6 +38,10 @@ class PackageError(ValueError):
     """Descarga o paquete rechazado."""
 
 
+class ManifestNotPublished(PackageError):
+    """Todavia no existe una distribucion publicada."""
+
+
 def _require(condition, code):
     if not condition:
         raise PackageError(code)
@@ -81,7 +85,8 @@ def _check_route(branch, base):
 
 def _transfer(
     url, sink, limit,
-    expected=None, opener=None
+    expected=None, opener=None,
+    manifest_request=False,
 ):
 
     request = urllib.request.Request(
@@ -195,7 +200,14 @@ def _transfer(
                 )
 
     except urllib.error.HTTPError as exc:
+
+        code = exc.code
         exc.close()
+
+        if manifest_request and code == 404:
+            raise ManifestNotPublished(
+                "MANIFEST_NOT_PUBLISHED"
+            ) from None
 
         raise PackageError(
             "HTTP_DOWNLOAD_FAILED"
@@ -223,6 +235,7 @@ def fetch_manifest(branch, base, opener=None):
         raw.extend,
         manifest.MAX_MANIFEST_BYTES,
         opener=opener,
+        manifest_request=True,
     )
 
     return manifest.parse_manifest(

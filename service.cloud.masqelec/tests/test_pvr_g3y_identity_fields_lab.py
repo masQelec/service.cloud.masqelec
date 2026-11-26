@@ -79,16 +79,20 @@ class IdentityFieldTests(unittest.TestCase):
                 m._fetch(object(), "TVH")
 
     def test_kodi_auth_is_specific(self):
-        error = urllib.error.HTTPError("http://localhost/jsonrpc", 401, "secret", {}, None)
+        body = io.BytesIO(b"error")
+        error = urllib.error.HTTPError("http://localhost/jsonrpc", 401, "secret", {}, body)
         with mock.patch.object(m.urllib.request, "urlopen", side_effect=error):
             with self.assertRaisesRegex(m.Blocked, "^KODI_AUTH_REQUIRED$"):
                 m._fetch(object(), "KODI")
+        self.assertTrue(body.closed)
 
     def test_kodi_404_is_specific(self):
-        error = urllib.error.HTTPError("http://localhost/jsonrpc", 404, "missing", {}, None)
+        body = io.BytesIO(b"error")
+        error = urllib.error.HTTPError("http://localhost/jsonrpc", 404, "missing", {}, body)
         with mock.patch.object(m.urllib.request, "urlopen", side_effect=error):
             with self.assertRaisesRegex(m.Blocked, "^KODI_ENDPOINT_NOT_FOUND$"):
                 m._fetch(object(), "KODI")
+        self.assertTrue(body.closed)
 
     def test_invalid_json_is_specific(self):
         response = mock.MagicMock()

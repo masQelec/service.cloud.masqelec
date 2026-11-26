@@ -180,7 +180,6 @@ def prepare_candidate(
     entry,
     device,
     transaction_root,
-    grabber_path,
 ):
     """Prepara candidate/ dentro del journal futuro.
 
@@ -198,11 +197,8 @@ def prepare_candidate(
         device,
     )
 
-    grabber = read_grabber(grabber_path)
-
     needed = (
         details["unpacked_bytes"]
-        + len(grabber)
         + FREE_SPACE_RESERVE
     )
 
@@ -229,22 +225,17 @@ def prepare_candidate(
             candidate / "bin" / "tv_grab_file"
         )
 
-        if os.path.lexists(destination):
+        require(
+            os.path.lexists(destination),
+            "PACKAGE_GRABBER_MISSING",
+        )
 
-            require(
-                stat.S_ISREG(
-                    destination.lstat().st_mode
-                ),
-                "INVALID_PACKAGE_GRABBER",
-            )
+        grabber = read_grabber(destination)
 
-        with destination.open("wb") as stream:
-
-            stream.write(grabber)
-            stream.flush()
-            os.fsync(stream.fileno())
-
-        destination.chmod(0o755)
+        require(
+            destination.stat().st_mode & 0o111,
+            "PACKAGE_GRABBER_NOT_EXECUTABLE",
+        )
 
         observed = transaction.identity(candidate)
 
@@ -255,7 +246,7 @@ def prepare_candidate(
 
         require(
             destination.read_bytes() == grabber,
-            "GRABBER_PRESERVATION_FAILED",
+            "PACKAGE_GRABBER_CHANGED",
         )
 
         transaction.sync_tree(candidate)

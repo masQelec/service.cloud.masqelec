@@ -54,6 +54,8 @@ def run_cycle(
     verify_recovery=boot_install.recovery_ready,
     verify_policy=boot_policy.policy_ready,
     release_control=None,
+    recover_only=False,
+    verify_playlist=None,
 ):
     """Ejecuta una iteracion completa bajo bloqueo persistente.
 
@@ -129,14 +131,11 @@ def run_cycle(
 
             manager.archive_unstarted(worker)
 
+        if recover_only:
+            return "NO_PENDING"
+
         if verify_policy() is not True:
             return "DEFERRED_UPDATE_POLICY"
-
-        # No descargar paquetes grandes durante
-        # reproduccion o actividad conocida de TVH.
-
-        if worker.activity_allowed() is not True:
-            return "DEFERRED_ACTIVITY"
 
         installed = tx.identity(worker.active)
 
@@ -150,19 +149,58 @@ def run_cycle(
 
         device = detect_device()
 
-        distribution = fetch_manifest(
-            branch, base
+        try:
+
+            distribution = fetch_manifest(
+                branch, base
+            )
+
+        except package.ManifestNotPublished:
+
+            return "NO_RELEASE"
+
+        # Consultar versiones no interrumpe Kodi ni Tvheadend.
+        selected = version.decide_update(
+            distribution, device,
+            installed["version"],
         )
 
         if release_control is not None:
             release_control.prune_history()
-            selected = version.decide_update(
-                distribution, device,
-                installed["version"],
-            )
-            if selected.status == "UPDATE_AVAILABLE":
-                if release_control.blocked(selected.package):
-                    return "FAILED_PACKAGE_BLOCKED"
+
+        if selected.status in (
+            "UP_TO_DATE",
+            "LOCAL_NEWER",
+        ):
+            return selected.status
+
+        require(
+            selected.status == "UPDATE_AVAILABLE",
+            "INVALID_UPDATE_DECISION",
+        )
+
+        if release_control is not None:
+            if release_control.blocked(selected.package):
+                return "FAILED_PACKAGE_BLOCKED"
+
+        # La descarga e instalacion siguen protegidas.
+        if worker.activity_allowed() is not True:
+            return "DEFERRED_ACTIVITY"
+
+        if verify_playlist is not None:
+
+            observed = verify_playlist()
+
+            if observed != "CONVERGED":
+
+                return (
+                    observed
+                    if observed in (
+                        "DEFERRED_PLAYLIST_CONVERGENCE",
+                        "DEFERRED_PLAYLIST_CONVERGENCE_UNKNOWN",
+                    )
+                    else "DEFERRED_PLAYLIST_CONVERGENCE_UNKNOWN"
+                )
 
         with stage_package(
             distribution,
@@ -200,6 +238,21 @@ def run_cycle(
             if worker.activity_allowed() is not True:
                 return "DEFERRED_ACTIVITY"
 
+            if verify_playlist is not None:
+
+                observed = verify_playlist()
+
+                if observed != "CONVERGED":
+
+                    return (
+                        observed
+                        if observed in (
+                            "DEFERRED_PLAYLIST_CONVERGENCE",
+                            "DEFERRED_PLAYLIST_CONVERGENCE_UNKNOWN",
+                        )
+                        else "DEFERRED_PLAYLIST_CONVERGENCE_UNKNOWN"
+                    )
+
             require(
                 tx.identity(worker.active) == installed,
                 "INSTALLED_VERSION_CHANGED",
@@ -222,7 +275,6 @@ def run_cycle(
                 decision.package,
                 device,
                 root,
-                worker.active / "bin/tv_grab_file",
             )
 
             require(

@@ -4,7 +4,7 @@
 
 Este servicio mantiene los **montajes de medios**, la **base de datos de películas/series**, el **catálogo STRM**, **Tvheadend/PVR**, la **guía EPG** y la **actualización del sistema**. Se inicia con Kodi y repite tareas según su configuración. No es un reproductor multimedia: los archivos `.strm` apuntan a los archivos reales de OneDrive mediante los montajes rclone.
 
-Esta descripción corresponde al **código auditado a 20/11/2026**, no a una propuesta. Los ensayos históricos y los detalles de implementación se mantienen en [docs/](service.cloud.masqelec/docs/README.md).
+Esta descripción corresponde al **código validado en MASTER a 27/11/2026**, no a una propuesta. Los ensayos históricos y los detalles de implementación se mantienen en [docs/](service.cloud.masqelec/docs/README.md).
 
 ## 1. Qué hace al arrancar
 
@@ -17,8 +17,8 @@ Esta descripción corresponde al **código auditado a 20/11/2026**, no a una pro
 | 3 | `fix_settings.fix_skin_home_menu_visibility_and_reload()` | Desactiva determinados ajustes de menú del skin; recarga el skin solo si hubo cambios y está inactivo. |
 | 4 | `updater.update_system()` | Si `auto_update` está activado y Kodi lleva al menos 300 s inactivo, compara `VERSION_ID` local/remota y prepara una actualización si existe. |
 | 5 | `update_library.update_library()` | Si está permitido al arranque, valida `MyVideos*.db` y sus rutas/scrapers. Solo descarga y sustituye la base de datos si falta o no cumple; puede reiniciar Kodi tras la reparación. |
-| 6 | `update_pvr.update_pvr()` | Comprueba autenticación de Tvheadend, `tv_grab_file`, User-Agent, fuentes EPG, recarga de EPG y estado final de `pvr.hts`. |
-| 7 | `_startup_maintenance_wrapper()` | Con red y montajes disponibles: actualiza playlist, sincroniza catálogo CLIENT, ejecuta CleanLibrary cuando corresponde y genera/publica catálogo MASTER. **No ejecuta VideoLibrary.Scan de arranque** en el flujo actual. |
+| 6 | `update_pvr.update_pvr()` | Coordinador PVR: recuperación pendiente, credenciales, playlist, ajustes XMLTV, actualizador Tvheadend, configuración y salud. |
+| 7 | `_startup_maintenance_wrapper()` | Con red y montajes disponibles: sincroniza catálogo CLIENT, limpia cuando corresponde y genera/publica catálogo MASTER. Sin Scan de arranque. |
 | 8 | Diagnóstico | Registra estadísticas de biblioteca, addons instalados relevantes y trata de subir el log al remoto `log:`. |
 
 **Diferencia importante:** `update_library()` **no equivale** a `VideoLibrary.Scan`. La primera verifica/repara `MyVideos*.db`; el segundo escanea fuentes para actualizar el inventario de vídeo en Kodi.
@@ -31,7 +31,7 @@ Tras el arranque se crean seis workers. Su *tick* de planificación es de 60 seg
 
 | Mantenimiento | Cadencia por defecto | Condiciones y resultado |
 | --- | --- | --- |
-| Playlist PVR (`update_playlist`) | 12 h | Ajustes PVR activos, red, Kodi inactivo y sin cooldown. Compara playlist y consistencia TV DB; puede efectuar un soft reset del stack PVR. |
+| Mantenimiento PVR integral | 12 h | Mismo coordinador que al arrancar; bloqueo, cooldown y resultado explícito. |
 | Escaneo/sync biblioteca | 6 h | Ajustes activos, red, Kodi inactivo, montajes correctos y lock libre. MASTER escanea y después regenera/publica STRM. CLIENT sincroniza catálogo y solo escanea si hay cambios o desajuste DB↔FS. |
 | Limpieza biblioteca | 12 h | Misma barrera de red/inactividad/montajes y lock. MASTER invoca `VideoLibrary.Clean`; CLIENT limpia según actualizaciones o entradas sobrantes y puede realizar un escaneo posterior. |
 | Control montajes v2 | 60 s | Examina estado de migración y salud del árbol 2 FUSE + 4 bind; aplica mantenimiento/reparación autorizada, sin recrear cuatro FUSE legacy. |
@@ -40,7 +40,7 @@ Tras el arranque se crean seis workers. Su *tick* de planificación es de 60 seg
 
 `0` horas en los intervalos configurables desactiva esa periodicidad. Los tiempos son aproximados: el worker despierta cada minuto y pospone tareas si faltan condiciones; no es un cron rígido. Los contadores de PVR, escaneo y limpieza se reinician con el proceso.
 
-Los tres mantenimientos PVR / escaneo / limpieza tienen un circuito de espera de **1 hora tras tres excepciones consecutivas**; `cloud_storage`, catálogo y updater también cuentan con protecciones propias. Estas barreras no equivalen a supervisión externa del resultado.
+El mantenimiento PVR distingue intentos, éxitos y aplazamientos con su propio cooldown. Escaneo y limpieza disponen de sus protecciones específicas; `cloud_storage`, catálogo y updater también cuentan con protecciones propias. Estas barreras no equivalen a supervisión externa del resultado.
 
 ## 3. Biblioteca de vídeo y catálogo STRM
 
@@ -66,15 +66,60 @@ Los tres mantenimientos PVR / escaneo / limpieza tienen un circuito de espera de
 
 ## 4. PVR, IPTV y guía EPG
 
-`lib/update_pvr.py` contiene dos procedimientos distintos:
+MASTER y CLIENT utilizan el mismo coordinador PVR
+y su propio Tvheadend local.
 
-**`update_pvr()` (arranque):** comprueba credenciales HTTP de Tvheadend, actualiza el script `tv_grab_file` si procede, asegura User-Agent, repara asociaciones EPG, solicita nueva carga interna y comprueba que el servicio y `pvr.hts` estén operativos. Puede reactivar Tvheadend o `pvr.hts` si no están listos.
+El arranque y el mantenimiento periódico comparten
+`lib/update_pvr.py`.
 
-**`update_playlist()` (arranque y periódico):** descarga la plantilla `pvr/playlist.m3u` desde `cloud.masqelec/develop`; usa `USER_CODE`/`PASS_CODE` del fichero privado `/storage/.user/user`. Si falta ese fichero, intenta recuperarlo del remoto `masqelec:` correspondiente al dispositivo.
+Orden de ejecución:
 
-Si cambió la lista o se detecta inconsistencia entre playlist y TV DB, el procedimiento puede deshabilitar temporalmente `pvr.hts`, reconciliar canales/grupos en la base de datos, depurar canales del bouquet en Tvheadend, sincronizar etiquetas, reiniciar Tvheadend y reactivar PVR. Tiene fases de recuperación si PVR no vuelve a READY. Si no hay diferencias, no efectúa el soft reset.
+1. Recuperación de transacciones pendientes.
+2. Credenciales privadas.
+3. Playlist M3U validada y escrita atómicamente.
+4. Ajustes nativos XMLTV.
+5. Actualización transaccional Tvheadend.
+6. Configuración nativa del servidor.
+7. Salud final.
 
-**Precaución:** una actualización de playlist puede interrumpir TV en directo durante el soft reset. Hay una barrera de inactividad para la ejecución periódica, pero el procedimiento de arranque no tiene la misma comprobación. No usar manualmente este flujo mientras se graba o visualiza televisión sin estudiar su impacto.
+La distribución utiliza la rama correspondiente a la
+versión mayor de Kodi: rama `21` para Kodi 21.
+
+La plantilla `pvr/playlist.m3u` conserva el orden y
+los identificadores CUID. Las credenciales proceden
+de `/storage/.user/user`.
+
+No se emplea una reconciliación directa de la base de
+datos PVR como mantenimiento ordinario ni se fuerza
+un reinicio del stack por cada cambio de playlist.
+
+Antes de actualizar Tvheadend se verifica convergencia
+de URL entre la playlist y los mux existentes.
+
+El actualizador comprueba plataforma, build, versión,
+tamaño, SHA256, ELF y actividad antes de instalar.
+
+Si no existe un manifiesto publicado, devuelve
+`NO_RELEASE` y el mantenimiento continúa.
+
+La reproducción, las grabaciones y determinadas
+actividades de fondo aplazan las instalaciones reales.
+
+La actualización dispone de backup, intercambio
+atómico, verificación de salud, rollback, diario
+persistente y recuperación previa al arranque de Kodi.
+
+El nuevo grabber XMLTV se distribuye dentro del
+paquete Tvheadend, no mediante sustitución independiente.
+
+Guía EPG RAW:
+https://raw.githubusercontent.com/masQelec/epg/main/guide.xml
+
+La prueba física de altas, bajas y reapariciones de
+canales sigue siendo un requisito independiente.
+
+Documentación vigente:
+[Handoff PVR final](service.cloud.masqelec/docs/HANDOFF_PVR_FINAL_2026-11-27.md).
 
 ## 5. Actualización del sistema KodiELEC
 
@@ -115,13 +160,13 @@ En `resources/settings.xml`:
 | `lib_update_period_hours` | 6 | Intervalo de escaneo y sincronización de catálogo |
 | `lib_clean_enabled` | Sí | Permitir CleanLibrary |
 | `lib_clean_period_hours` | 12 | Intervalo de limpieza |
-| `update_pvr` | Sí | Permitir el mantenimiento PVR de arranque y playlist de arranque |
-| `pvr_update_enabled` | Sí | Permitir actualización periódica de playlist |
-| `pvr_update_period_hours` | 12 | Intervalo de playlist PVR |
+| `update_pvr` | Sí | Permitir mantenimiento PVR integral al arrancar |
+| `pvr_update_enabled` | Sí | Permitir mantenimiento PVR periódico |
+| `pvr_update_period_hours` | 12 | Intervalo de mantenimiento PVR |
 | `pvr_disable_conflicts` / `pvr_disable_conflict_services` | Sí | Preferencias de conflictos PVR; verificar su aplicación antes de asumir que actúan siempre |
 | `activar_log` / `ver_log` | Sí / acción | Archivo de registro y consulta desde Kodi |
 
-Los flags internos de migración y OAuth viven en `lib/constants.py`; **no** son ajustes normales para cambiar desde la interfaz. Algunos comportamientos siguen utilizando `cloud.masqelec/develop` aunque el código esté fusionado en `main`.
+Los flags internos de migración y OAuth viven en `lib/constants.py`; **no** son ajustes normales para cambiar desde la interfaz. Las rutas operativas de distribución utilizan la rama numérica correspondiente a Kodi.
 
 ## 8. Diagnóstico y operación
 
@@ -145,17 +190,35 @@ python3 -m unittest discover -s service.cloud.masqelec/tests -p 'test_*.py' -q
 
 CI: [GitHub Actions](https://github.com/masQelec/service.cloud.masqelec/actions). El resultado de laboratorio no reemplaza una prueba física de reproducción, PVR o recuperación OAuth.
 
-## 9. Limitaciones detectadas en la auditoría
+## 9. Estado y limitaciones
 
-Estas limitaciones están **en seguimiento** y no se deben confundir con errores de montajes observados:
+Validación confirmada el 27/11/2026:
 
-1. `VideoLibrary.Scan` y `VideoLibrary.Clean` pueden devolver `False` por timeout o porque Kodi no confirmó el inicio; algunos llamadores ignoran ese resultado y aun así actualizan el tiempo de última ejecución.
-2. `update_playlist()` retorna `(ok, did_something)`, pero varios llamadores no inspeccionan `ok`; el circuito de fallos periódico registra éxito si no hubo excepción.
-3. `update_pvr()` y la actualización de playlist del arranque no comparten todas las barreras de inactividad usadas por los workers periódicos.
-4. La comprobación del montaje basada en `mountinfo` no acredita por sí misma una lectura remota sana.
-5. Coordinación definitiva de generaciones OAuth y separación `cloud/main` / `cloud/develop` pendientes.
+- 1748 pruebas unitarias y de laboratorio.
+- MASTER con Cloud 2.3.2 completo, 176 archivos.
+- Persistencia tras reinicio y mantenimiento PVR OK.
+- 714 canales, 54 grupos y 1428 asociaciones conservados.
+- 2 FUSE, 4 bind y ninguna unidad legacy activa.
+- Actualización CLIENTE aplazada durante reproducción.
 
-No se ha modificado el comportamiento de estas operaciones durante la reescritura documental. Las correcciones deben incorporar tests y conservar los requisitos de seguridad de biblioteca, PVR y OAuth.
+Pendientes y límites:
+
+- Revocación OAuth real y recuperación física.
+- Actualización Tvheadend legacy en CLIENTE.
+- Nuevo grabber nativo en funcionamiento real.
+- Validación física NE y actualización nativa Cloud.
+- Descarga del release definitivo desde GitHub.
+- Altas, bajas y reapariciones de canales con control
+  de huérfanos, identidad y orden.
+- Convergencia de URL no equivale a verificar metadatos.
+- Un montaje presente no acredita lectura remota sana.
+- Las operaciones Scan/Clean conservan sus limitaciones
+  de confirmación y timeout descritas en la auditoría.
+- El resultado de rollback simulado no acredita
+  recuperación frente a cualquier corte físico.
+
+Los paquetes no se publican automáticamente por
+consolidar el código en develop.
 
 ## Documentación técnica e historial
 

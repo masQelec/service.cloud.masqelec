@@ -22,13 +22,17 @@ from test_tvheadend_manifest import CANDIDATE
 from test_tvheadend_package import make_zip
 
 
-def executable_zip(executable=True):
+def executable_zip(
+    executable=True,
+    grabber=b"factory-grabber",
+    grabber_executable=True,
+):
 
     original = make_zip(
         extras=[
             (
                 manifest.ADDON_ID + "/bin/tv_grab_file",
-                b"factory-grabber",
+                grabber,
             ),
         ],
     )
@@ -48,6 +52,9 @@ def executable_zip(executable=True):
                 if (
                     info.filename.endswith("/bin/tvheadend")
                     and executable
+                ) or (
+                    info.filename.endswith("/bin/tv_grab_file")
+                    and grabber_executable
                 ):
                     mode = 0o755
 
@@ -120,7 +127,6 @@ class TvheadendStagingTests(unittest.TestCase):
             self.entry,
             self.device,
             self.root,
-            self.grabber,
         )
 
     def test_prepare_candidate(self):
@@ -136,7 +142,7 @@ class TvheadendStagingTests(unittest.TestCase):
             result["version"], "21.2.8"
         )
 
-    def test_custom_grabber_preserved(self):
+    def test_factory_grabber_preserved(self):
 
         result = self.prepare()
 
@@ -146,13 +152,13 @@ class TvheadendStagingTests(unittest.TestCase):
 
         self.assertEqual(
             path.read_bytes(),
-            self.custom,
+            b"factory-grabber",
         )
 
         self.assertEqual(
             result["grabber_sha256"],
             hashlib.sha256(
-                self.custom
+                b"factory-grabber"
             ).hexdigest(),
         )
 
@@ -241,7 +247,7 @@ class TvheadendStagingTests(unittest.TestCase):
 
     def test_empty_grabber_rejected(self):
 
-        self.grabber.write_bytes(b"")
+        self.load_zip(executable_zip(grabber=b""))
 
         with self.assertRaisesRegex(
             staging.StagingError,
@@ -253,18 +259,42 @@ class TvheadendStagingTests(unittest.TestCase):
             self.candidate.exists()
         )
 
-    def test_symlink_grabber_rejected(self):
+    def test_active_grabber_not_required(self):
 
         self.grabber.unlink()
 
-        self.grabber.symlink_to(self.zip)
+        self.prepare()
 
-        with self.assertRaises(OSError):
+        self.assertEqual(
+            (self.candidate / "bin/tv_grab_file").read_bytes(),
+            b"factory-grabber",
+        )
+
+    def test_non_executable_grabber_rejected(self):
+
+        self.load_zip(
+            executable_zip(grabber_executable=False)
+        )
+
+        with self.assertRaisesRegex(
+            staging.StagingError,
+            "^PACKAGE_GRABBER_NOT_EXECUTABLE$",
+        ):
             self.prepare()
 
-        self.assertFalse(
-            self.candidate.exists()
-        )
+        self.assertFalse(self.candidate.exists())
+
+    def test_missing_grabber_rejected(self):
+
+        self.load_zip(make_zip())
+
+        with self.assertRaisesRegex(
+            staging.StagingError,
+            "^PACKAGE_GRABBER_MISSING$",
+        ):
+            self.prepare()
+
+        self.assertFalse(self.candidate.exists())
 
     def test_corrupted_package_rejected(self):
 

@@ -10,6 +10,7 @@ No modifica /storage ni publica paquetes.
 import os
 import sys
 import tempfile
+import zipfile
 
 from contextlib import contextmanager
 from dataclasses import replace
@@ -244,16 +245,11 @@ def prepare_old_addon(
 
     old_root.mkdir(mode=0o700)
 
-    fixture = base / "custom-grabber"
-
-    fixture.write_bytes(GRABBER)
-
     staging.prepare_candidate(
         old_zip,
         old_entry,
         device,
         old_root,
-        fixture,
     )
 
     os.rename(
@@ -262,6 +258,11 @@ def prepare_old_addon(
     )
 
     old_root.rmdir()
+
+    # Simular una instalacion antigua personalizada.
+    grabber = active / "bin/tv_grab_file"
+    grabber.write_bytes(GRABBER)
+    grabber.chmod(0o755)
 
     return "REAL_NG_21.2.7"
 
@@ -513,11 +514,21 @@ def run_case(
             "LAB_BACKUP_MISMATCH",
         )
 
+        with zipfile.ZipFile(new_zip) as archive:
+
+            native_grabber = archive.read(
+                tx.ADDON_ID + "/bin/tv_grab_file"
+            )
+
+        expected_grabber = (
+            GRABBER if fail_health else native_grabber
+        )
+
         require(
             (
                 active / "bin/tv_grab_file"
-            ).read_bytes() == GRABBER,
-            "LAB_CUSTOM_GRABBER_CHANGED",
+            ).read_bytes() == expected_grabber,
+            "LAB_GRABBER_MISMATCH",
         )
 
         require(
@@ -585,7 +596,7 @@ def run_case(
         print(f"SCENARIO={expected_result}")
         print(f"RESULT={result}")
         print("BACKUP_INTEGRITY=PASS")
-        print("CUSTOM_GRABBER=PASS")
+        print("EXPECTED_GRABBER=PASS")
         print("CHANNEL_FIXTURE_PRESERVED=PASS")
         print("TRANSACTION_ARCHIVED=PASS")
 

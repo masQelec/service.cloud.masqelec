@@ -45,7 +45,7 @@ from lib import rclone_utils
 from lib.cloud_storage import start_cloud_storage
 from lib.updater import update_system
 from lib.update_library import update_library
-from lib.update_pvr import update_pvr, update_playlist
+from lib.update_pvr import update_pvr
 from lib.jsonrpc_utils import get_library_stats, get_installed_addons_filtered, format_addons_for_log
 from lib.fix_settings import fix_skin_home_menu_visibility_and_reload
 from lib import utils
@@ -80,6 +80,9 @@ LOG_FILE = log_utils.LOG_FILE
 _last_update_ts   = 0.0
 _last_clean_ts    = 0.0
 _last_pvrcheck_ts = None
+_last_pvr_attempt_ts = None
+_PVR_RETRY_SECS = 300
+_pvr_startup_finished_ts = None
 
 _LIBRARY_LOCK = threading.Lock()
 _PVR_LOCK     = threading.Lock()
@@ -639,16 +642,78 @@ def _update_library_wrapper():
     except Exception:
         log(f"Fallo en update_library:\n{traceback.format_exc()}", "ERROR")
 
-def _update_pvr_wrapper():
+def _run_pvr_cycle():
+
+    global _last_pvrcheck_ts
+    global _last_pvr_attempt_ts
+
+    if not _PVR_LOCK.acquire(blocking=False):
+        return
+
+    attempted = False
+
     try:
-        enabled = _get_bool_setting("update_pvr", True)
-        if enabled:
-            log("Actualizando PVR mediante update_pvr()")
-            update_pvr()
+
+        if _task_is_in_cooldown("pvr"):
+            return
+
+        attempted = True
+
+        _last_pvr_attempt_ts = time.monotonic()
+
+        result = update_pvr()
+
+        status = result.get("status")
+
+        if status == "OK":
+
+            _last_pvrcheck_ts = time.monotonic()
+
+            _task_mark_success("pvr")
+
+        elif status == "DEFERRED":
+
+            log(
+                "PVR aplazado: " + str(result.get("deferred")),
+                "INFO",
+            )
+
         else:
-            log("Actualización de PVR desactivada")
-    except Exception:
-        log(f"Fallo en update_pvr:\n{traceback.format_exc()}", "ERROR")
+
+            _task_mark_failure(
+                "pvr",
+                "Mantenimiento PVR",
+                str(result.get("failures")),
+            )
+
+    except Exception as error:
+
+        _task_mark_failure(
+            "pvr",
+            "Mantenimiento PVR",
+            type(error).__name__,
+        )
+
+    finally:
+
+        if attempted:
+            _last_pvr_attempt_ts = time.monotonic()
+
+        _PVR_LOCK.release()
+
+
+def _update_pvr_wrapper():
+
+    global _pvr_startup_finished_ts
+
+    try:
+
+        if _get_bool_setting("update_pvr", True):
+            _run_pvr_cycle()
+
+    finally:
+
+        _pvr_startup_finished_ts = time.monotonic()
 
 def _startup_maintenance_wrapper():
     global _last_clean_ts, _last_update_ts
@@ -660,19 +725,6 @@ def _startup_maintenance_wrapper():
         if not _mounts_ready():
             log("Mantenimiento de arranque: montajes rclone no listos, se omite.", "WARNING")
             return
-
-        # 1) PVR playlist
-        try:
-            update_pvr_enabled = _get_bool_setting("update_pvr", True)
-        except Exception:
-            update_pvr_enabled = True
-
-        if update_pvr_enabled:
-            log("Mantenimiento de arranque: actualización de lista PVR -> inicio")
-            update_playlist()
-            log("Mantenimiento de arranque: actualización de lista PVR -> finalizado")
-        else:
-            log("Mantenimiento de arranque: actualización de lista PVR desactivada por ajustes")
 
         prefs = _load_library_prefs()
 
@@ -729,55 +781,50 @@ def _startup_maintenance_wrapper():
 
     except Exception:
         log(
-            "Fallo en mantenimiento de arranque (PVR + Clean + Update):\n"
+            "Fallo en mantenimiento de arranque (Clean + Update):\n"
             f"{traceback.format_exc()}",
             "ERROR",
         )
 
 # ---------- Workers periódicos ----------
 def _periodic_pvr_worker():
-    global _last_pvrcheck_ts
+
+    if _pvr_startup_finished_ts is None:
+        return
+
     prefs = _load_pvr_prefs()
+
     if not prefs["update_enabled"]:
         return
 
-    period_secs = _hours_to_secs(prefs["update_period_hours"])
-    if period_secs <= 0:
+    period = _hours_to_secs(
+        prefs["update_period_hours"]
+    )
+
+    if period <= 0:
         return
 
-    now = time.time()
+    now = time.monotonic()
 
-    if _last_pvrcheck_ts is None:
-        _last_pvrcheck_ts = now
+    if (
+        _last_pvr_attempt_ts is None
+        and now - _pvr_startup_finished_ts < period
+    ):
         return
 
-    if (now - _last_pvrcheck_ts) < period_secs:
+    if (
+        _last_pvr_attempt_ts is not None
+        and now - _last_pvr_attempt_ts < _PVR_RETRY_SECS
+    ):
         return
 
-    if not utils.is_online():
-        log("Omitiendo revisión PVR: sin red.", "WARNING")
-        return
-    if not utils.kodi_is_idle():
-        log("Omitiendo revisión PVR: Kodi no está inactivo.", "INFO")
-        return
-
-    if _task_is_in_cooldown("pvr"):
-        log("Omitiendo revisión PVR: en cooldown por fallos recientes.", "WARNING")
+    if (
+        _last_pvrcheck_ts is not None
+        and now - _last_pvrcheck_ts < period
+    ):
         return
 
-    if _PVR_LOCK.acquire(blocking=False):
-        try:
-            log("Revisión periódica de canales PVR -> inicio")
-            update_playlist()
-            _task_mark_success("pvr")
-            _last_pvrcheck_ts = time.time()
-            log("Revisión periódica de canales PVR -> finalizado")
-        except Exception:
-            _task_mark_failure("pvr", "Error en revisión periódica de canales PVR", traceback.format_exc())
-        finally:
-            _PVR_LOCK.release()
-    else:
-        log("Omitiendo revisión de canales PVR: ya hay una operación PVR en curso.", "INFO")
+    _run_pvr_cycle()
 
 def _periodic_update_worker():
     global _last_update_ts
@@ -1002,15 +1049,36 @@ def run_service():
             wlan0 = wlan0_candidate
         log(f"Direcciones MAC: Eth: {eth0}  Wlan: {wlan0}")
 
+    pvr_startup = StoppableWorker(
+        "pvr_update_once",
+        _update_pvr_wrapper,
+        monitor,
+        run_once=True,
+    )
+
+    pvr_startup.start()
+
+    pvr_periodic = StoppableWorker(
+        "periodic_pvr_tick",
+        _periodic_pvr_worker,
+        monitor,
+        interval=CHECK_TICK_SECS,
+    )
+
+    if not monitor.abortRequested():
+        pvr_periodic.start()
+
     _phase1_cloud_storage_blocking(monitor)
     if not monitor.abortRequested():
         _rclone_v2_autostart_worker()
+
+    while pvr_startup.is_alive() and not monitor.abortRequested():
+        monitor.waitForAbort(0.25)
 
     oneshot_sequence = [
         ("fix_settings_once",   _fix_settings_wrapper),
         ("auto_update_once",    _update_system_wrapper),
         ("library_update_once", _update_library_wrapper),
-        ("pvr_update_once",     _update_pvr_wrapper),
         ("startup_maintenance", _startup_maintenance_wrapper),
     ]
 
@@ -1088,7 +1156,6 @@ def run_service():
         log("upload_log (post-one-shots) falló:\n" f"{traceback.format_exc()}", "ERROR")
 
     workers_periodic = [
-        StoppableWorker("periodic_pvr_tick", _periodic_pvr_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_clean_tick", _periodic_clean_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_update_tick", _periodic_update_worker, monitor, interval=CHECK_TICK_SECS),
         StoppableWorker("periodic_rclone_v2_cutover", _rclone_v2_autostart_worker, monitor, interval=CHECK_TICK_SECS),
@@ -1106,7 +1173,7 @@ def run_service():
             break
 
     log("Servicio deteniéndose: abort solicitado")
-    for w in workers_periodic:
+    for w in [pvr_startup, pvr_periodic] + workers_periodic:
         try:
             w.join(timeout=10)
         except Exception as e:

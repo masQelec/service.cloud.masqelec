@@ -1,5 +1,22 @@
 # Documentación técnica — `service.cloud.masqelec`
 
+## Estado vigente — 27/11/2026
+
+Documento principal de continuidad:
+
+[Cloud 2.3.2 — Integración PVR y validación final MASTER](HANDOFF_PVR_FINAL_2026-11-27.md).
+
+- MASTER: candidato completo instalado y reinicio PASS.
+- Regresión: 1748 tests.
+- CLIENTE: instalación aplazada por reproducción activa.
+- Distribución operativa: rama numérica 21.
+- Producción: paquetes y manifiestos no publicados.
+
+Las secciones anteriores al 27/11/2026 se conservan
+como evidencia histórica. No utilizar sus antiguos
+comandos de despliegue ni estados como situación actual.
+
+
 ## Próximo desarrollo prioritario — mantenimiento IPTV/PVR de Kodi
 
 - [**Especificación definitiva: PVR / Kodi, limpieza segura de huérfanos y Scan/Clean**](PVR_KODI_MAINTENANCE_DESIGN_2026-11-20.md) — alcance vigente, hechos confirmados, fallos del código, diseño de reconciliación, gates y prompt del siguiente chat.

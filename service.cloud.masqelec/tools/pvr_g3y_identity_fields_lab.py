@@ -32,9 +32,11 @@ def _fetch(request, source):
                 raise Blocked(source + "_HTTP_ERROR")
             content = response.read(MAX_REPLY + 1)
     except urllib.error.HTTPError as exc:
-        if exc.code in (401, 403):
+        code = exc.code
+        exc.close()
+        if code in (401, 403):
             raise Blocked(source + "_AUTH_REQUIRED") from None
-        if exc.code == 404:
+        if code == 404:
             raise Blocked(source + "_ENDPOINT_NOT_FOUND") from None
         raise Blocked(source + "_HTTP_ERROR") from None
     except (urllib.error.URLError, socket.timeout, TimeoutError,

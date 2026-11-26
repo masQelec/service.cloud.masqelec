@@ -6,6 +6,7 @@ Sin dependencias directas de Kodi, systemd o rclone.
 """
 
 import json
+import time
 
 from dataclasses import dataclass
 
@@ -157,6 +158,373 @@ def check_kodi_activity(rpc_call):
         return _unknown()
 
 
+
+LEGACY_GRID_LIMIT = 10000
+LEGACY_EPG_AFTER_SECONDS = 900
+
+
+def _legacy_data(api_get, endpoint, grid=False):
+
+    options = {
+        "timeout_s": API_TIMEOUT_SECONDS,
+    }
+
+    if grid:
+
+        options["query"] = {
+            "start": 0,
+            "limit": LEGACY_GRID_LIMIT,
+        }
+
+    ok, code, data, _ = api_get(
+        endpoint, **options
+    )
+
+    if (
+        ok is not True
+        or code != 200
+        or not isinstance(data, dict)
+    ):
+        raise ValueError("LEGACY_API_UNAVAILABLE")
+
+    return data
+
+
+def _legacy_entries(api_get, endpoint, grid=False):
+
+    data = _legacy_data(api_get, endpoint, grid)
+
+    entries = data.get("entries")
+
+    total = data.get(
+        "total", data.get("totalCount")
+    )
+
+    if (
+        not isinstance(entries, list)
+        or type(total) is not int
+        or not 0 <= total <= LEGACY_GRID_LIMIT
+        or total != len(entries)
+        or not all(
+            isinstance(row, dict)
+            for row in entries
+        )
+    ):
+        raise ValueError("LEGACY_GRID_INCOMPLETE")
+
+    return entries
+
+
+def _cron_field(value, maximum):
+
+    result = set()
+
+    for item in value.split(","):
+
+        if item == "*":
+
+            result.update(range(maximum + 1))
+
+        elif item.startswith("*/"):
+
+            step = item[2:]
+
+            if not step.isascii() or not step.isdigit():
+                raise ValueError("INVALID_CRON_STEP")
+
+            step = int(step)
+
+            if not 1 <= step <= maximum + 1:
+                raise ValueError("INVALID_CRON_STEP")
+
+            result.update(
+                range(0, maximum + 1, step)
+            )
+
+        elif item.isascii() and item.isdigit():
+
+            number = int(item)
+
+            if not 0 <= number <= maximum:
+                raise ValueError("INVALID_CRON_VALUE")
+
+            result.add(number)
+
+        else:
+
+            raise ValueError("UNSUPPORTED_CRON")
+
+    return result
+
+
+def _daily_schedule(value):
+
+    if not isinstance(value, str) or len(value) > 4096:
+        raise ValueError("INVALID_CRON")
+
+    result = set()
+
+    for line in value.splitlines():
+
+        line = line.strip()
+
+        if not line or line.startswith("#"):
+            continue
+
+        fields = line.split()
+
+        # Soporte explicito para horarios diarios.
+        # No interpretar expresiones desconocidas.
+
+        if len(fields) != 5 or fields[2:] != ["*"] * 3:
+            raise ValueError("UNSUPPORTED_CRON")
+
+        minutes = _cron_field(fields[0], 59)
+
+        hours = _cron_field(fields[1], 23)
+
+        result.update(
+            (hour, minute)
+            for hour in hours
+            for minute in minutes
+        )
+
+    return result
+
+
+def _epg_schedule(api_get):
+
+    data = _legacy_data(
+        api_get, "epggrab/config/load"
+    )
+
+    entries = data.get("entries")
+
+    if (
+        not isinstance(entries, list)
+        or len(entries) != 1
+        or not isinstance(entries[0], dict)
+    ):
+        raise ValueError("INVALID_EPG_CONFIG")
+
+    params = entries[0].get("params")
+
+    if not isinstance(params, list):
+        raise ValueError("INVALID_EPG_CONFIG")
+
+    properties = {}
+
+    for prop in params:
+
+        if not isinstance(prop, dict):
+            raise ValueError("INVALID_EPG_PROPERTY")
+
+        name = prop.get("id")
+
+        if (
+            not isinstance(name, str)
+            or name in properties
+        ):
+            raise ValueError("INVALID_EPG_PROPERTY")
+
+        properties[name] = prop.get("value")
+
+    internal = _daily_schedule(
+        properties.get("cron")
+    )
+
+    ota = _daily_schedule(
+        properties.get("ota_cron")
+    )
+
+    timeout = properties.get("ota_timeout")
+
+    if (
+        type(timeout) is not int
+        or not 0 <= timeout <= 86400
+    ):
+        raise ValueError("INVALID_OTA_TIMEOUT")
+
+    return internal, ota, timeout
+
+
+def _schedule_near(now, schedule, after):
+
+    if not schedule:
+        return False
+
+    first = ((now - after) // 60) * 60
+
+    last = (
+        (now + BACKGROUND_GUARD_SECONDS) // 60
+    ) * 60
+
+    for instant in range(first, last + 1, 60):
+
+        # Proteccion conservadora ante diferencias
+        # entre la configuracion horaria del servicio
+        # y la del proceso Kodi.
+
+        for clock in (time.localtime, time.gmtime):
+
+            observed = clock(instant)
+
+            if (
+                observed.tm_hour,
+                observed.tm_min,
+            ) in schedule:
+
+                if (
+                    -after
+                    <= instant - now
+                    <= BACKGROUND_GUARD_SECONDS
+                ):
+                    return True
+
+    return False
+
+
+def check_legacy_activity(api_get, now=None):
+
+    """Proteccion legacy de solo lectura.
+
+    Los horarios EPG no certifican el estado interno
+    del grabber. La parada ordenada sigue siendo
+    obligatoria.
+    """
+
+    try:
+
+        if _legacy_entries(
+            api_get, "status/subscriptions"
+        ):
+            return ActivityDecision(
+                DEFERRED_TVH_SUBSCRIPTIONS
+            )
+
+        if _legacy_entries(
+            api_get, "status/inputs"
+        ):
+            return ActivityDecision(
+                DEFERRED_BACKGROUND_ACTIVITY
+            )
+
+        recordings = _legacy_entries(
+            api_get,
+            "dvr/entry/grid_upcoming",
+            grid=True,
+        )
+
+        current = (
+            int(time.time()) if now is None else now
+        )
+
+        if not _valid_number(current) or current <= 0:
+            return _unknown()
+
+        for row in recordings:
+
+            enabled = row.get("enabled")
+            status = row.get("sched_status")
+
+            if type(enabled) is not bool:
+                return _unknown()
+
+            if not isinstance(status, str):
+                return _unknown()
+
+            if status.lower().startswith("recording"):
+                return ActivityDecision(
+                    DEFERRED_RECORDING
+                )
+
+            if not enabled:
+                continue
+
+            start = row.get("start_real")
+            stop = row.get("stop_real")
+
+            if (
+                status != "scheduled"
+                or not _valid_number(start)
+                or not _valid_number(stop)
+                or not 0 < start < stop
+            ):
+                return _unknown()
+
+            remaining = start - current
+
+            if remaining <= 0:
+                return ActivityDecision(
+                    DEFERRED_RECORDING
+                )
+
+            if remaining <= DVR_GUARD_SECONDS:
+                return ActivityDecision(
+                    DEFERRED_UPCOMING_RECORDING
+                )
+
+        # Los clientes IPTV observados no tienen
+        # programaciones de mux. Una configuracion
+        # diferente requiere soporte explicito.
+
+        if _legacy_entries(
+            api_get,
+            "mpegts/mux_sched/grid",
+            grid=True,
+        ):
+            return _unknown()
+
+        internal, ota, timeout = _epg_schedule(
+            api_get
+        )
+
+        if now is None:
+            current = int(time.time())
+
+        if (
+            _schedule_near(
+                current,
+                internal,
+                LEGACY_EPG_AFTER_SECONDS,
+            )
+            or _schedule_near(
+                current,
+                ota,
+                max(
+                    timeout,
+                    LEGACY_EPG_AFTER_SECONDS,
+                ),
+            )
+        ):
+            return ActivityDecision(
+                DEFERRED_BACKGROUND_ACTIVITY
+            )
+
+        # Repetir las comprobaciones activas al
+        # terminar las consultas de programacion.
+
+        if _legacy_entries(
+            api_get, "status/subscriptions"
+        ):
+            return ActivityDecision(
+                DEFERRED_TVH_SUBSCRIPTIONS
+            )
+
+        if _legacy_entries(
+            api_get, "status/inputs"
+        ):
+            return ActivityDecision(
+                DEFERRED_BACKGROUND_ACTIVITY
+            )
+
+        return ActivityDecision(IDLE)
+
+    except Exception:
+
+        return _unknown()
+
+
 def check_activity(rpc_call, api_get):
     """Comprueba Kodi y Tvheadend sin modificar servicios.
 
@@ -178,10 +546,17 @@ def check_activity(rpc_call, api_get):
             timeout_s=API_TIMEOUT_SECONDS,
         )
 
-        if ok is not True or code != 200:
-            return _unknown()
+        if ok is False and code == 404:
 
-        tvh = evaluate_tvh_activity(data)
+            tvh = check_legacy_activity(api_get)
+
+        elif ok is True and code == 200:
+
+            tvh = evaluate_tvh_activity(data)
+
+        else:
+
+            return _unknown()
 
     except Exception:
         return _unknown()

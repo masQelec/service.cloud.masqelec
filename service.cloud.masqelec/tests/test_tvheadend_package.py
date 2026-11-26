@@ -308,6 +308,76 @@ class TvheadendPackageTests(unittest.TestCase):
             "INVALID_PACKAGE_ZIP",
         )
 
+    def test_manifest_not_published(self):
+
+        def opener(request, timeout):
+
+            raise package.urllib.error.HTTPError(
+                request.full_url,
+                404,
+                "Not Found",
+                {},
+                None,
+            )
+
+        with self.assertRaises(
+            package.ManifestNotPublished
+        ):
+            package.fetch_manifest(
+                "21", BASE, opener
+            )
+
+    def test_manifest_permission_error_is_failure(self):
+
+        def opener(request, timeout):
+
+            raise package.urllib.error.HTTPError(
+                request.full_url,
+                403,
+                "Forbidden",
+                {},
+                None,
+            )
+
+        with self.assertRaisesRegex(
+            package.PackageError,
+            "^HTTP_DOWNLOAD_FAILED$",
+        ):
+            package.fetch_manifest(
+                "21", BASE, opener
+            )
+
+    def test_missing_zip_is_failure(self):
+
+        raw = make_zip()
+
+        distribution = self.distribution(raw)
+
+        def opener(request, timeout):
+
+            raise package.urllib.error.HTTPError(
+                request.full_url,
+                404,
+                "Not Found",
+                {},
+                None,
+            )
+
+        with self.assertRaisesRegex(
+            package.PackageError,
+            "^HTTP_DOWNLOAD_FAILED$",
+        ):
+            with package.stage_update(
+                distribution,
+                self.ng,
+                "21.2.7",
+                "21",
+                BASE,
+                self.folder,
+                opener,
+            ):
+                self.fail("MISSING_PACKAGE_ACCEPTED")
+
     def test_fetch_manifest(self):
 
         raw = json.dumps(self.data).encode()

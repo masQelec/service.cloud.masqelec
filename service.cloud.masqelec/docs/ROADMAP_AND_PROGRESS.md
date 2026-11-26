@@ -359,3 +359,19 @@ Se ha conectado `rclone_two_mount_autostart.tick` al primer arranque de `service
 Nuevo `lib/rclone_two_mount_media_samples.py`: selecciona sin red una ruta de prueba por cada cuenta OneDrive leyendo únicamente los `.strm` del catálogo local (`/storage/videos` y `/storage/tvshows`). Validación de symlinks/traversal, <=8192 bytes por archivo, recorrido acotado a 200k entradas/12 s/8 niveles y **sin imprimir rutas**. Integrado en `rclone_two_mount_autostart.tick()` cuando `RCLONE_TWO_MOUNT_KNOWN_MEDIA_FILES=()`: no precisa configuración manual por cliente. Playback ocupado difiere sin explorar; fase unsafe permite recuperar sin muestras. CLI de solo lectura `--inventory` imprime `PASS_2_LOCAL_STRM_ACCOUNTS` o bloqueo, sin tocar montajes/OneDrive. **773/773 CI PASS** ([44426001148](https://github.com/masQelec/service.cloud.masqelec/actions/runs/44426001148)).
 
 **AÚN PENDIENTE:** preflight físico en MASTER y CLIENTE, confirmar existencia real de los vídeos tras levantar v2, ensayo cutover+rollback/reboot. Mantener flags desactivadas. [Procedimiento y script](AUTO_FIRST_RUN_CUTOVER_2026-11-19.md).
+
+
+## 27/11/2026 — PVR-12M: candidato final MASTER
+
+- 1748 tests PASS.
+- Instalación integral de Cloud 2.3.2: PASS.
+- Reinicio físico y recuperación temprana: PASS.
+- Integridad de 176 archivos: PASS.
+- PVR automático: OK.
+- 714 canales, 54 grupos, 1428 asociaciones conservados.
+- Rclone 2 FUSE + 4 bind: PASS.
+- CLIENTE: DEFERRED_KODI_PLAYBACK.
+- Publicación de paquetes: NO.
+
+Continuidad:
+[HANDOFF_PVR_FINAL_2026-11-27.md](HANDOFF_PVR_FINAL_2026-11-27.md).

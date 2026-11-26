@@ -10,6 +10,7 @@ import os
 from contextlib import contextmanager
 
 from lib import tvheadend_activity as activity
+from lib import pvr_playlist_convergence as playlist_convergence
 from lib import tvheadend_boot as boot
 from lib import tvheadend_boot_install as install
 from lib import tvheadend_health as health
@@ -201,6 +202,7 @@ def run(
     base,
     authorized=False,
     install_protection=False,
+    recover_only=False,
 ):
 
     if authorized is not True:
@@ -223,7 +225,11 @@ def run(
     if monitor.abortRequested():
         return "DEFERRED_ABORT"
 
-    if install_protection:
+    if (
+        install_protection
+        and not recover_only
+        and not os.path.lexists(boot.TRANSACTION_ROOT)
+    ):
 
         prepare_boot_protection()
 
@@ -315,8 +321,12 @@ def run(
         branch=branch,
         base=base,
         authorized=True,
+        recover_only=recover_only,
         stage_package=stage,
         verify_protection=protection_ready,
+        verify_playlist=lambda: playlist_convergence.check(
+            _tvh_api_get_json
+        ),
         release_control=releases.ReleaseControl(
             boot.TRANSACTION_ROOT
         ),

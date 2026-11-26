@@ -443,10 +443,19 @@ def execute(stage, report):
         "KODI_ADDON_NOT_ENABLED",
     )
 
+    import zipfile
+    import hashlib
+
+    with zipfile.ZipFile(zip_path) as archive:
+
+        native_grabber = archive.read(
+            "service.tvheadend43/bin/tv_grab_file"
+        )
+
     require(
         report["after"]["grabber_sha256"]
-        == grabber_before,
-        "CUSTOM_GRABBER_CHANGED",
+        == hashlib.sha256(native_grabber).hexdigest(),
+        "NATIVE_GRABBER_MISMATCH",
     )
 
     require(
